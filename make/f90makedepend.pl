@@ -19,6 +19,12 @@ unless( $input_file ) {
 }
 my $module_name = &basename( &tail( $input_file ) );
 
+unless( exists $ENV{HOSTTYPE} ) {
+    die "$0: environment variable HOSTTYPE not set\n";
+}
+my $hosttype = $ENV{HOSTTYPE};
+my $uppercase = $hosttype eq 'iris4d';
+
 # open input file
 
 open( INPUT_FILE, $input_file ) or die "Couldn't open $input_file, $!\n";
@@ -28,9 +34,9 @@ open( INPUT_FILE, $input_file ) or die "Couldn't open $input_file, $!\n";
 my (%defined_modules,%used_modules);
 while( defined(my $line = <INPUT_FILE>) ) {
     if( $line =~ /^ *MODULE +(\w*)/i ) {
-	$defined_modules{ uc( $1 ) } = 1;
+	$defined_modules{ &case_module( $1 ) } = 1;
     } elsif( $line =~ /^ *USE +(\w*)/i ) {
-	$used_modules{ uc( $1 ) } = 1;
+	$used_modules{ &case_module( $1 ) } = 1;
     }
 }
 
@@ -50,6 +56,10 @@ if( %defined_modules ) {
 	print "\$(WORKING_DIR)/$_.mod \\\n\t";
     }
     print ": \$(WORKING_DIR)/$module_name.o\n";
+}
+
+sub case_module {
+    return $uppercase ? uc $_[0] : lc $_[0];
 }
 
 sub basename {
