@@ -52,10 +52,13 @@ ifeq ($(filter-out IRIX%,$(SYSNAME)),)# SGI
     endif
   endif
   INSTRUCTION := mips$(MIPS)
-  ARCH_DIR := $(INSTRUCTION)-$(ABI)
+  ARCH_DIR := mips-$(ABI)-irix
 endif
 ifeq ($(SYSNAME),Linux)
   ARCH_DIR := i686-linux
+endif
+ifeq ($(SYSNAME),win32)
+  ARCH_DIR := i386-win32
 endif
 ifeq ($(SYSNAME),SunOS)
   ARCH_DIR := solaris-$(ABI)
@@ -68,7 +71,7 @@ ifeq ($(SYSNAME),AIX)
       endif
     endif
   endif
-  ARCH_DIR := aix-$(ABI)
+  ARCH_DIR := rs6000-$(ABI)-aix
 endif
 ifndef ARCH_DIR
    # set architecture dependent directories and default options
