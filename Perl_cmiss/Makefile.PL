@@ -7,7 +7,7 @@ use Config;
 my $name = 'Perl_cmiss';
 my $xs = "$name.xs";
 
-my $working_dir = "generated/$Config{archname}";
+my $working_dir = "generated/$Config{version}/$Config{archname}";
 unless( -d $working_dir ) {
     use File::Path;
     # make and print subdirectories
@@ -17,7 +17,7 @@ unless( -d $working_dir ) {
 
 print "$0: Entering directory `$working_dir'\n";
 chdir $working_dir or die "$0: can't chdir to $working_dir";
-my $source_dir = '../..';
+my $source_dir = '../../..';
 
 foreach my $link ( 'Makefile.PL', $xs ) {
     my $source = "$source_dir/$link";

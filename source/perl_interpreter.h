@@ -20,7 +20,6 @@ LAST MODIFIED : 19 May 2000
 DESCRIPTION:
 ==============================================================================*/
 
-
 void create_interpreter_(int argc, char **argv, const char *initial_comfile, int *status);
 #if ! defined (FORTRAN_INTERPRETER_INTERFACE)
 #define create_interpreter create_interpreter_
@@ -58,7 +57,7 @@ This redirects the output from stdout to a pipe so that the handle_output
 routine can write this to the command window.
 ==============================================================================*/
 
-void interpreter_evaluate_integer_(char *exprssion, int *result, int *status);
+void interpreter_evaluate_integer_(char *expression, int *result, int *status);
 #if ! defined (FORTRAN_INTERPRETER_INTERFACE)
 #define interpreter_evaluate_integer interpreter_evaluate_integer_
 #endif /* ! defined (FORTRAN_INTERPRETER_INTERFACE) */
@@ -141,6 +140,19 @@ DESCRIPTION:
 Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
 ==============================================================================*/
 
+void create_interpreter_(int argc, char **argv, const char *initial_comfile, int *status);
+#if ! defined (FORTRAN_INTERPRETER_INTERFACE)
+#define create_interpreter create_interpreter_
+#endif /* defined (FORTRAN_INTERPRETER_INTERFACE) */
+/*******************************************************************************
+LAST MODIFIED : 24 July 2001
+
+DESCRIPTION:
+Creates the interpreter for processing commands.
+<argc>, <argv> and <initial_comfile> are used to initialise some internal variables.
+If <*warnings_flag> is true then perl is started with its -w option on..
+==============================================================================*/
+
 #if ! defined (MESSAGE_H)
 /*
 From message.h:
@@ -164,10 +176,21 @@ The different message types.
 	INFORMATION_MESSAGE,
 	WARNING_MESSAGE
 }; /* enum Message_type */
-#endif /* ! defined (CMGUI) */
+#endif /* ! defined (MESSAGE_H) */
 
-/*
-Functions called from perl_interpreter.c
-========================================
-*/
-int display_message(enum Message_type message_type,char *format, ... );
+typedef int (Interpreter_display_message_function)(enum Message_type message_type,
+	char *format, ... );
+
+void interpreter_set_display_message_function_(Interpreter_display_message_function *function,
+	int *status);
+#if ! defined (FORTRAN_INTERPRETER_INTERFACE)
+#define interpreter_set_display_message_function interpreter_set_display_message_function_
+#endif /* defined (FORTRAN_INTERPRETER_INTERFACE) */
+/*******************************************************************************
+LAST MODIFIED : 26 March 2003
+
+DESCRIPTION:
+Sets the function that will be called whenever the Interpreter wants to report
+information.
+==============================================================================*/
+

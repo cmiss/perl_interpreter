@@ -57,7 +57,7 @@ ifeq ($(filter-out IRIX%,$(SYSNAME)),)# SGI
   ARCH_DIR := $(INSTRUCTION)-$(ABI)
 endif
 ifeq ($(SYSNAME),Linux)
-  ARCH_DIR := linux86
+  ARCH_DIR := i686-linux
 endif
 ifeq ($(SYSNAME),SunOS)
   ARCH_DIR = solaris-$(ABI)
@@ -83,19 +83,28 @@ else
   OPT_SUFFIX = -opt
 endif
 
-SOURCE_DIR = source
-WORKING_DIR := generated/$(ARCH_DIR)$(OPT_SUFFIX)
-LIBRARY_DIR := lib/$(ARCH_DIR)
+#This is now the default build version, each libperlinterpreter.so
+#that is found in the lib directories is converted into a base64
+#c string (.soh) and included into the interpreter and the one that
+#matches the machine that it is running on loaded dynamically at runtime.
 
-SOURCE_FILES := $(notdir $(wildcard $(SOURCE_DIR)/*.*) )
-PMH_FILES := $(patsubst %.pm, %.pmh, $(filter %.pm, $(SOURCE_FILES)))
-C_SOURCES := $(filter %.c, $(SOURCE_FILES) )
-C_UNITS := $(basename $(C_SOURCES) )
-DEPEND_FILES := $(foreach unit, $(C_UNITS), $(WORKING_DIR)/$(unit).d )
+#If you want this perl_interpreter to be as portable as possible then
+#you will want to provide as many different perl versions to compile
+#against as you can.
 
-C_OBJ := $(WORKING_DIR)/libperlinterpreter.o
-LIBRARY := $(LIBRARY_DIR)/libperlinterpreter$(OPT_SUFFIX).a
-LIB_EXP := $(patsubst %.a, %.exp, $(LIBRARY))
+#If you want to build an old non dynamic loader version you will 
+#need to override this to false and you must have the corresponding
+#static libperl.a
+ifndef USE_DYNAMIC_LOADER
+  USE_DYNAMIC_LOADER = false
+endif
+
+#This routine is recursivly called for each possible dynamic version
+#with SHARED_OBJECT set to true.  That builds the corresponding 
+#libperlinterpereter.so
+ifndef SHARED_OBJECT
+  SHARED_OBJECT = false
+endif
 
 # ABI string for environment variables
 # (for location of perl librarys in execuatable)
@@ -178,20 +187,74 @@ PERL_ARCHLIB := $(shell $(PERL) -MConfig -e 'print "$$Config{archlibexp}\n"')
 ifeq ($(PERL_ARCHLIB),)
   $(error problem with $(PERL))
 endif
+PERL_VERSION := $(shell $(PERL) -MConfig -e 'print "$$Config{version}\n"')
+ifeq ($(PERL_VERSION),)
+  $(error problem with $(PERL))
+endif
+PERL_CFLAGS := $(shell $(PERL) -MConfig -e 'print "$$Config{ccflags}\n"')
+ifeq ($(PERL_CFLAGS),)
+  $(error problem with $(CFLAGS))
+endif
 DYNALOADER_LIB = $(PERL_ARCHLIB)/auto/DynaLoader/DynaLoader.a
-PERL_WORKING_DIR = Perl_cmiss/generated/$(PERL_ARCHNAME)
+PERL_WORKING_DIR = Perl_cmiss/generated/$(PERL_VERSION)/$(PERL_ARCHNAME)
 PERL_CMISS_MAKEFILE = $(PERL_WORKING_DIR)/Makefile
 PERL_CMISS_LIB = $(PERL_WORKING_DIR)/auto/Perl_cmiss/Perl_cmiss.a
-PERL_LIB = $(PERL_ARCHLIB)/CORE/libperl.a
+ifneq ($(SHARED_OBJECT), true)
+   STATIC_PERL_LIB = $(wildcard $(PERL_ARCHLIB)/CORE/libperl.a)
+   ifneq ($(USE_DYNAMIC_LOADER), true)
+      ifeq ($(STATIC_PERL_LIB),)
+         $(error 'Static $(PERL_ARCHLIB)/CORE/libperl.a not found for ${PERL} which is required for a non dynamic loading perl interpreter.')
+      endif
+   endif
+else
+   STATIC_PERL_LIB = 
+endif
 PERL_EXP = $(wildcard $(PERL_ARCHLIB)/CORE/perl.exp)
 
+#Make architecture directory names and lib name
+SOURCE_DIR = source
+ifneq ($(USE_DYNAMIC_LOADER), true)
+   ifneq ($(SHARED_OBJECT), true)
+      SHARED_SUFFIX = 
+   else
+      SHARED_SUFFIX = -shared
+   endif
+   SHARED_LIB_SUFFIX =
+else
+   SHARED_SUFFIX = -dynamic
+   SHARED_LIB_SUFFIX = -dynamic
+endif
+WORKING_DIR := generated/$(PERL_VERSION)/$(PERL_ARCHNAME)$(OPT_SUFFIX)$(SHARED_SUFFIX)
 C_INCLUDE_DIRS = $(PERL_ARCHLIB)/CORE $(WORKING_DIR)
+
+LIBRARY_ROOT_DIR := lib/$(ARCH_DIR)
+LIBRARY_VERSION := $(PERL_VERSION)/$(PERL_ARCHNAME)$(SHARED_LIB_SUFFIX)
+LIBRARY_DIR := $(LIBRARY_ROOT_DIR)/$(LIBRARY_VERSION)
+ifneq ($(SHARED_OBJECT), true)
+   LIBRARY_SUFFIX = .a
+else
+   LIBRARY_SUFFIX = .so
+endif
+LIBRARY_NAME := libperlinterpreter$(OPT_SUFFIX)$(LIBRARY_SUFFIX)
+LIBRARY := $(LIBRARY_DIR)/$(LIBRARY_NAME)
+LIBRARY_LINK := $(LIBRARY_ROOT_DIR)/libperlinterpreter$(OPT_SUFFIX)$(LIBRARY_SUFFIX)
+LIB_EXP := $(patsubst %$(LIBRARY_SUFFIX), %.exp, $(LIBRARY))
+
+SOURCE_FILES := $(notdir $(wildcard $(SOURCE_DIR)/*.*) )
+PMH_FILES := $(patsubst %.pm, %.pmh, $(filter %.pm, $(SOURCE_FILES)))
+C_SOURCES := $(filter %.c, $(SOURCE_FILES) )
+C_UNITS := $(basename $(C_SOURCES) )
+DEPEND_FILES := $(foreach unit, $(C_UNITS), $(WORKING_DIR)/$(unit).d )
+
+C_OBJ := $(WORKING_DIR)/libperlinterpreter.o
+
 
 #-----------------------------------------------------------------------------
 # compiling commands
 
 CC = cc
 LD_RELOCATABLE = ld -r $(CFL_FLGS) $(L_FLGS)
+LD_SHARED = ld -shared $(CFL_FLGS) $(L_FLGS)
 AR = ar
 # Option lists
 # (suboption lists become more specific so that later ones overrule previous)
@@ -250,7 +313,18 @@ ifeq ($(SYSNAME),AIX)
   OPTCF_FLGS = -O3 -qmaxmem=12000 -qtune=auto
   OPTC_FLGS += -qnoignerrno
 endif
-
+ifeq ($(SHARED_OBJECT), true)
+  CPPFLAGS += -DSHARED_OBJECT
+endif
+ifeq ($(USE_DYNAMIC_LOADER), true)
+  CPPFLAGS += -DUSE_DYNAMIC_LOADER
+endif
+ifneq ($(SHARED_OBJECT), true)
+  ifeq ($(STATIC_PERL_LIB),)
+    CPPFLAGS += -DNO_STATIC_FALLBACK
+  endif
+endif
+CFLAGS += $(PERL_CFLAGS)
 .PHONY : main
 
 vpath $(PERL) $(subst :, ,$(PATH))
@@ -273,10 +347,85 @@ ifeq ($(TASK),)
   .PHONY : tidy clean allclean \
 	all debug opt debug64 opt64
 
-  main : $(PERL_CMISS_MAKEFILE) $(WORKING_DIR) $(LIBRARY_DIR)
+SHARED_PERL_EXECUTABLES =
+define VERSION_MESSAGE
+   @echo '     Version $(shell ${perl_executable} -MConfig -e 'print "$$Config{version} $$Config{archname}"') ${perl_executable}'
+
+endef
+ifeq ($(USE_DYNAMIC_LOADER),true)
+   #Dynamic loading perl interpreter
+   #Note that the blank line in the define is useful.
+   define SHARED_BUILD_RULE
+      $(MAKE) --no-print-directory USE_DYNAMIC_LOADER=false SHARED_OBJECT=true CMISS32_PERL=$(perl_executable)
+
+   endef
+   ifneq ($(wildcard ${CMISS_ROOT}/perl),)
+      SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-i386-linux*/perl)
+      SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-i686-linux*/perl)
+   else
+      SHARED_PERL_EXECUTABLES += ${PERL}
+   endif
+   SHARED_INTERPRETER_BUILDS = $(foreach perl_executable, $(SHARED_PERL_EXECUTABLES), $(SHARED_BUILD_RULE))
+   SHARED_VERSION_STRINGS = $(foreach perl_executable, $(SHARED_PERL_EXECUTABLES), $(shell ${perl_executable} -MConfig -e 'print "$$Config{version}/$$Config{archname}"'))
+   SHARED_LIBRARIES = $(foreach version_string, $(SHARED_VERSION_STRINGS), $(LIBRARY_ROOT_DIR)/$(version_string)/libperlinterpreter$(OPT_SUFFIX).so)
+   ifneq ($(STATIC_PERL_LIB),)
+      define SUB_WRITE_BUILD_MESSAGE
+         @echo 'The static fallback perl built into the interpreter is:'
+         $(foreach perl_executable, $(PERL), $(VERSION_MESSAGE))
+      endef
+   else
+      define SUB_WRITE_BUILD_MESSAGE
+         @echo
+         @echo '  YOU HAVE NOT INCLUDED A STATIC FALLBACK PERL SO ANY'
+         @echo '  EXECUTABLE BUILT WITH THIS PERL INTERPRETER WILL NOT'
+         @echo '  RUN AT ALL UNLESS ONE OF THE ABOVE VERSIONS OF PERL'
+         @echo '  IS FIRST IN YOUR PATH.'
+      endef
+   endif
+   define WRITE_BUILD_MESSAGE
+	   @echo
+	   @echo '======================================================'
+	   @echo 'Congratulations, you have built a dynamic perl interpreter.'
+	   @echo '     $(LIBRARY_LINK)'
+      @echo 'It will work dynamically with the following versions of perl:'
+      $(foreach perl_executable, $(SHARED_PERL_EXECUTABLES), $(VERSION_MESSAGE))
+      ${SUB_WRITE_BUILD_MESSAGE}
+   endef
+else
+   SHARED_INTERPRETER_BUILDS =
+   ifeq ($(SHARED_OBJECT),true)
+      #This is an intermediate step and so doesn't write a message
+      WRITE_BUILD_MESSAGE =
+   else
+      #Old style static perl interpreter
+      define WRITE_BUILD_MESSAGE
+	      @echo
+	      @echo '======================================================'
+	      @echo 'You have built a non dynamic loading perl interpreter.'
+	      @echo '     $(LIBRARY_LINK)'
+	      @echo 'It will always run on any machine but will only'
+	      @echo 'be able to load binary perl modules if they are the correct '
+	      @echo 'version.  The version you have built with is:'
+         $(foreach perl_executable, $(PERL), $(VERSION_MESSAGE))
+      endef
+   endif
+endif
+
+  main : $(PERL_CMISS_MAKEFILE) $(PERL_WORKING_DIR) $(WORKING_DIR) $(LIBRARY_DIR)
+ifeq ($(USE_DYNAMIC_LOADER),true)
+	$(SHARED_INTERPRETER_BUILDS)
+endif
+	@echo
+	@echo 'Building library ${LIBRARY}'
+	@echo
 	$(MAKE) --directory=$(PERL_WORKING_DIR) static
+ifeq ($(USE_DYNAMIC_LOADER),true)
+	$(MAKE) --no-print-directory TASK=source SHARED_LIBRARIES='$(SHARED_LIBRARIES)'
+else
 	$(MAKE) --no-print-directory TASK=source
+endif
 	$(MAKE) --no-print-directory TASK=library
+	$(WRITE_BUILD_MESSAGE)
 
   tidy :
   ifneq ($(OLD_FILES),)
@@ -285,6 +434,9 @@ ifeq ($(TASK),)
 
   $(PERL_CMISS_MAKEFILE) : $(PERL) Perl_cmiss/Makefile.PL
 	cd Perl_cmiss ; $(PERL) Makefile.PL
+
+  $(PERL_WORKING_DIR) :
+	mkdir -p $@
 
   $(WORKING_DIR) :
 	mkdir -p $@
@@ -348,6 +500,43 @@ ifeq ($(TASK),source)
 $(WORKING_DIR)/%.pmh : $(SOURCE_DIR)/%.pm
 	utilities/pm2pmh $< > $@
 
+#Dynamic loader code for putting shared objects into the interpreter
+ifeq ($(USE_DYNAMIC_LOADER),true)
+   ifeq ($(SHARED_LIBRARIES),)
+      $(error Missing list of SHARED_LIBRARIES in source stage)
+   endif
+   SHARED_LIBRARY_HEADERS = $(patsubst %.so, %.soh, $(SHARED_LIBRARIES))
+
+   UID2UIDH = ${CMISS_ROOT}/cmgui/utilities/i686-linux/uid2uidh
+
+  .SUFFIXES : .so .soh
+
+  # implicit rules for making the objects
+  %.soh : %.so
+	$(UID2UIDH) $< $@ libperlinterpreter
+
+  #Always regenerate the dynamic_versions file as it has recorded for
+  #us the versions that are built into this executable
+  $(WORKING_DIR)/dynamic_versions.h.new : $(SHARED_LIBRARY_HEADERS)
+	echo -n > $@;
+	$(foreach header, $(SHARED_LIBRARY_HEADERS), \
+      echo '#define libperlinterpreter_uidh libperlinterpreter$(word 3, $(subst /,' ',$(subst .,_,$(header))))$(word 4, $(subst /,' ',$(subst -,_,$(header))))' >> $@; \
+      echo '#include "../../../$(header)"' >> $@; \
+      echo '#undef libperlinterpreter_uidh' >> $@; )
+	echo 'static struct Interpreter_library_strings interpreter_strings[] = {' >> $@;
+	$(foreach header, $(SHARED_LIBRARY_HEADERS), \
+      echo '{"$(word 3, $(subst /,' ',$(header)))","$(word 4, $(subst /,' ',$(header)))", libperlinterpreter$(word 3, $(subst /,' ',$(subst .,_,$(header))))$(word 4, $(subst /,' ',$(subst -,_,$(header)))) },' >> $@; )
+	echo '};' >> $@;
+	if [ ! -f $(WORKING_DIR)/dynamic_versions.h ] || ! diff $(WORKING_DIR)/dynamic_versions.h $(WORKING_DIR)/dynamic_versions.h.new > /dev/null ; then \
+		mv $(WORKING_DIR)/dynamic_versions.h.new $(WORKING_DIR)/dynamic_versions.h ; \
+	else \
+		rm $(WORKING_DIR)/dynamic_versions.h.new; \
+	fi
+
+#Always build the .new and see if it should be updated.
+   .PHONY: $(WORKING_DIR)/dynamic_versions.h.new
+   main: $(WORKING_DIR)/dynamic_versions.h.new
+endif
 #-----------------------------------------------------------------------------
 endif
 
@@ -358,29 +547,42 @@ ifeq ($(TASK),library)
 #-----------------------------------------------------------------------------
 
   main : $(LIBRARY)
+   #Always update the link for the .a libraries.
+ifneq ($(SHARED_OBJECT), true)
+	if [ -L $(LIBRARY_LINK) ] || [ -e $(LIBRARY_LINK) ] ; then \
+		rm $(LIBRARY_LINK) ; \
+	fi
+	ln -s $(LIBRARY_VERSION)/$(LIBRARY_NAME) $(LIBRARY_LINK)
+endif
 
   # explicit rule for making the library
   # Including all necessary objects from archives into output archive.
   # This is done by producing a relocatable object first.
   # Is there a better way?
 
-  $(LIBRARY) : $(C_OBJ)
-	$(AR) $(ARFLAGS) $@ $^
+  ifneq ($(SHARED_OBJECT), true)
+    $(LIBRARY) : $(C_OBJ)
+		$(AR) $(ARFLAGS) $@ $^
 
-  # If there is an export file for libperl.a then use it for this library.
-  ifneq ($(PERL_EXP),)
-    main : $(LIB_EXP)
+    # If there is an export file for libperl.a then use it for this library.
+    ifneq ($(PERL_EXP),)
+      main : $(LIB_EXP)
 
-    $(LIB_EXP) : $(PERL_EXP)
-	cp -f $^ $@
+      $(LIB_EXP) : $(PERL_EXP)
+			cp -f $^ $@
+    endif
+
+    # don't retain these relocatable objects
+    .INTERMEDIATE : $(C_OBJ)
+
+    $(C_OBJ) : $(foreach unit, $(C_UNITS), $(WORKING_DIR)/$(unit).o ) \
+         $(DYNALOADER_LIB) $(PERL_CMISS_LIB) $(STATIC_PERL_LIB)
+		$(LD_RELOCATABLE) -o $@ $^
+  else
+    $(LIBRARY) : $(foreach unit, $(C_UNITS), $(WORKING_DIR)/$(unit).o ) \
+         $(DYNALOADER_LIB) $(PERL_CMISS_LIB) $(STATIC_PERL_LIB)
+		$(LD_SHARED) -o $@ $^ -lcrypt -lc
   endif
-
-  # don't retain these relocatable objects
-  .INTERMEDIATE : $(C_OBJ)
-
-  $(C_OBJ) : $(foreach unit, $(C_UNITS), $(WORKING_DIR)/$(unit).o ) \
-    $(DYNALOADER_LIB) $(PERL_CMISS_LIB) $(PERL_LIB)
-	$(LD_RELOCATABLE) -o $@ $^
 
   # include the object dependencies
   ifneq ($(DEPEND_FILES),)
@@ -391,5 +593,15 @@ ifeq ($(TASK),library)
   $(WORKING_DIR)/%.o : $(SOURCE_DIR)/%.c
 	$(CC) -o $@ $(CPPFLAGS) $(CFLAGS) $<
 
+#Dynamic loader code for putting shared objects into the interpreter
+ifeq ($(USE_DYNAMIC_LOADER),true)
+
+  $(WORKING_DIR)/perl_interpreter.o : $(WORKING_DIR)/dynamic_versions.h
+endif
+
+
 #-----------------------------------------------------------------------------
 endif
+
+#-----------------------------------------------------------------------------
+

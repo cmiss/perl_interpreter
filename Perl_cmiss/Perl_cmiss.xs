@@ -25,6 +25,8 @@ not_there:
     return 0;
 }
 
+static XS(XS_Perl_cmiss_constant);
+static XS(XS_Perl_cmiss_cmiss);
 
 MODULE = Perl_cmiss		PACKAGE = Perl_cmiss		
 

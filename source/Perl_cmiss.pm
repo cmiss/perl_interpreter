@@ -79,24 +79,29 @@ sub set_INC_for_platform
 			  {
 				# perl has given us its include list.
 				$perlinc = $perlout;
-				# include $ENV{CMISS_ROOT}/perl_lib if exists
-				if( exists $ENV{CMISS_ROOT} )
-				  {
-# GBS 6-March-2000  Directory changed
-# 			  my $cmiss_perl_lib = $ENV{CMISS_ROOT}.'/perl_lib';
-# 				my $cmiss_perl_lib = $ENV{CMISS_ROOT}.'/perl/lib';
-					my $cmiss_perl_lib = $ENV{CMISS_ROOT}.'/cmiss_perl/lib';
-					if( -d $cmiss_perl_lib )
-					  {
-						$perlinc = $cmiss_perl_lib.':'.$perlinc;
-					  }
-				  }
 			  }
 		  }
       }
 
     if( defined $perlinc ) { @INC = split /:/, $perlinc }
   }
+
+sub add_cmiss_perl_to_INC
+  {
+	# include $ENV{CMISS_ROOT}/perl_lib if exists
+	if( exists $ENV{CMISS_ROOT} )
+	  {
+# GBS 6-March-2000  Directory changed
+# 		my $cmiss_perl_lib = $ENV{CMISS_ROOT}.'/perl_lib';
+# 		my $cmiss_perl_lib = $ENV{CMISS_ROOT}.'/perl/lib';
+		my $cmiss_perl_lib = $ENV{CMISS_ROOT}.'/cmiss_perl/lib';
+		if( -d $cmiss_perl_lib )
+		  {
+			unshift @INC, $cmiss_perl_lib;
+		  }
+	  }
+  }
+
 
 sub register_keyword
   {

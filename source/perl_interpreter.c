@@ -1,31 +1,32 @@
 /*******************************************************************************
 FILE : perl_interpreter.c
 
-LAST MODIFIED : 22 August 2000
+LAST MODIFIED : 26 March 2003
 
 DESCRIPTION :
 Provides an interface between cmiss and a Perl interpreter.
 ==============================================================================*/
 
+#if ! defined (NO_STATIC_FALLBACK)
 #include <EXTERN.h>               /* from the Perl distribution     */
 #include <perl.h>                 /* from the Perl distribution     */
+#endif /* ! defined (NO_STATIC_FALLBACK) */
+#include <stdio.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <fcntl.h>
-#if defined (CMGUI)
-#include "command/cmiss.h"
-#include "user_interface/message.h"
-#include "command/perl_interpreter.h"
-#else /* defined (CMGUI) */
+#include <dlfcn.h>
+#include <stdarg.h>
 #include "perl_interpreter.h"
-#endif /* defined (CMGUI) */
 
-static PerlInterpreter *perl_interpreter = (PerlInterpreter *)NULL;  /***    The Perl interpreter    ***/
+#if ! defined (NO_STATIC_FALLBACK)
+/***    The Perl interpreter    ***/
+PerlInterpreter *my_perl = (PerlInterpreter *)NULL;
 
-static void xs_init _((void));
+static void xs_init(pTHX);
 
-void boot_DynaLoader _((CV* cv));
-void boot_Perl_cmiss _((CV* cv));
+void boot_DynaLoader (pTHX_ CV* cv);
+void boot_Perl_cmiss (pTHX_ CV* cv);
 static int perl_interpreter_filehandle_in = 0;
 static int perl_interpreter_filehandle_out = 0;
 static int perl_interpreter_kept_quit;
@@ -33,15 +34,62 @@ static void *perl_interpreter_kept_user_data;
 static execute_command_function_type kept_execute_command_function;
 static int keep_stdout = 0;
 static int keep_stderr = 0;
+#endif /* ! defined (NO_STATIC_FALLBACK) */
 
-void xs_init()
+#if ! defined (NO_STATIC_FALLBACK)
+void xs_init(pTHX)
 {
-	char *file = __FILE__;
-	newXS("Perl_cmiss::bootstrap", boot_Perl_cmiss, file);
+	char *file_name = __FILE__;
+	newXS("Perl_cmiss::bootstrap", boot_Perl_cmiss, file_name);
 	/* DynaLoader is a special case */
-	newXS("DynaLoader::boot_DynaLoader", boot_DynaLoader, file);
+	newXS("DynaLoader::boot_DynaLoader", boot_DynaLoader, file_name);
 }
+#endif /* ! defined (NO_STATIC_FALLBACK) */
 
+static int interpreter_display_message(enum Message_type message_type,
+	char *format, ... )
+/*******************************************************************************
+LAST MODIFIED : 26 March 2003
+
+DESCRIPTION :
+The default interpreter_display_message_function.
+==============================================================================*/
+{
+	int return_code;
+	va_list ap;
+
+	va_start(ap,format);
+	return_code=vfprintf(stderr,format,ap);
+	va_end(ap);
+
+	return (return_code);
+} /* interpreter_display_message */
+
+static Interpreter_display_message_function *display_message_function =
+   interpreter_display_message;
+
+#if defined (USE_DYNAMIC_LOADER)
+#include "perl_interpreter_dynamic.h"
+#endif /* defined (USE_DYNAMIC_LOADER) */
+
+#if defined (USE_DYNAMIC_LOADER) || defined (SHARED_OBJECT)
+/* Mangle the function names from now on so that function loaders 
+	 are the ones that CMISS connects to. */
+#define create_interpreter_ __create_interpreter_
+#define interpreter_destroy_string_ __interpreter_destroy_string_
+#define destroy_interpreter_ __destroy_interpreter_
+#define redirect_interpreter_output_ __redirect_interpreter_output_
+#define interpreter_set_display_message_function_ __interpreter_set_display_message_function_
+#define interpret_command_ __interpret_command_
+#define interpreter_evaluate_integer_ __interpreter_evaluate_integer_
+#define interpreter_set_integer_ __interpreter_set_integer_
+#define interpreter_evaluate_double_ __interpreter_evaluate_double_
+#define interpreter_set_double_ __interpreter_set_double_
+#define interpreter_evaluate_string_ __interpreter_evaluate_string_
+#define interpreter_set_string_ __interpreter_set_string_
+#endif /* defined (USE_DYNAMIC_LOADER) || defined (SHARED_OBJECT) */
+
+#if ! defined (NO_STATIC_FALLBACK)
 static char *interpreter_duplicate_string(char *source_string, size_t length)
 /*******************************************************************************
 LAST MODIFIED : 7 September 2000
@@ -66,7 +114,7 @@ copied and the NULL termination is added after that length.
 			}
 			else
 			{
-				display_message(ERROR_MESSAGE,"interpreter_duplicate_string.  "
+				(*display_message_function)(ERROR_MESSAGE,"interpreter_duplicate_string.  "
 					 "Not enough memory");
 			}
 		}
@@ -78,21 +126,23 @@ copied and the NULL termination is added after that length.
 			}
 			else
 			{
-				display_message(ERROR_MESSAGE,"interpreter_duplicate_string.  "
+				(*display_message_function)(ERROR_MESSAGE,"interpreter_duplicate_string.  "
 					 "Not enough memory");
 			}
 		}
 	}
 	else
 	{
-		display_message(ERROR_MESSAGE,"interpreter_duplicate_string.  "
+		(*display_message_function)(ERROR_MESSAGE,"interpreter_duplicate_string.  "
 			 "Invalid argument(s)");
 		copy_of_string=(char *)NULL;
 	}
 
 	return (copy_of_string);
 } /* interpreter_duplicate_string */
+#endif /* ! defined (NO_STATIC_FALLBACK) */
 
+#if ! defined (NO_STATIC_FALLBACK)
 void interpreter_destroy_string_(char *string)
 /*******************************************************************************
 LAST MODIFIED : 7 September 2000
@@ -107,10 +157,12 @@ Frees the memory associated with a string allocated by the interpreter.
 	}
 	else
 	{
-		display_message(ERROR_MESSAGE,"interpreter_duplicate_string.  Invalid argument(s)");
+		(*display_message_function)(ERROR_MESSAGE,"interpreter_duplicate_string.  Invalid argument(s)");
 	}
 } /* interpreter_duplicate_string */
+#endif /* ! defined (NO_STATIC_FALLBACK) */
 
+#if ! defined (NO_STATIC_FALLBACK)
 void create_interpreter_(int argc, char **argv, const char *initial_comfile, int *status)
 /*******************************************************************************
 LAST MODIFIED : 24 July 2001
@@ -132,7 +184,11 @@ Creates the interpreter for processing commands.
 	 "$| = 1;\n"
     ;
   char *load_commands[] =
-  { "Perl_cmiss::set_INC_for_platform('" ABI_ENV "')",
+  {
+#if ! defined (SHARED_OBJECT)
+		"Perl_cmiss::set_INC_for_platform('" ABI_ENV "')",
+#endif /* defined (SHARED_OBJECT) */
+		"Perl_cmiss::add_cmiss_perl_to_INC",
 		"Perl_cmiss::register_keyword assign",
 		"Perl_cmiss::register_keyword attach",
 		"Perl_cmiss::register_keyword cell",
@@ -160,13 +216,13 @@ Creates the interpreter for processing commands.
 
   return_code = 1;
 
-  perl_interpreter = perl_alloc();
-  perl_construct(perl_interpreter);
+  my_perl = perl_alloc();
+  perl_construct(my_perl);
 	embedding[0] = argv[0];
 	embedding[1] = e_string;
 	embedding[2] = zero_string;
-  perl_parse(perl_interpreter, xs_init, 3, embedding, NULL);
-  perl_run(perl_interpreter);
+  perl_parse(my_perl, xs_init, 3, embedding, NULL);
+  perl_run(my_perl);
   
   {
 	 STRLEN n_a;
@@ -201,14 +257,14 @@ Creates the interpreter for processing commands.
 			}
 			else
 			{
-				 display_message(ERROR_MESSAGE,"initialise_interpreter.  "
+				 (*display_message_function)(ERROR_MESSAGE,"initialise_interpreter.  "
 						"Unable to get ARGV\n") ;
 			}
 	 }
 	 perl_eval_pv(perl_start_code, FALSE);
 	 if (SvTRUE(ERRSV))
 		{
-		  display_message(ERROR_MESSAGE,"initialise_interpreter.  "
+		  (*display_message_function)(ERROR_MESSAGE,"initialise_interpreter.  "
 			 "Uh oh - %s\n", SvPV(ERRSV, n_a)) ;
 		  POPs ;
 		  return_code = 0;
@@ -220,7 +276,7 @@ Creates the interpreter for processing commands.
 		  perl_eval_pv(load_commands[i], FALSE);
 		  if (SvTRUE(ERRSV))
 			 {
-				display_message(ERROR_MESSAGE,"initialise_interpreter.  "
+				(*display_message_function)(ERROR_MESSAGE,"initialise_interpreter.  "
 				  "Uh oh - %s\n", SvPV(ERRSV, n_a)) ;
 				POPs ;
 				return_code = 0;
@@ -235,7 +291,9 @@ Creates the interpreter for processing commands.
   *status = return_code;
 
 }
+#endif /* ! defined (NO_STATIC_FALLBACK) */
 
+#if ! defined (NO_STATIC_FALLBACK)
 void destroy_interpreter_(int *status)
 /*******************************************************************************
 LAST MODIFIED : 8 June 2000
@@ -245,10 +303,10 @@ Takes a <command_string>, processes this through the F90 interpreter
 and then executes the returned strings
 ==============================================================================*/
 {
-	 if (perl_interpreter)
+	 if (my_perl)
 	 {
-			perl_destruct(perl_interpreter);
-			perl_free(perl_interpreter);
+			perl_destruct(my_perl);
+			perl_free(my_perl);
 
 			if(perl_interpreter_filehandle_in)
 			{
@@ -277,7 +335,37 @@ and then executes the returned strings
 			*status = 0;
 	 }
 }
+#endif /* ! defined (NO_STATIC_FALLBACK) */
 
+#if ! defined (NO_STATIC_FALLBACK)
+void interpreter_set_display_message_function_(Interpreter_display_message_function *function,
+	int *status)
+/*******************************************************************************
+LAST MODIFIED : 26 March 2003
+
+DESCRIPTION:
+Sets the function that will be called whenever the Interpreter wants to report
+information.
+==============================================================================*/
+{
+	 int return_code;
+
+	 return_code = 1;
+
+	 if (function)
+	 {
+			display_message_function = function;
+	 }
+	 else
+	 {
+			display_message_function = interpreter_display_message;			
+	 }
+
+	 *status = return_code;
+}
+#endif /* ! defined (NO_STATIC_FALLBACK) */
+
+#if ! defined (NO_STATIC_FALLBACK)
 void redirect_interpreter_output_(int *status)
 /*******************************************************************************
 LAST MODIFIED : 25 August 2000
@@ -301,14 +389,16 @@ routine can write this to the command window.
   }
   else
   {
-	  display_message(ERROR_MESSAGE,"redirect_interpreter_output.  "
+	  (*display_message_function)(ERROR_MESSAGE,"redirect_interpreter_output.  "
 		  "Unable to create pipes") ;
 	  return_code = 0;
   }
 
   *status = return_code;
 }
+#endif /* ! defined (NO_STATIC_FALLBACK) */
 
+#if ! defined (NO_STATIC_FALLBACK)
 static int handle_output(void)
 /*******************************************************************************
 LAST MODIFIED : 19 May 2000
@@ -351,14 +441,16 @@ and then executes the returned strings
 			if (read_length = read(perl_interpreter_filehandle_out, (void *)buffer, sizeof(buffer) - 1))
 			{
 				buffer[read_length] = 0;
-				display_message(INFORMATION_MESSAGE,
+				(*display_message_function)(INFORMATION_MESSAGE,
 					"%s", buffer) ;				
 			}
 		}
 	}
 	return (return_code);
 } /* handle_output */
+#endif /* ! defined (NO_STATIC_FALLBACK) */
 
+#if ! defined (NO_STATIC_FALLBACK)
 int cmiss_perl_callback(char *command_string)
 /*******************************************************************************
 LAST MODIFIED : 19 May 2000
@@ -408,14 +500,16 @@ and then executes the returned strings
 	}
 	else
 	{
-		display_message(ERROR_MESSAGE,"cmiss_perl_callback.  "
+		(*display_message_function)(ERROR_MESSAGE,"cmiss_perl_callback.  "
 			 "Missing command_data");
 		return_code=0;
 	}
 
 	return (return_code);
 } /* cmiss_perl_callback */
+#endif /* ! defined (NO_STATIC_FALLBACK) */
 
+#if ! defined (NO_STATIC_FALLBACK)
 void interpret_command_(char *command_string, void *user_data, int *quit,
   execute_command_function_type execute_command_function, int *status)
 /*******************************************************************************
@@ -431,7 +525,7 @@ Takes a <command_string>, processes this through the Perl interpreter.
 	STRLEN n_a;
 	dSP ;
  
-	if (perl_interpreter)
+	if (my_perl)
 	{
 		 ENTER ;
 		 SAVETMPS;
@@ -491,7 +585,7 @@ Takes a <command_string>, processes this through the Perl interpreter.
 							}
 							else
 							{
-								 display_message(ERROR_MESSAGE,"cmiss_perl_execute_command.  "
+								 (*display_message_function)(ERROR_MESSAGE,"cmiss_perl_execute_command.  "
 										"Unable to allocate escaped_string");
 								 return_code=0;
 							}
@@ -514,6 +608,16 @@ Takes a <command_string>, processes this through the Perl interpreter.
 				
 					 perl_eval_pv(wrapped_command, FALSE);
 
+					 handle_output();
+
+					 if (SvTRUE(ERRSV))
+					 {
+							(*display_message_function)(ERROR_MESSAGE,
+								 "%s", SvPV(ERRSV, n_a)) ;
+							POPs ;
+							return_code = 0;
+					 }
+
 					 /* Change STDOUT and STDERR back again */
 					 if (keep_stdout)
 					 {
@@ -526,21 +630,11 @@ Takes a <command_string>, processes this through the Perl interpreter.
 
 					 *quit = perl_interpreter_kept_quit;
  
-					 handle_output();
-
-					 if (SvTRUE(ERRSV))
-					 {
-							display_message(ERROR_MESSAGE,
-								 "%s", SvPV(ERRSV, n_a)) ;
-							POPs ;
-							return_code = 0;
-					 }
-
 					 /*  This command needs to get the correct response from a 
 							 partially complete command before it is useful
 							 if (!SvTRUE(cvrv))
 							 {
-							 display_message(ERROR_MESSAGE,
+							 (*display_message_function)(ERROR_MESSAGE,
 							 "Unable to compile command: %s\n", wrapped_command) ;
 							 POPs ;
 							 }*/
@@ -549,31 +643,34 @@ Takes a <command_string>, processes this through the Perl interpreter.
 				}
 				else
 				{
-					 display_message(ERROR_MESSAGE,"interpret_command.  "
+					 (*display_message_function)(ERROR_MESSAGE,"interpret_command.  "
 							"Unable to allocate wrapped_string");
 					 return_code=0;
 				}
 		 }
 		 else
 		 {
-				display_message(ERROR_MESSAGE,"interpret_command.  "
+				(*display_message_function)(ERROR_MESSAGE,"interpret_command.  "
 					 "Missing command_data");
 				return_code=0;
 		 }
 
 		 FREETMPS ;
 		 LEAVE ;	
+
 	}
 	else
 	{
-		 display_message(ERROR_MESSAGE,"interpret_command.  "
+		 (*display_message_function)(ERROR_MESSAGE,"interpret_command.  "
 				"Missing interpreter");
 		 return_code=0;
 	}
 	
 	*status = return_code;
 } /* interpret_command_ */
+#endif /* ! defined (NO_STATIC_FALLBACK) */
 
+#if ! defined (NO_STATIC_FALLBACK)
 void interpreter_evaluate_integer_(char *expression, int *result, int *status)
 /*******************************************************************************
 LAST MODIFIED : 6 September 2000
@@ -592,7 +689,7 @@ as an integer then <status> will be set to zero.
 
 	return_code = 1;
 
-	if (perl_interpreter)
+	if (my_perl)
 	{
 		 ENTER ;
 		 SAVETMPS;
@@ -622,7 +719,7 @@ as an integer then <status> will be set to zero.
 
 				if (SvTRUE(ERRSV))
 				{
-					 display_message(ERROR_MESSAGE,
+					 (*display_message_function)(ERROR_MESSAGE,
 							"%s", SvPV(ERRSV, n_a)) ;
 					 POPs ;
 					 return_code = 0;
@@ -636,7 +733,7 @@ as an integer then <status> will be set to zero.
 					 }
 					 else
 					 {
-							display_message(ERROR_MESSAGE,"interpreter_evaluate_integer.  "
+							(*display_message_function)(ERROR_MESSAGE,"interpreter_evaluate_integer.  "
 								 "String \"%s\" does not evaluate to an integer.", expression);
 							return_code = 0;
 					 }
@@ -644,7 +741,7 @@ as an integer then <status> will be set to zero.
 		 }
 		 else
 		 {
-				display_message(ERROR_MESSAGE,"interpreter_evaluate_integer.  "
+				(*display_message_function)(ERROR_MESSAGE,"interpreter_evaluate_integer.  "
 					 "Invalid arguments.") ;
 				return_code = 0;
 		 }
@@ -654,14 +751,16 @@ as an integer then <status> will be set to zero.
 	}
 	else
 	{
-		 display_message(ERROR_MESSAGE,"interpreter_evaluate_integer.  "
+		 (*display_message_function)(ERROR_MESSAGE,"interpreter_evaluate_integer.  "
 				"Missing interpreter");
 		 return_code=0;
 	}
 
 	*status = return_code;
 } /* interpreter_evaluate_integer_ */
+#endif /* ! defined (NO_STATIC_FALLBACK) */
 
+#if ! defined (NO_STATIC_FALLBACK)
 void interpreter_set_integer_(char *variable_name, int *value, int *status)
 /*******************************************************************************
 LAST MODIFIED : 6 September 2000
@@ -676,7 +775,7 @@ Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
 
 	return_code = 1;
 
-	if (perl_interpreter)
+	if (my_perl)
 	{
 		 ENTER ;
 		 SAVETMPS;
@@ -688,7 +787,7 @@ Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
 		 }
 		 else
 		 {
-				display_message(ERROR_MESSAGE,"interpreter_set_integer.  "
+				(*display_message_function)(ERROR_MESSAGE,"interpreter_set_integer.  "
 					 "Invalid arguments.") ;
 				return_code = 0;
 		 }
@@ -698,14 +797,16 @@ Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
  	}
 	else
 	{
-		 display_message(ERROR_MESSAGE,"interpreter_set_integer.  "
+		 (*display_message_function)(ERROR_MESSAGE,"interpreter_set_integer.  "
 				"Missing interpreter");
 		 return_code=0;
 	}
  
 	*status = return_code;
 } /* interpreter_set_integer_ */
+#endif /* ! defined (NO_STATIC_FALLBACK) */
 
+#if ! defined (NO_STATIC_FALLBACK)
 void interpreter_evaluate_double_(char *expression, double *result, int *status)
 /*******************************************************************************
 LAST MODIFIED : 6 September 2000
@@ -724,7 +825,7 @@ as an double then <status> will be set to zero.
  
 	return_code = 1;
 
-	if (perl_interpreter)
+	if (my_perl)
 	{
 		 ENTER ;
 		 SAVETMPS;
@@ -754,7 +855,7 @@ as an double then <status> will be set to zero.
 
 				if (SvTRUE(ERRSV))
 				{
-					 display_message(ERROR_MESSAGE,
+					 (*display_message_function)(ERROR_MESSAGE,
 							"%s", SvPV(ERRSV, n_a)) ;
 					 POPs ;
 					 return_code = 0;
@@ -768,7 +869,7 @@ as an double then <status> will be set to zero.
 					 }
 					 else
 					 {
-							display_message(ERROR_MESSAGE,"interpreter_evaluate_double.  "
+							(*display_message_function)(ERROR_MESSAGE,"interpreter_evaluate_double.  "
 								 "String \"%s\" does not evaluate to a double.", expression);
 							return_code = 0;
 					 }
@@ -776,7 +877,7 @@ as an double then <status> will be set to zero.
 		 }
 		 else
 		 {
-				display_message(ERROR_MESSAGE,"interpreter_evaluate_double.  "
+				(*display_message_function)(ERROR_MESSAGE,"interpreter_evaluate_double.  "
 					 "Invalid arguments.") ;
 				return_code = 0;
 		 }
@@ -786,14 +887,16 @@ as an double then <status> will be set to zero.
  	}
 	else
 	{
-		 display_message(ERROR_MESSAGE,"interpreter_evaluate_double.  "
+		 (*display_message_function)(ERROR_MESSAGE,"interpreter_evaluate_double.  "
 				"Missing interpreter");
 		 return_code=0;
 	}
 
 	*status = return_code;
 } /* interpreter_evaluate_double_ */
+#endif /* ! defined (NO_STATIC_FALLBACK) */
 
+#if ! defined (NO_STATIC_FALLBACK)
 void interpreter_set_double_(char *variable_name, double *value, int *status)
 /*******************************************************************************
 LAST MODIFIED : 6 September 2000
@@ -808,7 +911,7 @@ Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
 
 	return_code = 1;
 
-	if (perl_interpreter)
+	if (my_perl)
 	{
 		 ENTER ;
 		 SAVETMPS;
@@ -820,7 +923,7 @@ Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
 		 }
 		 else
 		 {
-				display_message(ERROR_MESSAGE,"interpreter_set_double.  "
+				(*display_message_function)(ERROR_MESSAGE,"interpreter_set_double.  "
 					 "Invalid arguments.") ;
 				return_code = 0;
 		 }
@@ -830,15 +933,17 @@ Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
  	}
 	else
 	{
-		 display_message(ERROR_MESSAGE,"interpreter_set_double.  "
+		 (*display_message_function)(ERROR_MESSAGE,"interpreter_set_double.  "
 				"Missing interpreter");
 		 return_code=0;
 	}
 
 	*status = return_code;
 } /* interpreter_set_double_ */
+#endif /* ! defined (NO_STATIC_FALLBACK) */
 
-void interpreter_evaluate_string(char *expression, char **result, int *status)
+#if ! defined (NO_STATIC_FALLBACK)
+void interpreter_evaluate_string_(char *expression, char **result, int *status)
 /*******************************************************************************
 LAST MODIFIED : 7 September 2000
 
@@ -860,7 +965,7 @@ as an string then <status> will be set to zero and <*result> will be NULL.
 	return_code = 1;
 
 	*result = (char *)NULL;
-	if (perl_interpreter)
+	if (my_perl)
 	{ 
 		 ENTER ;
 		 SAVETMPS;
@@ -890,7 +995,7 @@ as an string then <status> will be set to zero and <*result> will be NULL.
 
 				if (SvTRUE(ERRSV))
 				{
-					 display_message(ERROR_MESSAGE,
+					 (*display_message_function)(ERROR_MESSAGE,
 							"%s", SvPV(ERRSV, n_a)) ;
 					 POPs ;
 					 return_code = 0;
@@ -911,7 +1016,7 @@ as an string then <status> will be set to zero and <*result> will be NULL.
 					 }
 					 else
 					 {
-							display_message(ERROR_MESSAGE,"interpreter_evaluate_string.  "
+							(*display_message_function)(ERROR_MESSAGE,"interpreter_evaluate_string.  "
 								 "String \"%s\" does not evaluate to a string.", expression);
 							return_code = 0;
 					 }
@@ -919,7 +1024,7 @@ as an string then <status> will be set to zero and <*result> will be NULL.
 		 }
 		 else
 		 {
-				display_message(ERROR_MESSAGE,"interpreter_evaluate_string.  "
+				(*display_message_function)(ERROR_MESSAGE,"interpreter_evaluate_string.  "
 					 "Invalid arguments.") ;
 				return_code = 0;
 		 }
@@ -929,14 +1034,16 @@ as an string then <status> will be set to zero and <*result> will be NULL.
  	}
 	else
 	{
-		 display_message(ERROR_MESSAGE,"interpreter_evaluate_string.  "
+		 (*display_message_function)(ERROR_MESSAGE,"interpreter_evaluate_string.  "
 				"Missing interpreter");
 		 return_code=0;
 	}
 
 	*status = return_code;
 } /* interpreter_evaluate_string_ */
+#endif /* ! defined (NO_STATIC_FALLBACK) */
 
+#if ! defined (NO_STATIC_FALLBACK)
 void interpreter_set_string_(char *variable_name, char *value, int *status)
 /*******************************************************************************
 LAST MODIFIED : 7 September 2000
@@ -951,7 +1058,7 @@ Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
 
 	return_code = 1;
 
-	if (perl_interpreter)
+	if (my_perl)
 	{
 		 ENTER ;
 		 SAVETMPS;
@@ -963,7 +1070,7 @@ Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
 		 }
 		 else
 		 {
-				display_message(ERROR_MESSAGE,"interpreter_set_string.  "
+				(*display_message_function)(ERROR_MESSAGE,"interpreter_set_string.  "
 					 "Invalid arguments.") ;
 				return_code = 0;
 		 }
@@ -973,12 +1080,13 @@ Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
  	}
 	else
 	{
-		 display_message(ERROR_MESSAGE,"interpreter_set_string.  Missing interpreter");
+		 (*display_message_function)(ERROR_MESSAGE,"interpreter_set_string.  Missing interpreter");
 		 return_code=0;
 	}
 
 	*status = return_code;
 } /* interpreter_set_string_ */
+#endif /* ! defined (NO_STATIC_FALLBACK) */
 
 /*
 	Local Variables: 
