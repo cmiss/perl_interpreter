@@ -76,6 +76,7 @@ ifeq ($(SYSNAME),win32)
   ifndef STATIC
     STATIC = true
   endif
+  ABI=32
   NEW_INSTRUCTION := i386
   OPERATING_SYSTEM := win32
 endif
@@ -135,7 +136,13 @@ ifndef USE_DYNAMIC_LOADER
     #a shared "libperl.a" I cannot seem to dlopen it.
     USE_DYNAMIC_LOADER = false
   else
-    USE_DYNAMIC_LOADER = true
+    ifeq ($(SYSNAME,win32)
+      #I have not tried to make a dynamic perl interpreter in win32,
+      #I have not even been including a dynaloader at all so far.
+      USE_DYNAMIC_LOADER = false
+    else
+      USE_DYNAMIC_LOADER = true
+    endif
   endif
 endif
 
@@ -223,7 +230,11 @@ PERL_ARCHNAME := $(shell $(PERL) -MConfig -e 'print "$$Config{archname}\n"')
 ifeq ($(PERL_ARCHNAME),)
   $(error problem with $(PERL))
 endif
-PERL_ARCHLIB := $(shell $(PERL) -MConfig -e 'print "$$Config{archlibexp}\n"')
+ifeq ($(SYSNAME),win32)
+  PERL_ARCHLIB := $(subst \,/,$(shell $(PERL) -MConfig -e 'print "$$Config{archlibexp}\n"'))
+else
+  PERL_ARCHLIB := $(shell $(PERL) -MConfig -e 'print "$$Config{archlibexp}\n"')
+endif
 ifeq ($(PERL_ARCHLIB),)
   $(error problem with $(PERL))
 endif
@@ -240,7 +251,7 @@ PERL_WORKING_DIR = Perl_cmiss/generated/$(PERL_VERSION)/$(PERL_ARCHNAME)
 PERL_CMISS_MAKEFILE = $(PERL_WORKING_DIR)/Makefile
 PERL_CMISS_LIB = $(PERL_WORKING_DIR)/auto/Perl_cmiss/Perl_cmiss.a
 ifneq ($(SHARED_OBJECT), true)
-   STATIC_PERL_LIB = $(wildcard $(PERL_ARCHLIB)/CORE/libperl.a)
+   STATIC_PERL_LIB = $(firstword $(wildcard $(PERL_ARCHLIB)/CORE/libperl.a) $(wildcard $(PERL_ARCHLIB)/CORE/libperl56.a))
    ifneq ($(USE_DYNAMIC_LOADER), true)
       ifeq ($(STATIC_PERL_LIB),)
          $(error 'Static $(PERL_ARCHLIB)/CORE/libperl.a not found for ${PERL} which is required for a non dynamic loading perl interpreter.')
@@ -338,6 +349,9 @@ ifeq ($(SYSNAME),SunOS)
     CFE_FLGS += -xarch=native64
   endif
 endif
+ifeq ($(SYSNAME),win32)
+  CC = gcc
+endif
 ifeq ($(SYSNAME),AIX)
   CC = xlc
   # 1506-743 (I) 64-bit portability: possible change of result through conversion ...
@@ -380,6 +394,19 @@ ifndef TASK
 endif
 ifeq ($(TASK),)
 #-----------------------------------------------------------------------------
+
+ifeq ($(SYSNAME:CYGWIN%=),)# CYGWIN
+  $(error use SYSNAME=win32)
+endif
+ifeq ($(SYSNAME),win32)
+  $(warning *******************************)
+  $(warning This still does not compile win32 out of the box)
+  $(warning link in the Perl_cmiss Makefile.pl needs to be changed to system("cp...") )
+  $(warning The generated Perl_cmiss Makefile ends up with many \ where there need to be / and I just searched and replaced carefully)
+  $(warning The library built does not have the perl or Perl_cmiss in it, these only seem to work when linked in the final link)
+  $(warning *******************************)
+  $(warning)
+endif
 
   .NOTPARALLEL:
 
@@ -646,8 +673,16 @@ endif
     # don't retain these relocatable objects
     .INTERMEDIATE : $(C_OBJ)
 
+    ifneq ($(SYSNAME),win32)
+       LIBRARY_LIBS = $(DYNALOADER_LIB) $(PERL_CMISS_LIB) $(STATIC_PERL_LIB)
+    else
+       #I have not got Win32 to work with building the libararies into the
+       #perl_interpreter lib, instead I link them all together at the final link
+       LIBRARY_LIBS = 
+    endif
+
     $(C_OBJ) : $(foreach unit, $(C_UNITS), $(WORKING_DIR)/$(unit).o ) \
-         $(DYNALOADER_LIB) $(PERL_CMISS_LIB) $(STATIC_PERL_LIB)
+         $(LIBRARY_LIBS)
 		$(LD_RELOCATABLE) -o $@ $^
   else
     $(LIBRARY) : $(foreach unit, $(C_UNITS), $(WORKING_DIR)/$(unit).o ) \
