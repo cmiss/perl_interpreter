@@ -88,7 +88,22 @@ sub set_INC_for_platform
 
 sub add_cmiss_perl_to_INC
   {
-	use Config;
+	my $use_config = 0;
+
+	{
+	  #By not using "use" we can avoid the BEGIN and therefore the $use_config
+	  #variable will be in the correct scope.  Because of this the automatic imports
+	  #will not happen, so below we just use the qualified name for the Config hash.
+	  eval { require Config };
+	  if ( $@ )
+	  {
+		warn $@;
+	  }
+	  else
+	  {
+		$use_config = 1;
+	  }
+	}
 
     my ($abi_env) = @_;
 
@@ -100,9 +115,12 @@ sub add_cmiss_perl_to_INC
 	  if ( exists $ENV{$varname} )
 	 {
 		my @env_list = split (':', $ENV{$varname});
-		#Add in a version/archname specific derivative of any paths if they exist
-		@path_list = (@env_list,
-		   grep { -d $_ } map { "$_/$Config{version}/$Config{archname}" } @env_list);
+		if ( $use_config )
+		{
+		  #Add in a version/archname specific derivative of any paths if they exist
+		  @path_list = (@env_list,
+			 grep { -d $_ } map { "$_/$Config::Config{version}/$Config::Config{archname}" } @env_list);
+		}
 		last;
 	  }
     }
@@ -112,8 +130,19 @@ sub add_cmiss_perl_to_INC
 	  if (exists $ENV{CMISS_ROOT})
 	  {
 		my $cmissroot_perl_lib = "$ENV{CMISS_ROOT}/cmiss_perl/lib";
-		my $cmissroot_perl_lib_arch = "$ENV{CMISS_ROOT}/cmiss_perl/lib/$Config{version}/$Config{archname}";
-		@path_list = grep { -d $_ } ($cmissroot_perl_lib, $cmissroot_perl_lib_arch);
+		@path_list = ();
+		if (-d $cmissroot_perl_lib)
+		{
+		  push @path_list, $cmissroot_perl_lib;
+		}
+		if ( $use_config )
+		{
+		  my $cmissroot_perl_lib_arch = "$ENV{CMISS_ROOT}/cmiss_perl/lib/$Config::Config{version}/$Config::Config{archname}";
+		  if (-d $cmissroot_perl_lib_arch)
+		  {
+			push @path_list, $cmissroot_perl_lib_arch;
+		  }
+		}
 	  }
 	}
 	# If a CMISS_PERLLIB has been found prepend it to the path.
