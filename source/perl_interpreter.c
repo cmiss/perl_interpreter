@@ -136,7 +136,9 @@ and then executes the returned strings
 	 "  my $extracted;\n"
 	 "  my $lc_command;\n"
 	 "  my $continue;\n"
-	 "  while ($command)\n"
+	 "  my $reduced_command;\n"
+	 /* #define CMISS_DEBUG_EXTRACT */
+	 "  while ($command ne \"\")\n"
 	 "  {\n"
 #if defined (CMISS_DEBUG_EXTRACT)
 	 "    print \"$command   \";\n"
@@ -153,7 +155,7 @@ and then executes the returned strings
 #if defined (CMISS_DEBUG_EXTRACT)
 	 "       print \"open bracket: $1\\n\";\n"
 #endif /* defined (CMISS_DEBUG_EXTRACT) */
-	 "       if ($part_token)\n"
+	 "       if ($part_token ne \"\")\n"
 	 "       {\n"
 	 "          push(@tokens, $part_token);\n"
 	 "       }\n"
@@ -165,7 +167,7 @@ and then executes the returned strings
 #if defined (CMISS_DEBUG_EXTRACT)
 	 "       print \"comment: $1\\n\";\n"
 #endif /* defined (CMISS_DEBUG_EXTRACT) */
-	 "       if ($part_token)\n"
+	 "       if ($part_token ne \"\")\n"
 	 "       {\n"
 	 "          push(@tokens, $part_token);\n"
 	 "       }\n"
@@ -176,7 +178,7 @@ and then executes the returned strings
 #if defined (CMISS_DEBUG_EXTRACT)
 	 "       print \"close bracket: $1\\n\";\n"
 #endif /* defined (CMISS_DEBUG_EXTRACT) */
-	 "       if ($part_token)\n"
+	 "       if ($part_token ne \"\")\n"
 	 "       {\n"
 	 "          push(@tokens, $part_token);\n"
 	 "       }\n"
@@ -186,17 +188,32 @@ and then executes the returned strings
 	 "    else\n"
     "    {\n"
 	 "       $continue = 1;\n"
-    "       if (!$part_token)\n"
+    "       if ($part_token eq \"\")\n"
 	 "       {"
 	 "          $lc_command = lc ($command);\n"
     "          if (($lc_command =~ m/^(?:$match_string)/) "
     "          || ($lc_command =~ m/^\\?$/))\n"
 	 "          {\n"
-	 "             $command =~ s/([^}#]*)//;\n"
+	 "             while (($command ne \"\") && !($command =~ m/(^[}#])/))\n"
+	 "             {\n"
+	 "                ($extracted, $reduced_command) = "
+	 "                   Text::Balanced::extract_variable($command);\n"
+	 "                if ($extracted)\n" 
+	 "                {\n"
+	 "                   $command = $reduced_command;\n"
+	 "                   $part_token = $part_token . $extracted;\n"
+	 "                }\n"
+	 "                else\n"
+	 "                {\n"
+	 "                   $part_token = $part_token . substr($command, 0, 1);\n"
+	 "                   $command = substr($command, 1);\n"
+	 "                }\n"
+	 "             }\n"
 #if defined (CMISS_DEBUG_EXTRACT)
-	 "             print \"cmiss: $1\\n\";\n"
+	 "             print \"cmiss: $part_token\\n\";\n"
 #endif /* defined (CMISS_DEBUG_EXTRACT) */
-	 "             push(@tokens, $1);\n"
+	 "             push(@tokens, $part_token);\n"
+	 "             $part_token = \"\";\n"
 	 "             $continue = 0;\n"
 	 "          }\n"
     "          if ($lc_command =~ m/^(?:assert)/)\n"
@@ -212,10 +229,11 @@ and then executes the returned strings
 	 "       if ($continue)\n"
 	 "       {\n"
 
-	 "       ($extracted, $command) = "
+	 "       ($extracted, $reduced_command) = "
 	 "          Text::Balanced::extract_variable($command);\n"
     "       if ($extracted)\n"
 	 "       {\n"
+	 "          $command = $reduced_command;\n"
 #if defined (CMISS_DEBUG_EXTRACT)
 	 "          print \"variable: $extracted\\n\";\n"
 #endif /* defined (CMISS_DEBUG_EXTRACT) */
@@ -223,10 +241,11 @@ and then executes the returned strings
 	 "       }\n"
 	 "       else\n"
 	 "       {\n"
-	 "          ($extracted, $command) = "
+	 "          ($extracted, $reduced_command) = "
 	 "             Text::Balanced::extract_quotelike($command);\n"
 	 "          if ($extracted)\n"
 	 "          {\n"
+	 "             $command = $reduced_command;\n"
 #if defined (CMISS_DEBUG_EXTRACT)
 	 "             print \"quotelike: $extracted\\n\";\n"
 #endif /* defined (CMISS_DEBUG_EXTRACT) */
@@ -235,7 +254,7 @@ and then executes the returned strings
 	 "          else\n"
 	 "          {\n"
 #if defined (CMISS_DEBUG_EXTRACT)
-	 "             print \"character:\\n\";\n"
+	 "             print \"character: \" . substr($command, 0, 1) . \"\\n\";\n"
 #endif /* defined (CMISS_DEBUG_EXTRACT) */
 	 "             $part_token = $part_token . substr($command, 0, 1);\n"
 	 "             $command = substr($command, 1);\n"
@@ -244,7 +263,7 @@ and then executes the returned strings
 	 "       }\n"
 	 "    }\n"
 	 "  }\n"
-	 "  if ($part_token)\n"
+	 "  if ($part_token ne \"\")\n"
 	 "  {\n"
 	 "     push(@tokens, $part_token);\n"
 	 "  }\n"
