@@ -44,7 +44,7 @@ ifdef ABI
   ifeq ($(ABI),n32)
     ABI_ENV=N32#
   else
-    ABI_ENV=ABI#
+    ABI_ENV=$(ABI)#
   endif
 else
   ABI_ENV=#

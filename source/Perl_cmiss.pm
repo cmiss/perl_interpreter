@@ -46,7 +46,7 @@ sub set_INC_for_platform
 		# run the local perl to get its @INC so we can use its modules
 		my $perl = 'perl';
 		# see if an environment variable specifies which local perl.
-		foreach my $varname ("CMISS${abi_ext}_PERL","CMISS_PERL")
+		foreach my $varname ("CMISS${abi_env}_PERL","CMISS_PERL")
 		  {
 			if( exists $ENV{$varname} )
 			  {
