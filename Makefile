@@ -141,7 +141,12 @@ else
     endif
   endif
   ifeq ($(SYSNAME),Linux)
-    PERL = /usr/bin/perl
+    ifeq ($(NODENAME:esp56%=),)
+      PERL = /usr/local/cmiss/bin/perl
+    else
+      #only 32-bit, assume first perl in path is suitable for this architecture
+      PERL = $(firstword $(wildcard $(subst :,/perl ,$(PATH))))
+    endif
   endif
   ifndef PERL
     $(error PERL not defined)
