@@ -6,7 +6,14 @@ MAKEFLAGS = --no-builtin-rules -I
 
 # files and directories
 
+ifndef HOSTTYPE
+.PHONY: error
+error:
+	@echo HOSTTYPE not defined
+endif
+
 SOURCE_DIR = source
+
 # set architecture dependent directory
 ifeq (${HOSTTYPE},iris4d)
   # Specify what application binary interface (ABI) to use i.e. 32, n32 or 64
@@ -45,11 +52,13 @@ ifeq (${HOSTTYPE},i386-linux)
   PERL = /usr/bin/perl
 endif
 
-PERL_ARCHLIB = $(shell $(PERL) -MConfig -e 'print "$$Config{archlib}\n"')
-DYNALOADER_LIB = $(PERL_ARCHLIB)/auto/DynaLoader/DynaLoader.a
-PERL_CMISS_MAKEFILE = $(WORKING_DIR)/Perl_cmiss.make
-PERL_CMISS_LIB = $(WORKING_DIR)/auto/Perl_cmiss/Perl_cmiss.a
-PERL_LIB = $(PERL_ARCHLIB)/CORE/libperl.a
+ifdef PERL
+  PERL_ARCHLIB = $(shell $(PERL) -MConfig -e 'print "$$Config{archlib}\n"')
+  DYNALOADER_LIB = $(PERL_ARCHLIB)/auto/DynaLoader/DynaLoader.a
+  PERL_CMISS_MAKEFILE = $(WORKING_DIR)/Perl_cmiss.make
+  PERL_CMISS_LIB = $(WORKING_DIR)/auto/Perl_cmiss/Perl_cmiss.a
+  PERL_LIB = $(PERL_ARCHLIB)/CORE/libperl.a
+endif
 
 CINCLUDE_DIRS = $(PERL_ARCHLIB)/CORE
 
@@ -137,8 +146,9 @@ $(WORKING_DIR)/%.pmh : $(SOURCE_DIR)/%.pm
 #-----------------------------------------------------------------------------
 # include the object (and .mod) dependencies)
 
-include $(foreach unit, $(C_UNITS) $(F_UNITS), $(WORKING_DIR)/$(unit).d )
-
+ifdef WORKING_DIR
+  include $(foreach unit, $(C_UNITS) $(F_UNITS), $(WORKING_DIR)/$(unit).d )
+endif
 #-----------------------------------------------------------------------------
 # implicit rules for making the objects
 
