@@ -431,11 +431,11 @@ Takes a <command_string>, processes this through the Perl interpreter.
 	STRLEN n_a;
 	dSP ;
  
-	ENTER ;
-	SAVETMPS;
-
 	if (perl_interpreter)
 	{
+		 ENTER ;
+		 SAVETMPS;
+
 		 if (command_string)
 		 {
 				PUSHMARK(sp) ;
@@ -560,6 +560,9 @@ Takes a <command_string>, processes this through the Perl interpreter.
 					 "Missing command_data");
 				return_code=0;
 		 }
+
+		 FREETMPS ;
+		 LEAVE ;	
 	}
 	else
 	{
@@ -567,9 +570,6 @@ Takes a <command_string>, processes this through the Perl interpreter.
 				"Missing interpreter");
 		 return_code=0;
 	}
-	
-	FREETMPS ;
-	LEAVE ;
 	
 	*status = return_code;
 } /* interpret_command_ */
@@ -589,14 +589,14 @@ as an integer then <status> will be set to zero.
 	STRLEN n_a;
 	dSP ;
 	SV *sv_result;
- 
-	ENTER ;
-	SAVETMPS;
 
 	return_code = 1;
 
 	if (perl_interpreter)
 	{
+		 ENTER ;
+		 SAVETMPS;
+
 		 if (expression && result && status)
 		 {
 				if (perl_interpreter_filehandle_in)
@@ -648,6 +648,9 @@ as an integer then <status> will be set to zero.
 					 "Invalid arguments.") ;
 				return_code = 0;
 		 }
+		 
+		 FREETMPS ;
+		 LEAVE ;
 	}
 	else
 	{
@@ -655,9 +658,6 @@ as an integer then <status> will be set to zero.
 				"Missing interpreter");
 		 return_code=0;
 	}
-
-	FREETMPS ;
-	LEAVE ;
 
 	*status = return_code;
 } /* interpreter_evaluate_integer_ */
@@ -674,13 +674,13 @@ Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
 
 	SV *sv_variable;
 
-	ENTER ;
-	SAVETMPS;
-
 	return_code = 1;
 
 	if (perl_interpreter)
 	{
+		 ENTER ;
+		 SAVETMPS;
+
 		 if (variable_name && value && status)
 		 {
 				sv_variable = perl_get_sv(variable_name, TRUE);
@@ -692,6 +692,9 @@ Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
 					 "Invalid arguments.") ;
 				return_code = 0;
 		 }
+
+		 FREETMPS ;
+		 LEAVE ;
  	}
 	else
 	{
@@ -700,9 +703,6 @@ Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
 		 return_code=0;
 	}
  
-	FREETMPS ;
-	LEAVE ;
-
 	*status = return_code;
 } /* interpreter_set_integer_ */
 
@@ -722,13 +722,13 @@ as an double then <status> will be set to zero.
 	dSP ;
 	SV *sv_result;
  
-	ENTER ;
-	SAVETMPS;
-
 	return_code = 1;
 
 	if (perl_interpreter)
 	{
+		 ENTER ;
+		 SAVETMPS;
+
 		 if (expression && result && status)
 		 {
 				if (perl_interpreter_filehandle_in)
@@ -780,6 +780,9 @@ as an double then <status> will be set to zero.
 					 "Invalid arguments.") ;
 				return_code = 0;
 		 }
+
+		 FREETMPS ;
+		 LEAVE ;
  	}
 	else
 	{
@@ -787,9 +790,6 @@ as an double then <status> will be set to zero.
 				"Missing interpreter");
 		 return_code=0;
 	}
-
-	FREETMPS ;
-	LEAVE ;
 
 	*status = return_code;
 } /* interpreter_evaluate_double_ */
@@ -806,13 +806,13 @@ Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
 
 	SV *sv_variable;
 
-	ENTER ;
-	SAVETMPS;
-
 	return_code = 1;
 
 	if (perl_interpreter)
 	{
+		 ENTER ;
+		 SAVETMPS;
+
 		 if (variable_name && value && status)
 		 {
 				sv_variable = perl_get_sv(variable_name, TRUE);
@@ -824,6 +824,9 @@ Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
 					 "Invalid arguments.") ;
 				return_code = 0;
 		 }
+ 
+		 FREETMPS ;
+		 LEAVE ;
  	}
 	else
 	{
@@ -831,9 +834,6 @@ Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
 				"Missing interpreter");
 		 return_code=0;
 	}
- 
-	FREETMPS ;
-	LEAVE ;
 
 	*status = return_code;
 } /* interpreter_set_double_ */
@@ -856,15 +856,15 @@ as an string then <status> will be set to zero and <*result> will be NULL.
 	STRLEN n_a, string_length;
 	dSP ;
 	SV *sv_result;
- 
-	ENTER ;
-	SAVETMPS;
 
 	return_code = 1;
 
 	*result = (char *)NULL;
 	if (perl_interpreter)
-	{
+	{ 
+		 ENTER ;
+		 SAVETMPS;
+
 		 if (expression && result && status)
 		 {
 				if (perl_interpreter_filehandle_in)
@@ -923,6 +923,9 @@ as an string then <status> will be set to zero and <*result> will be NULL.
 					 "Invalid arguments.") ;
 				return_code = 0;
 		 }
+		 
+		 FREETMPS ;
+		 LEAVE ;
  	}
 	else
 	{
@@ -930,9 +933,6 @@ as an string then <status> will be set to zero and <*result> will be NULL.
 				"Missing interpreter");
 		 return_code=0;
 	}
-
-	FREETMPS ;
-	LEAVE ;
 
 	*status = return_code;
 } /* interpreter_evaluate_string_ */
@@ -949,13 +949,13 @@ Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
 
 	SV *sv_variable;
 
-	ENTER ;
-	SAVETMPS;
-
 	return_code = 1;
 
 	if (perl_interpreter)
 	{
+		 ENTER ;
+		 SAVETMPS;
+
 		 if (variable_name && value && status)
 		 {
 				sv_variable = perl_get_sv(variable_name, TRUE);
@@ -967,15 +967,15 @@ Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
 					 "Invalid arguments.") ;
 				return_code = 0;
 		 }
+
+		 FREETMPS ;
+		 LEAVE ;
  	}
 	else
 	{
 		 display_message(ERROR_MESSAGE,"interpreter_set_string.  Missing interpreter");
 		 return_code=0;
 	}
-
-	FREETMPS ;
-	LEAVE ;
 
 	*status = return_code;
 } /* interpreter_set_string_ */
