@@ -436,7 +436,7 @@ ifeq ($(SYSNAME),Linux)
   SHARED_LINK_LIBRARIES += -lcrypt -ldl
 endif
 ifeq ($(SYSNAME),win32)
-  CC = gcc -fnative-struct
+  CC = gcc -mms-bitfields
 endif
 ifeq ($(SYSNAME),SunOS)
   # need -xarch=native after -fast
