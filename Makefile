@@ -607,24 +607,8 @@ all : debug opt
     all: debug64 opt64
   endif
 
-ESU_BUILD_PATH = '\$${CMISS_ROOT}/perl_interpreter'
-ESU_BUILD_MACHINE = 130.216.208.35 #esu35
-ESP_BUILD_PATH = '\$${CMISS_ROOT}/perl_interpreter'
-ESP_BUILD_MACHINE = 130.216.208.156 #esp56
-HPC1_BUILD_PATH = '\$${CMISS_ROOT}/perl_interpreter'
-HPC1_BUILD_MACHINE = 130.216.191.92 #hpc1
-
-#If not already cmiss become cmiss first and then propogate so that the user
-#only has to authenticate as cmiss once at the start.
 update :
-	if [ "$(USER)" = "cmiss" ] ; then \
-		ssh cmiss@$(ESU_BUILD_MACHINE) 'cd $(ESU_BUILD_PATH) ; $(MAKE) all' && \
-		ssh cmiss@$(ESP_BUILD_MACHINE) 'cd $(ESP_BUILD_PATH) ; $(MAKE) all' && \
-		ssh cmiss@$(HPC1_BUILD_MACHINE) 'cd $(HPC1_BUILD_PATH) ; $(MAKE) all' ; \
-	else \
-		ssh cmiss@$(ESU_BUILD_MACHINE) 'cd $(ESU_BUILD_PATH) ; $(MAKE) update' ; \
-	fi
-
+	cmissmake perl_interpreter
 
 #-----------------------------------------------------------------------------
 endif
