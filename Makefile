@@ -352,6 +352,11 @@ ifeq ($(filter-out IRIX%,$(SYSNAME)),)# SGI
   L_FLGS += -rdata_shared -DEBUG:error=158 -woff 47
   CFL_FLGS = -$(ABI) -$(INSTRUCTION)
   OPTCF_FLGS = -O3 -OPT:Olimit=8000
+  ifeq ($(ABI),n32)
+    LD_SHARED += -check_registry /usr/lib32/so_locations
+  else
+    LD_SHARED += -check_registry /usr/lib64/so_locations
+  endif
 endif
 ifeq ($(SYSNAME),Linux)
   CPPFLAGS += -Dbool=char -DHAS_BOOL
