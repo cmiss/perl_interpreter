@@ -190,7 +190,7 @@ Creates the interpreter for processing commands.
 #if ! defined (SHARED_OBJECT)
 		"Perl_cmiss::set_INC_for_platform('" ABI_ENV "')",
 #endif /* defined (SHARED_OBJECT) */
-		"Perl_cmiss::add_cmiss_perl_to_INC",
+		"Perl_cmiss::add_cmiss_perl_to_INC('" ABI_ENV "')",
 		"Perl_cmiss::register_keyword assign",
 		"Perl_cmiss::register_keyword attach",
 		"Perl_cmiss::register_keyword cell",

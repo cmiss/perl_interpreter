@@ -88,6 +88,8 @@ sub set_INC_for_platform
 
 sub add_cmiss_perl_to_INC
   {
+    my ($abi_env) = @_;
+
 	my $cmiss_perllib;
 
 	#Check the environment variables which specify this lib
