@@ -220,6 +220,11 @@ Creates the interpreter for processing commands.
 	 SAVETMPS;
 
 	 PUSHMARK(sp) ;
+
+#if ! defined (WIN32)
+    /* This code is not working in Win32 at the moment */
+    /* Causes perl to segfault */
+
 	 /* Override the $0 variable without actually executing the file */
 	 if (initial_comfile)
 	 {
@@ -233,6 +238,8 @@ Creates the interpreter for processing commands.
 	 }
 	 perl_eval_pv(perl_invoke_command, FALSE);
 	 free(perl_invoke_command);
+#endif /* ! defined (WIN32) */
+
 	 if (argc > 1)
 	 {
 			AV *perl_argv;
