@@ -425,7 +425,7 @@ ifeq ($(SYSNAME),Linux)
 #    CFE_FLGS += -m$(ABI)
     # !!! Position independent code is actually only required for objects
     # in shared libraries.
-    CF_FLGS += -fpic
+#    CF_FLGS += -fpic
   endif
   OPTCF_FLGS = -O2
   # Don't include a dependency on libperl.so in the shared link libraries as
