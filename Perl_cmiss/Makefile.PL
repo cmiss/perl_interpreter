@@ -32,14 +32,15 @@ foreach my $link ( 'Makefile.PL', $xs ) {
     }
 }
 
-my @define_list = ();
-if (defined $ENV{CMISS_PERL_CALLBACK_SUFFIX})
+my $define_list;
+if (defined $ENV{CMISS_PERL_CALLBACK})
   {
-	 push @define_list, "-DCMISS_PERL_CALLBACK=\"cmiss_perl_callback_$ENV{CMISS_PERL_CALLBACK_SUFFIX}\"";
+	 $define_list .= " -DCMISS_PERL_CALLBACK=\"$ENV{CMISS_PERL_CALLBACK}\"";
+	 $define_list .= " -DXS_Perl_cmiss_cmiss=\"XS_Perl_cmiss_$ENV{CMISS_PERL_CALLBACK}\"";
   }
 else
   {
-	 push @define_list, "-DCMISS_PERL_CALLBACK=\"cmiss_perl_callback\"";
+	 die ("Required environment variable CMISS_PERL_CALLBACK not set by Makefile");
   }
 
 #my $object = "$name.o";
@@ -49,7 +50,7 @@ WriteMakefile(
 #    'EXTRALIBS' => '',# to prevent undefined warnings in Makefile
     'MYEXTLIB'  => '',# to prevent undefined warnings in Makefile
     'INC'	=> "-I$source_dir",     # e.g., '-I/usr/include/other'
-    'DEFINE'	=> @define_list,# to prevent undefined warnings in Makefile
+    'DEFINE'	=> $define_list,# to prevent undefined warnings in Makefile
     'LINKTYPE'  => 'static',
     'INST_ARCHLIB' => '.'
 );

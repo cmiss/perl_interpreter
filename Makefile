@@ -261,6 +261,7 @@ ifeq ($(SHARED_OBJECT), true)
 else
    CMISS_PERL_CALLBACK_SUFFIX := static
 endif
+CMISS_PERL_CALLBACK=cmiss_perl_callback_$(CMISS_PERL_CALLBACK_SUFFIX)
 PERL_WORKING_DIR = Perl_cmiss/generated/$(PERL_VERSION)/$(PERL_ARCHNAME)-$(CMISS_PERL_CALLBACK_SUFFIX)
 PERL_CMISS_MAKEFILE = $(PERL_WORKING_DIR)/Makefile
 PERL_CMISS_LIB = $(PERL_WORKING_DIR)/auto/Perl_cmiss/Perl_cmiss.a
@@ -356,7 +357,7 @@ SHARED_LINK_LIBRARIES =
 AR = ar
 # Option lists
 # (suboption lists become more specific so that later ones overrule previous)
-CFLAGS = $(strip $(CFL_FLGS) $(CFE_FLGS) $(CF_FLGS)) '-DCMISS_PERL_CALLBACK=cmiss_perl_callback_$(CMISS_PERL_CALLBACK_SUFFIX)'
+CFLAGS = $(strip $(CFL_FLGS) $(CFE_FLGS) $(CF_FLGS)) '-DCMISS_PERL_CALLBACK=$(CMISS_PERL_CALLBACK)'
 CPPFLAGS := $(addprefix -I, $(C_INCLUDE_DIRS) ) '-DABI_ENV="$(ABI_ENV)"'
 ARFLAGS = -cr
 ifneq ($(DEBUG),false)
@@ -566,7 +567,7 @@ endif
   endif
 
   $(PERL_CMISS_MAKEFILE) : $(PERL) Perl_cmiss/Makefile.PL
-	cd Perl_cmiss ; export CMISS_PERL_CALLBACK_SUFFIX=$(CMISS_PERL_CALLBACK_SUFFIX) ; $(PERL) Makefile.PL
+	cd Perl_cmiss ; export CMISS_PERL_CALLBACK=$(CMISS_PERL_CALLBACK) CMISS_PERL_CALLBACK_SUFFIX=$(CMISS_PERL_CALLBACK_SUFFIX) ; $(PERL) Makefile.PL
 
   $(PERL_WORKING_DIR) :
 	mkdir -p $@
