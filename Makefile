@@ -171,67 +171,71 @@ endif
 ifneq ($(origin CMISS$(ABI_ENV)_PERL),undefined)
   PERL := $(CMISS$(ABI_ENV)_PERL)
 else
-  # Specify the perl on some platforms so that everyone builds with the same.
-  ifeq ($(filter-out IRIX%,$(SYSNAME)),)# SGI
-    ifeq ($(filter-out esu%,$(NODENAME)),)
-      ifeq ($(INSTRUCTION),mips3)
-        PERL = ${CMISS_ROOT}/bin/perl 
-      else
+  ifdef CMISS_PERL
+    PERL := $(CMISS_PERL)
+  else
+    # Specify the perl on some platforms so that everyone builds with the same.
+    ifeq ($(filter-out IRIX%,$(SYSNAME)),)# SGI
+      ifeq ($(filter-out esu%,$(NODENAME)),)
+        ifeq ($(INSTRUCTION),mips3)
+          PERL = ${CMISS_ROOT}/bin/perl 
+        else
+          ifeq ($(ABI),n32)
+            PERL = ${CMISS_ROOT}/bin/perl
+          else
+            PERL = ${CMISS_ROOT}/bin/mips-irix/perl64
+          endif
+        endif
+      endif
+      ifeq ($(NODENAME),hpc2)
         ifeq ($(ABI),n32)
           PERL = ${CMISS_ROOT}/bin/perl
         else
-          PERL = ${CMISS_ROOT}/bin/mips-irix/perl64
+          PERL = ${CMISS_ROOT}/bin/perl64
+        endif
+      endif
+      # What to oxford NODENAMEs look like?
+      CMISS_LOCALE ?=
+      ifeq (${CMISS_LOCALE},OXFORD)
+        ifeq ($(ABI),n32)
+          PERL = /usr/paterson/local/bin/perl
+        else
+          PERL = /usr/paterson/local64/bin/perl
         endif
       endif
     endif
-    ifeq ($(NODENAME),hpc2)
-      ifeq ($(ABI),n32)
-        PERL = ${CMISS_ROOT}/bin/perl
+    ifeq ($(SYSNAME),SunOS)
+        ifeq ($(ABI),32)
+          PERL = ${CMISS_ROOT}/bin/perl
+        else
+          PERL = ${CMISS_ROOT}/bin/$(ABI)/perl
+        endif
+    endif
+    ifeq ($(SYSNAME),AIX)
+        ifeq ($(ABI),32)
+          PERL = ${CMISS_ROOT}/bin/perl
+        else
+          PERL = ${CMISS_ROOT}/bin/perl64
+        endif
+    endif
+    ifeq ($(filter-out esp56%,$(NODENAME)),)
+      PERL = ${CMISS_ROOT}/bin/i686-linux/perl
+    endif
+    ifndef PERL
+      ifeq ($(ABI),64)
+        # Need a perl of the same ABI
+        PERL = perl64
       else
-        PERL = ${CMISS_ROOT}/bin/perl64
+        # Assume 32-bit and first perl in path is suitable for this architecture
+        PERL = perl
       endif
     endif
-    # What to oxford NODENAMEs look like?
-    CMISS_LOCALE ?=
-    ifeq (${CMISS_LOCALE},OXFORD)
-      ifeq ($(ABI),n32)
-        PERL = /usr/paterson/local/bin/perl
-      else
-        PERL = /usr/paterson/local64/bin/perl
-      endif
+    ifeq ($(SYSNAME),win32)
+      PERL = c:/perl/5.6.1/bin/MSWin32-x86/perl.exe
     endif
-  endif
-  ifeq ($(SYSNAME),SunOS)
-      ifeq ($(ABI),32)
-        PERL = ${CMISS_ROOT}/bin/perl
-      else
-        PERL = ${CMISS_ROOT}/bin/$(ABI)/perl
-      endif
-  endif
-  ifeq ($(SYSNAME),AIX)
-      ifeq ($(ABI),32)
-        PERL = ${CMISS_ROOT}/bin/perl
-      else
-        PERL = ${CMISS_ROOT}/bin/perl64
-      endif
-  endif
-  ifeq ($(filter-out esp56%,$(NODENAME)),)
-    PERL = ${CMISS_ROOT}/bin/i686-linux/perl
-  endif
-  ifndef PERL
-    ifeq ($(ABI),64)
-      # Need a perl of the same ABI
-      PERL = perl64
-    else
-      # Assume 32-bit and first perl in path is suitable for this architecture
-      PERL = perl
+    ifndef PERL
+      $(error PERL not defined)
     endif
-  endif
-  ifeq ($(SYSNAME),win32)
-	   PERL = c:/perl/5.6.1/bin/MSWin32-x86/perl.exe
-  endif
-  ifndef PERL
-    $(error PERL not defined)
   endif
 endif
 
@@ -261,6 +265,7 @@ PERL_CMISS_MAKEFILE = $(PERL_WORKING_DIR)/Makefile
 PERL_CMISS_LIB = $(PERL_WORKING_DIR)/auto/Perl_cmiss/Perl_cmiss.a
 ifneq ($(SHARED_OBJECT), true)
    STATIC_PERL_LIB = $(firstword $(wildcard $(PERL_ARCHLIB)/CORE/libperl.a) $(wildcard $(PERL_ARCHLIB)/CORE/libperl56.a))
+$(warning STATIC_PERL $(STATIC_PERL_LIB) $(PERL_ARCHLIB) $(wildcard $(PERL_ARCHLIB)/CORE/libperl.a) )
    ifneq ($(USE_DYNAMIC_LOADER), true)
       ifeq ($(STATIC_PERL_LIB),)
          $(error 'Static $(PERL_ARCHLIB)/CORE/libperl.a not found for ${PERL} which is required for a non dynamic loading perl interpreter.')
@@ -302,7 +307,10 @@ LIB_EXP := $(patsubst %$(LIBRARY_SUFFIX), %.exp, $(LIBRARY_LINK))
 
 SOURCE_FILES := $(notdir $(wildcard $(SOURCE_DIR)/*.*) )
 PMH_FILES := $(patsubst %.pm, %.pmh, $(filter %.pm, $(SOURCE_FILES)))
-C_SOURCES := $(filter %.c, $(SOURCE_FILES) )
+C_SOURCES := perl_interpreter.c
+ifeq ($(USE_DYNAMIC_LOADER), true)
+   C_SOURCES += perl_interpreter_dynamic.c
+endif
 C_UNITS := $(basename $(C_SOURCES) )
 DEPEND_FILES := $(foreach unit, $(C_UNITS), $(WORKING_DIR)/$(unit).d )
 
@@ -506,7 +514,7 @@ endif
 ifneq ($(SYSNAME),win32)
 	$(MAKE) --directory=$(PERL_WORKING_DIR) static
 else
-	#Use dmake as it supports back slashes for paths
+   #Use dmake as it supports back slashes for paths
 	( cd $(PERL_WORKING_DIR) ; dmake static )
 endif
 ifeq ($(USE_DYNAMIC_LOADER),true)

@@ -1,7 +1,7 @@
 /*******************************************************************************
 FILE : perl_interpreter.c
 
-LAST MODIFIED : 26 March 2003
+LAST MODIFIED : 9 June 2003
 
 DESCRIPTION :
 Provides an interface between cmiss and a Perl interpreter.
@@ -13,13 +13,6 @@ Provides an interface between cmiss and a Perl interpreter.
 #endif /* ! defined (NO_STATIC_FALLBACK) */
 #include <stdio.h>
 #include <unistd.h>
-#if defined (USE_DYNAMIC_LOADER)
-#include <string.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <fcntl.h>
-#include <dlfcn.h>
-#endif /* defined (USE_DYNAMIC_LOADER) */
 #include <stdarg.h>
 #include "perl_interpreter.h"
 
@@ -65,6 +58,7 @@ The default interpreter_display_message_function.
 	va_start(ap,format);
 	return_code=vfprintf(stderr,format,ap);
 	va_end(ap);
+	fprintf(stderr,"\n");
 
 	return (return_code);
 } /* interpreter_display_message */
@@ -72,13 +66,9 @@ The default interpreter_display_message_function.
 static Interpreter_display_message_function *display_message_function =
    interpreter_display_message;
 
-#if defined (USE_DYNAMIC_LOADER)
-#include "perl_interpreter_dynamic.h"
-#endif /* defined (USE_DYNAMIC_LOADER) */
-
 #if defined (USE_DYNAMIC_LOADER) || defined (SHARED_OBJECT)
 /* Mangle the function names from now on so that function loaders 
-	 are the ones that CMISS connects to. */
+	 from the perl_interpreter_dynamic module are the ones that CMISS connects to. */
 #define create_interpreter_ __create_interpreter_
 #define interpreter_destroy_string_ __interpreter_destroy_string_
 #define destroy_interpreter_ __destroy_interpreter_

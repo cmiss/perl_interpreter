@@ -1,13 +1,61 @@
+/*******************************************************************************
+FILE : perl_interpreter_dynamic.c
+
+LAST MODIFIED : 9 June 2003
+
+DESCRIPTION :
+Puts a layer between cmiss and the perl interpreter which allows many different
+perl interpreters to be included in the executable and the appropriate one
+selected at runtime according to the perl found in the users path.
+==============================================================================*/
+
+#if ! defined (NO_STATIC_FALLBACK)
+#include <EXTERN.h>               /* from the Perl distribution     */
+#include <perl.h>                 /* from the Perl distribution     */
+#endif /* ! defined (NO_STATIC_FALLBACK) */
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <fcntl.h>
+#include <dlfcn.h>
+#include <stdarg.h>
+#include "perl_interpreter.h"
+
+static int interpreter_display_message(enum Message_type message_type,
+	char *format, ... )
+/*******************************************************************************
+LAST MODIFIED : 9 June 2003
+
+DESCRIPTION :
+The default interpreter_display_message_function.
+==============================================================================*/
+{
+	int return_code;
+	va_list ap;
+
+	va_start(ap,format);
+	return_code=vfprintf(stderr,format,ap);
+	va_end(ap);
+	fprintf(stderr,"\n");
+
+	return (return_code);
+} /* interpreter_display_message */
+
+static Interpreter_display_message_function *display_message_function =
+   interpreter_display_message;
+
 /* Used by dynamic_versions.h */
 struct Interpreter_library_strings {   char *version; char *archname; char *base64_string; };
 #include "dynamic_versions.h"
 
 #define LOAD_FUNCTION(symbol) \
-			if (return_code && (!(symbol ## handle = dlsym(interpreter_handle, "__" #symbol )))) \
-			{ \
-				 (*display_message_function)(ERROR_MESSAGE,"Unable to find symbol %s", "__" #symbol ); \
-				 return_code = 0; \
-			}
+	if (return_code && (!(symbol ## handle = dlsym(interpreter_handle, "__" #symbol )))) \
+	{ \
+		(*display_message_function)(ERROR_MESSAGE,"Unable to find symbol %s", "__" #symbol ); \
+		return_code = 0; \
+	}
 
 static int use_dynamic_interpreter = 0;
 
@@ -251,14 +299,14 @@ remove the temporary file it refers to.
 		}
 		else
 		{
-			display_message(ERROR_MESSAGE,
+			(*display_message_function)(ERROR_MESSAGE,
 				"write_base64_string_to_binary_file.  Invalid argument(s)");
 			return_string = (char *)NULL;
 		}
 	}
 	else
 	{
-		display_message(ERROR_MESSAGE,
+		(*display_message_function)(ERROR_MESSAGE,
 			"write_base64_string_to_binary_file.  Invalid argument(s)");
 		return_string = (char *)NULL;
 	}
@@ -278,14 +326,20 @@ the function pointers and then calls create_interpreter_ for that instance.
 {
 	char command[300], *library, perl_archname[200], *perl_executable,
 		*perl_executable_default = "perl", *perl_interpreter_string, perl_version[200],
-		perl_archlib[200], perl_shared_library[200];
-	FILE *perl_result;
-	int i, number_of_perl_interpreters, return_code, stdout_pipe[2], old_stdout;
+		perl_archlib[200], perl_result_buffer[500], perl_shared_library[200];
+	fd_set readfds;
+	int flags, i, number_of_perl_interpreters, number_read, return_code,
+		stdout_pipe[2], old_stdout;
+	struct timeval timeout_struct;
 	void *interpreter_handle, *perl_handle;
 
 	return_code = 0;
 	use_dynamic_interpreter = 0;
 	perl_interpreter_string = (char *)NULL;
+
+	*perl_archname = 0;
+	*perl_version = 0;
+	*perl_archlib = 0;
 
 	number_of_perl_interpreters = sizeof(interpreter_strings) /
 		sizeof(struct Interpreter_library_strings);
@@ -307,31 +361,50 @@ the function pointers and then calls create_interpreter_ for that instance.
 				}
 			}
 
-			sprintf(command, "%s -MConfig -e 'print \"$Config{archname} $Config{version} $Config{archlibexp}\n\"'", perl_executable);
+			sprintf(command, "%s -MConfig -e 'print \"$Config{archname} $Config{version} $Config{archlibexp}\\n\"'", perl_executable);
 			system(command);
 
 			/* Set stdout back */
 			dup2(old_stdout, STDOUT_FILENO);
+			close(stdout_pipe[1]);
 
-			if (perl_result = fdopen(stdout_pipe[0], "r"))
+			FD_ZERO(&readfds);
+			FD_SET(stdout_pipe[0], &readfds);
+			timeout_struct.tv_sec = 2;
+			timeout_struct.tv_usec = 0;
+			if (select(FD_SETSIZE, &readfds, NULL, NULL, &timeout_struct))
 			{
-				if (3 == fscanf(perl_result, "%190s %190s %190s", perl_archname, 
-					perl_version, perl_archlib))
+				if (number_read = read(stdout_pipe[0], perl_result_buffer, 499))
 				{
-					for (i = 0 ; i < number_of_perl_interpreters ; i++)
+					perl_result_buffer[number_read] = 0;
+					if (3 == sscanf(perl_result_buffer, "%190s %190s %190s", perl_archname, 
+						perl_version, perl_archlib))
 					{
-						if ((!strcmp(perl_archname, interpreter_strings[i].archname))
-							&& (!strcmp(perl_version, interpreter_strings[i].version)))
+						for (i = 0 ; i < number_of_perl_interpreters ; i++)
 						{
-							perl_interpreter_string = interpreter_strings[i].base64_string;
+							if ((!strcmp(perl_archname, interpreter_strings[i].archname))
+								&& (!strcmp(perl_version, interpreter_strings[i].version)))
+							{
+								perl_interpreter_string = interpreter_strings[i].base64_string;
+							}
 						}
+					}
+					else
+					{
+						(*display_message_function)(ERROR_MESSAGE,
+							"Unexpected result from \"%s\"", command);
 					}
 				}
 				else
 				{
-					display_message(ERROR_MESSAGE,"create_interpreter.  "
-						"Problem executing \"%s\"", command);
+					(*display_message_function)(ERROR_MESSAGE,
+						"No characters received from \"%s\"", command);
 				}
+			}
+			else
+			{
+				(*display_message_function)(ERROR_MESSAGE,
+					"Timed out executing \"%s\"", command);
 			}
 		}
 	}
@@ -361,9 +434,32 @@ the function pointers and then calls create_interpreter_ for that instance.
 
 	if (!return_code)
 	{
-		display_message(ERROR_MESSAGE,"create_interpreter.  "
-			"Unable to open a dynamic perl_interpreter.  Using the internal one. %s",
-			dlerror()) ;
+		(*display_message_function)(ERROR_MESSAGE,
+			"Unable to open a dynamic perl_interpreter to match your perl \"%s\".",
+			perl_executable);
+		if (perl_interpreter_string)
+		{
+			(*display_message_function)(ERROR_MESSAGE,
+				"dl library error: %s", dlerror());
+		}
+		else
+		{
+			if (*perl_version && *perl_archname)
+			{
+				/* We didn't get a match so lets list all the versions strings */
+				(*display_message_function)(ERROR_MESSAGE,
+					"Your perl reported version \"%s\" and archname \"%s\".",
+					perl_version, perl_archname);
+				(*display_message_function)(ERROR_MESSAGE,
+					"The version and archname interpreters included in this executable are:");
+				for (i = 0 ; i < number_of_perl_interpreters ; i++)
+				{
+					(*display_message_function)(ERROR_MESSAGE,
+						"                         %s             %s",
+						interpreter_strings[i].version, interpreter_strings[i].archname);
+				}
+			}
+		}
 	}
 
 	if (return_code)
@@ -396,12 +492,13 @@ the function pointers and then calls create_interpreter_ for that instance.
 	else
 	{
 #if ! defined (NO_STATIC_FALLBACK)
+		(*display_message_function)(ERROR_MESSAGE, "Falling back to using the internal perl interpreter.");
 		__create_interpreter_(argc, argv, initial_comfile, status);
 		return_code = *status;
 #else /* ! defined (NO_STATIC_FALLBACK) */
-		display_message(ERROR_MESSAGE,"create_interpreter.  "
-			"No fallback static perl interpreter was included in this "
-			"executable.");
+		(*display_message_function)(ERROR_MESSAGE,
+			"No fallback static perl interpreter was included in this executable."
+			"This executable will be unable to operate until your perl version matches one of the dynamically included versions.");
 		return_code = 0;
 #endif /* ! defined (NO_STATIC_FALLBACK) */
 	}
@@ -429,12 +526,22 @@ Dynamic loader wrapper
 void interpreter_set_display_message_function_(Interpreter_display_message_function *function,
 	int *status)
 /*******************************************************************************
-LAST MODIFIED : 26 March 2003
+LAST MODIFIED : 9 June 2003
 
 DESCRIPTION :
 Dynamic loader wrapper
 ==============================================================================*/
 {
+	/* Set the display message function in this module */
+	if (function)
+	{
+		display_message_function = function;
+	}
+	else
+	{
+		display_message_function = interpreter_display_message;			
+	}
+	/* Now set it in the actual perl interpreter module */
 	if (use_dynamic_interpreter)
 	{
 		(*interpreter_set_display_message_function_handle)(function, status);
