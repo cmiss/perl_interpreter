@@ -294,7 +294,7 @@ ifeq ($(TASK),library)
 #-----------------------------------------------------------------------------
 
   # retain intermediate files
-  .PRECIOUS : $(WORKING_DIR)/%.o $(WORKING_DIR)/%.mod_date \
+  .PRECIOUS : $(WORKING_DIR)/%.mod_date \
     $(WORKING_DIR)/%.mod_record $(WORKING_DIR)/%.mod
 
   #-----------------------------------------------------------------------------
@@ -306,6 +306,9 @@ ifeq ($(TASK),library)
 
   $(LIBRARY) : $(C_OBJ) $(F_OBJ)
 	$(AR) $(ARFLAGS) $@ $^
+
+  # don't retain these relocatable objects
+  .INTERMEDIATE : $(C_OBJ) $(F_OBJ)
 
   $(C_OBJ) : $(foreach unit, $(C_UNITS), $(WORKING_DIR)/$(unit).o ) \
     $(DYNALOADER_LIB) $(PERL_CMISS_LIB) $(PERL_LIB)
