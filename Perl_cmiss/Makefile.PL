@@ -9,10 +9,6 @@ unless( exists $ENV{WORKING_DIR} ) {
     die "$0: environment variable WORKING_DIR not set\n";
 }
 my $working_dir = $ENV{WORKING_DIR};
-unless( exists $ENV{HOSTTYPE} ) {
-    die "$0: environment variable HOSTTYPE not set\n";
-}
-my $hosttype = $ENV{HOSTTYPE};
 unless( -d $working_dir ) {
     use File::Path;
     # make and print subdirectories

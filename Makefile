@@ -4,8 +4,11 @@ MAKEFLAGS = --no-builtin-rules --warn-undefined-variables
 
 #-----------------------------------------------------------------------------
 
-ifndef HOSTTYPE
-  $(error HOSTTYPE not defined)
+ifndef SYSNAME
+  SYSNAME = $(shell uname)
+  ifeq ($(SYSNAME),)
+    $(error error with shell command uname)
+  endif
 endif
 
 ifndef DEBUG
@@ -20,7 +23,7 @@ ifndef DEBUG
 endif
 
 # set architecture dependent directories
-ifeq (${HOSTTYPE},iris4d)
+ifneq ($(findstring IRIX,$(SYSNAME)),) #SGI
   # Specify what application binary interface (ABI) to use i.e. 32, n32 or 64
   ifndef ABI
     ABI = n32
@@ -41,8 +44,8 @@ ifeq (${HOSTTYPE},iris4d)
   INSTRUCTION := mips$(MIPS)
   ARCH_DIR := $(INSTRUCTION)-$(ABI)
 else
-  ifeq (${HOSTTYPE},i386-linux)
-    ABI = 32# for preprocess_fortran.pl#
+  ifeq ($(SYSNAME),Linux)
+    ABI = 32# for preprocess_fortran.pl
     ARCH_DIR := linux86
   else
     ifndef ABI
@@ -56,11 +59,6 @@ ifneq ($(DEBUG),false)
   OPT_SUFFIX = -debug
 else
   OPT_SUFFIX = -opt
-endif
-
-PWD = $(shell pwd)
-ifeq ($(PWD),)
-  $(error pwd failed)
 endif
 
 SOURCE_DIR = source
@@ -108,7 +106,7 @@ else
   ifdef CMISS_PERL
     PERL := ${CMISS_PERL}
   else
-    ifeq (${HOSTTYPE},iris4d) 
+    ifneq ($(findstring IRIX,$(SYSNAME)),)
       # need a perl of the same architecture (and ABI) type
       # so don't just find the first perl in PATH
       ifeq ($(HOST:esu%=),)
@@ -139,7 +137,7 @@ else
         endif
       endif
     endif
-    ifeq (${HOSTTYPE},i386-linux)
+    ifeq ($(SYSNAME),Linux)
       PERL = /usr/bin/perl
     endif
     ifndef PERL
@@ -159,7 +157,7 @@ PERL_LIB = $(PERL_ARCHLIB)/CORE/libperl.a
 
 C_INCLUDE_DIRS = $(PERL_ARCHLIB)/CORE
 
-export WORKING_DIR HOSTTYPE# for Perl_cmiss/Makefile.PL
+export WORKING_DIR# for Perl_cmiss/Makefile.PL
 
 #-----------------------------------------------------------------------------
 # compiling commands
@@ -174,7 +172,8 @@ LD_RELOCATABLE = ld -r
 F90_ARCHIVES =
 AR = ar
 ARFLAGS = -cr
-ifeq (${HOSTTYPE},iris4d)
+
+ifneq ($(findstring IRIX,$(SYSNAME)),)
   F90C = f90
   CFLAGS += -$(ABI) -$(INSTRUCTION)
   F90FLAGS += -$(ABI) -$(INSTRUCTION)
@@ -187,7 +186,7 @@ ifeq (${HOSTTYPE},iris4d)
   F90FLAGS += -$(ABI) -$(INSTRUCTION)
   LD_RELOCATABLE += -$(ABI) -$(INSTRUCTION)
 else
-  ifeq (${HOSTTYPE},i386-linux)
+  ifeq ($(SYSNAME),Linux)
     F90C = pgf90
     # Include pgf90 objects required by f90
     # so that pgf90 is not required to link cm.
@@ -239,7 +238,7 @@ ifeq ($(TASK),)
   all :
 	$(MAKE)
 	$(MAKE) OPT=
-  ifeq (${HOSTTYPE},iris4d)
+  ifneq ($(SYSNAME),Linux)
 	$(MAKE) ABI=64
 	$(MAKE) ABI=64 OPT=
   endif
@@ -357,7 +356,7 @@ ifeq ($(TASK),library)
 
   $(WORKING_DIR)/%.o : $(SOURCE_DIR)/%.f90
         # cd so that .mod files end up in WORKING_DIR
-	cd $(WORKING_DIR); $(F90C) $(F90FLAGS) ${PWD}/$<
+	cd $(WORKING_DIR); $(F90C) $(F90FLAGS) $(CURDIR)/$<
 
   #-----------------------------------------------------------------------------
   # implicit rules for the f90 modules
