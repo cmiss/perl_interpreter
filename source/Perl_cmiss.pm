@@ -37,8 +37,8 @@ sub call_command
   {
 	 local $command = shift;
 	 {
-#Need to import the cmiss command before we change to this package always
-#		package main;
+		package main;
+		*{main::cmiss} = \&{Perl_cmiss::cmiss};
 		# Catch all warnings as errors */
 		local $SIG{__WARN__} = sub { die $_[0] };
 		eval ($Perl_cmiss::command);
@@ -248,7 +248,7 @@ sub execute_command
 										  $is_simple_token = 1;
 										  $part_token = "";
 										}
-									 elsif (($part_token eq "") && ($command =~ s%^(\-?[.,0-9:]+)%%))
+									 elsif (($part_token eq "") && ($command =~ s%^(\?|[\-]?[.,0-9:]+)%%))
 										{
 										  if ($cmiss_debug)
 											 {
@@ -303,6 +303,9 @@ sub execute_command
 												if ($extracted)
 												  {
 													 $command = $reduced_command;
+													 #Escape " and \ characters except for the start and end ones
+													 $extracted =~ s/(?<=.)\\(?=.)/\\\\/g;
+													 $extracted =~ s/(?<=.)\"(?=.)/\\\"/g;
 													 $part_token = $part_token . $extracted;
 													 if ($cmiss_debug)
 														{
