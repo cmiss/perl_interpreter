@@ -130,7 +130,13 @@ endif
 #need to override this to false and you must have the corresponding
 #static libperl.a
 ifndef USE_DYNAMIC_LOADER
-  USE_DYNAMIC_LOADER = true
+  ifeq ($(SYSNAME),AIX)
+    #AIX distributions have a static perl and even if I build
+    #a shared "libperl.a" I cannot seem to dlopen it.
+    USE_DYNAMIC_LOADER = false
+  else
+    USE_DYNAMIC_LOADER = true
+  endif
 endif
 
 #This routine is recursivly called for each possible dynamic version
@@ -272,7 +278,7 @@ endif
 LIBRARY_NAME := libperlinterpreter$(OPT_SUFFIX)$(LIBRARY_SUFFIX)
 LIBRARY := $(LIBRARY_DIR)/$(LIBRARY_NAME)
 LIBRARY_LINK := $(LIBRARY_ROOT_DIR)/libperlinterpreter$(OPT_SUFFIX)$(LIBRARY_SUFFIX)
-LIB_EXP := $(patsubst %$(LIBRARY_SUFFIX), %.exp, $(LIBRARY))
+LIB_EXP := $(patsubst %$(LIBRARY_SUFFIX), %.exp, $(LIBRARY_LINK))
 
 SOURCE_FILES := $(notdir $(wildcard $(SOURCE_DIR)/*.*) )
 PMH_FILES := $(patsubst %.pm, %.pmh, $(filter %.pm, $(SOURCE_FILES)))
@@ -400,6 +406,9 @@ ifeq ($(USE_DYNAMIC_LOADER),true)
       ifeq ($(SYSNAME),Linux)
          SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-i386-linux*/perl)
          SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-i686-linux*/perl)
+      endif
+      ifeq ($(SYSNAME),AIX)
+         SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-rs6000-${ABI}*/perl)
       endif
       ifeq ($(filter-out IRIX%,$(SYSNAME)),)# SGI
          SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-irix-${ABI}*/perl)
@@ -580,7 +589,7 @@ ifeq ($(USE_DYNAMIC_LOADER),true)
   #Always regenerate the dynamic_versions file as it has recorded for
   #us the versions that are built into this executable
   $(WORKING_DIR)/dynamic_versions.h.new : $(SHARED_LIBRARY_HEADERS)
-	echo -n > $@;
+	echo > $@;
 	$(foreach header, $(SHARED_LIBRARY_HEADERS), \
       echo '#define libperlinterpreter_uidh libperlinterpreter$(word 3, $(subst /,' ',$(subst .,_,$(header))))$(word 4, $(subst /,' ',$(subst -,_,$(header))))' >> $@; \
       echo '#include "../../../$(header)"' >> $@; \
