@@ -142,6 +142,13 @@ else
       endif
     endif
   endif
+  ifeq ($(SYSNAME),SunOS)
+      ifeq ($(ABI),32)
+        PERL = ${CMISS_ROOT}/bin/perl
+      else
+        PERL = ${CMISS_ROOT}/bin/$(ABI)/perl
+      endif
+  endif
   ifeq ($(SYSNAME),AIX)
       ifeq ($(ABI),32)
         PERL = ${CMISS_ROOT}/bin/perl
