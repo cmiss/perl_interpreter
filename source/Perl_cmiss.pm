@@ -24,18 +24,6 @@ my $block_required = 0;
 my $echo_commands = 0;
 my $cmiss_debug = 0;
 
-sub remap_descriptor
-  {
-	 my $filedescriptor = shift;
-
-	 #Redirect all STDOUT and STDERR to a pipe */
-	 if ($filedescriptor)
-		{
-		  open (STDOUT, ">&=$filedescriptor") || die "can't open fd $filedescriptor: $!";
-		}
-	 $| = 1;
-  }
-
 sub register_keyword
   {
 	 my $word = shift;

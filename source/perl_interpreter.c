@@ -26,10 +26,13 @@ static void xs_init _((void));
 
 void boot_DynaLoader _((CV* cv));
 void boot_Perl_cmiss _((CV* cv));
-static int perl_interpreter_filehandle = 0;
+static int perl_interpreter_filehandle_in = 0;
+static int perl_interpreter_filehandle_out = 0;
 static int perl_interpreter_kept_quit;
 static void *perl_interpreter_kept_user_data; 
 static execute_command_function_type kept_execute_command_function;
+static int keep_stdout = 0;
+static int keep_stderr = 0;
 
 void xs_init()
 {
@@ -158,28 +161,16 @@ routine can write this to the command window.
 ==============================================================================*/
 {
   int filehandles[2], return_code;
-  IV perl_filehandle;
 
   return_code = 1;
 
   if (0 == pipe (filehandles))
   {
-	 dSP ;
-	 
-	 perl_interpreter_filehandle = filehandles[0];
-	  
-	 ENTER ;
-	 SAVETMPS;
+	  perl_interpreter_filehandle_in = filehandles[1];
+	  perl_interpreter_filehandle_out = filehandles[0];
 
-	 PUSHMARK(sp) ;
-	 perl_filehandle = filehandles[1];
-	 XPUSHs(sv_2mortal(newSViv(perl_filehandle)));
-	 PUTBACK;
-	 perl_call_pv("Perl_cmiss::remap_descriptor", G_DISCARD);
-	 
-	 FREETMPS ;
-	 LEAVE ;
-
+	  keep_stdout = dup(STDOUT_FILENO);
+	  keep_stderr = dup(STDERR_FILENO);
   }
   else
   {
@@ -207,24 +198,24 @@ and then executes the returned strings
 	
 	return_code = 1;
 
-	if (perl_interpreter_filehandle)
+	if (perl_interpreter_filehandle_out)
 	  {
 		 FD_ZERO(&readfds);
-		 FD_SET(perl_interpreter_filehandle, &readfds);
+		 FD_SET(perl_interpreter_filehandle_out, &readfds);
 		 timeout_struct.tv_sec = 0;
 		 timeout_struct.tv_usec = 0;
 		 
 		 /* Empty the output buffer and send it to the screen */
-		 flags = fcntl (perl_interpreter_filehandle, F_GETFL);
+		 flags = fcntl (perl_interpreter_filehandle_out, F_GETFL);
 		 /*???DB.  Wouldn't compile at home.  O_NDELAY is equivalent to
 			FNDELAY */
 		 /*					flags &= FNDELAY;*/
 		 flags &= O_NDELAY;
 		 flags &= O_NONBLOCK;
-		 fcntl (perl_interpreter_filehandle, F_SETFL, flags);
+		 fcntl (perl_interpreter_filehandle_out, F_SETFL, flags);
 		 while (select(FD_SETSIZE, &readfds, NULL, NULL, &timeout_struct))
 			{
-			  if (read_length = read(perl_interpreter_filehandle, (void *)buffer, sizeof(buffer) - 1))
+			  if (read_length = read(perl_interpreter_filehandle_out, (void *)buffer, sizeof(buffer) - 1))
 				 {
 					buffer[read_length] = 0;
 					display_message(INFORMATION_MESSAGE,
@@ -248,6 +239,16 @@ and then executes the returned strings
 
 	if (command_string)
 	{
+		/* Change STDOUT and STDERR back to the standard pipes */
+		if (keep_stdout)
+		{
+			dup2(keep_stdout, STDOUT_FILENO);
+		}
+		if (keep_stderr)
+		{
+			dup2(keep_stderr, STDERR_FILENO);
+		}
+
 #if defined (CMISS_DEBUG)
 		printf("cmiss_perl_callback: %s\n", command_string);
 #endif /* defined (CMISS_DEBUG) */
@@ -264,6 +265,13 @@ and then executes the returned strings
 #if defined (CMISS_DEBUG)
 		printf("cmiss_perl_callback code: %d (%s)\n", return_code, command_string);
 #endif /* defined (CMISS_DEBUG) */
+
+		/* Put the redirection back on again */
+		if (perl_interpreter_filehandle_in)
+		{
+			dup2(perl_interpreter_filehandle_in, STDOUT_FILENO);
+			dup2(perl_interpreter_filehandle_in, STDERR_FILENO);
+		}
 	}
 	else
 	{
@@ -287,7 +295,6 @@ Takes a <command_string>, processes this through the Perl interpreter.
 		*slash_pointer, *wrapped_command;
 	int return_code;
 	STRLEN n_a;
-	SV *cvrv;
 	dSP ;
  
 	ENTER ;
@@ -358,7 +365,25 @@ Takes a <command_string>, processes this through the Perl interpreter.
 #if defined (CMISS_DEBUG)
 			printf("cmiss_perl_execute_command: %s\n", wrapped_command);
 #endif /* defined (CMISS_DEBUG) */
-			cvrv = perl_eval_pv(wrapped_command, FALSE);
+
+			if (perl_interpreter_filehandle_in)
+			{
+				/* Redirect STDOUT and STDERR */
+				dup2(perl_interpreter_filehandle_in, STDOUT_FILENO);
+				dup2(perl_interpreter_filehandle_in, STDERR_FILENO);
+			}
+				
+			perl_eval_pv(wrapped_command, FALSE);
+
+			/* Change STDOUT and STDERR back again */
+			if (keep_stdout)
+			{
+				dup2(keep_stdout, STDOUT_FILENO);
+			}
+			if (keep_stderr)
+			{
+				dup2(keep_stderr, STDERR_FILENO);
+			}
 
 			*quit = perl_interpreter_kept_quit;
  
