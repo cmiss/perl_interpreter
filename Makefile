@@ -87,6 +87,9 @@ ifeq ($(SYSNAME),Linux)
     ifeq ($(MACHNAME),ia64)
       ABI=64
     endif
+    ifeq ($(MACHNAME),x86_64)
+      ABI=64
+    endif
   endif
 endif
 ifeq (filter-out $(SYSNAME),)# CYGWIN
@@ -180,9 +183,9 @@ else
   else
     # defaults first
     PERL = perl# first perl in path
-    ifneq ($(MACHNAME),ia64)
-      ifeq ($(ABI),64)
-        # Need a perl of the same ABI
+    ifeq ($(ABI),64)
+      # Need a perl of the same ABI
+      ifeq (,$(filter $(MACHNAME),ia64 x86_64))# not ia64 or x86_64
         PERL = perl64
       endif
     endif
@@ -282,8 +285,12 @@ ifeq ($(TASK),)
     SHARED_PERL_EXECUTABLES =
     ifneq ($(wildcard ${CMISS_ROOT}/perl),)
       ifeq ($(SYSNAME),Linux)
-         SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-i386-linux*/perl)
-         SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-i686-linux*/perl)
+        ifeq ($(filter-out i%86,$(MACHNAME)),)
+          SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-i386-linux*/perl)
+          SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-i686-linux*/perl)
+        else
+	  SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-$(MACHNAME)-linux*/perl)
+        endif
       endif
       ifeq ($(SYSNAME),AIX)
          SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-rs6000-${ABI}*/perl)
@@ -418,9 +425,13 @@ ifeq ($(SYSNAME),Linux)
   else
     # gcc
     CPPFLAGS += -Dbool=char -DHAS_BOOL
+    # !!! Position independent code is actually only required for objects
+    # in shared libraries.
+    CF_FLGS += -fpic
+#    CFE_FLGS += -m$(ABI)
   endif
   OPTCF_FLGS = -O2
-  SHARED_LINK_LIBRARIES += -lcrypt -ldl -lperl
+  SHARED_LINK_LIBRARIES += -lcrypt -ldl -L$(PERL_ARCHLIB)/CORE -lperl
 endif
 ifeq ($(SYSNAME),win32)
   CC = gcc -fnative-struct
@@ -590,7 +601,7 @@ endif
 	mkdir -p $@
 
 clean:
-	@echo "Cleaning house ..."
+	@echo "Cleaning some of house ..."
 	-rm -rf $(PERL_WORKING_DIR) $(WORKING_DIR) $(LIBRARY) $(LIB_EXP)
 
 allclean:
