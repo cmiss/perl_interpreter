@@ -232,13 +232,6 @@ else
     ifeq ($(SYSNAME),win32)
       PERL = c:/perl/5.6.1/bin/MSWin32-x86/perl.exe
     endif
-    ifeq ($(SYSNAME),Darwin)
-        ifeq ($(ABI),32)
-          PERL = ${CMISS_ROOT}/bin/perl
-        else
-          PERL = ${CMISS_ROOT}/bin/perl64
-        endif
-    endif
   endif
 endif
 
