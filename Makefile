@@ -737,7 +737,7 @@ endif
     endif
 
     $(LIBRARY):
-	rm $@
+	[ ! -f $@ ] || rm $@
 	$(AR) $(ARFLAGS) $@ $^
 
     ifneq (,$(STATIC_PERL_LIB)) # have a static perl
