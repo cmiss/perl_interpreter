@@ -13,6 +13,7 @@ Provides an interface between cmiss and a Perl interpreter.
 #endif /* ! defined (NO_STATIC_FALLBACK) */
 #include <stdio.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <stdarg.h>
 #include "perl_interpreter.h"
 
