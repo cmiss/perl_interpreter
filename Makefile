@@ -1,18 +1,18 @@
-#!/usr/local/bin/gmake -f
+# For use with GNU make.
 # no builtin implicit rules
 MAKEFLAGS = --no-builtin-rules --warn-undefined-variables
 
 #-----------------------------------------------------------------------------
 
 ifndef SYSNAME
-  SYSNAME = $(shell uname)
+  SYSNAME := $(shell uname)
   ifeq ($(SYSNAME),)
     $(error error with shell command uname)
   endif
 endif
 
 ifndef NODENAME
-  NODENAME = $(shell uname -n)
+  NODENAME := $(shell uname -n)
   ifeq ($(NODENAME),)
     $(error error with shell command uname -n)
   endif
@@ -29,12 +29,16 @@ ifndef DEBUG
   endif
 endif
 
-# set architecture dependent directories
-ARCH_FLAGS :=
-ifneq ($(findstring IRIX,$(SYSNAME)),) #SGI
+# set architecture dependent directories and default options
+ARCH_DIR = $(SYSNAME)-$(ABI) #default
+ifeq ($(SYSNAME:IRIX%=),) #SGI
   # Specify what application binary interface (ABI) to use i.e. 32, n32 or 64
   ifndef ABI
-    ABI = n32
+    ifeq ($(SGI_ABI),-64)
+      ABI = 64
+    else
+      ABI = n32
+    endif
   endif
   # Specify which instruction set to use i.e. -mips#
   ifndef MIPS
@@ -51,24 +55,26 @@ ifneq ($(findstring IRIX,$(SYSNAME)),) #SGI
   endif
   INSTRUCTION := mips$(MIPS)
   ARCH_DIR := $(INSTRUCTION)-$(ABI)
-  ARCH_FLAGS := -$(ABI) -$(INSTRUCTION)
-else
-  ifeq ($(SYSNAME),Linux)
-    ABI = 32# for preprocess_fortran.pl
-    ARCH_DIR := linux86
-  else
-    ifndef ABI
-      ABI = 32# for preprocess_fortran.pl
-    endif
-    ifeq ($(SYSNAME),SunOS)
-      ARCH_DIR := solaris-$(ABI)
-      ifeq ($(ABI),64)
-        ARCH_FLAGS := -xarch=v9
-      endif
+endif
+ifeq ($(SYSNAME),Linux)
+  ARCH_DIR := linux86
+endif
+ifeq ($(SYSNAME),SunOS)
+  ARCH_DIR = solaris-$(ABI)
+endif
+ifeq ($(SYSNAME),AIX)
+  ifndef ABI
+    ifdef OBJECT_MODE
+      ABI = $(OBJECT_MODE)
     else
-      ARCH_DIR := $(SYSNAME)-$(ABI)
+      ABI = 64
     endif
   endif
+  ARCH_DIR = aix-$(ABI)
+endif
+
+ifndef ABI
+  ABI = 32# for preprocess_fortran.pl
 endif
 
 ifneq ($(DEBUG),false)
@@ -78,7 +84,6 @@ else
 endif
 
 SOURCE_DIR = source
-
 WORKING_DIR := generated/$(ARCH_DIR)$(OPT_SUFFIX)
 LIBRARY_DIR := lib/$(ARCH_DIR)
 
@@ -171,55 +176,70 @@ PERL_CMISS_MAKEFILE = $(PERL_WORKING_DIR)/Makefile
 PERL_CMISS_LIB = $(PERL_WORKING_DIR)/auto/Perl_cmiss/Perl_cmiss.a
 PERL_LIB = $(PERL_ARCHLIB)/CORE/libperl.a
 
-C_INCLUDE_DIRS = $(PERL_ARCHLIB)/CORE
+C_INCLUDE_DIRS = $(PERL_ARCHLIB)/CORE $(WORKING_DIR)
 
 #-----------------------------------------------------------------------------
 # compiling commands
 
 CC = cc
-CFLAGS = -c $(ARCH_FLAGS)
-DEBUG_CFLAGS = -g
-DEBUG_F90FLAGS = -g
-DEFINE = '-DABI_ENV="$(ABI_ENV)"'
-LD_RELOCATABLE = ld -r $(ARCH_FLAGS)
+LD_RELOCATABLE = ld -r $(LD_FLGS)
 AR = ar
+# option lists
+CCFLAGS = $(C_FLGS)
+CPPFLAGS := $(addprefix -I, $(C_INCLUDE_DIRS) ) '-DABI_ENV="$(ABI_ENV)"'
 ARFLAGS = -cr
-
-ifneq ($(findstring IRIX,$(SYSNAME)),)
-  DEBUG_CFLAGS += -DEBUG:trap_uninitialized:subscript_check:verbose_runtime
-  OPT_CFLAGS = -O3 -OPT:Olimit=0
-  ifeq ($(ABI),64)
-    OPT_CFLAGS += -r10000
-  endif
-else
-  ifeq ($(SYSNAME),Linux)
-    DEFINE += -Dbool=char -DHAS_BOOL
-    OPT_CFLAGS = -O2
-  else
-    ifeq ($(SYSNAME),SunOS)
-      OPT_CFLAGS = -O
-      LD_RELOCATABLE = ld -r
-    else
-      ifeq ($(SYSNAME),AIX)
-        OPT_CFLAGS = -O2
-        ifeq ($(ABI),64)
-          DEBUG_CFLAGS = -g -q64
-          OPT_CFLAGS = -O2 -q64
-          LD_RELOCATABLE = ld -r -b64 
-          ARFLAGS = -cr -X64
-        endif
-      else
-        OPT_CFLAGS = -O2
-      endif
-    endif
-  endif
-endif
 ifneq ($(DEBUG),false)
-  CFLAGS += $(DEBUG_CFLAGS)
+  CCFLAGS += $(DBGCC_FLGS)
 else
-  CFLAGS += $(OPT_CFLAGS)
+  CCFLAGS += $(OPTCC_FLGS)
 endif
-CPPFLAGS = $(addprefix -I, $(C_INCLUDE_DIRS) $(WORKING_DIR) ) $(DEFINE)
+# suboption lists
+C_FLGS = -c $(CLD_FLGS) $(CE_FLGS)
+CE_FLGS =
+LD_FLGS = $(CLD_FLGS)
+CLD_FLGS =
+DBGCC_FLGS = $(DBGC_FLGS)
+DBGC_FLGS = -g
+OPTCC_FLGS = $(OPTC_FLGS)
+OPTC_FLGS = -O $(OPT_FLGS)
+OPT_FLGS =
+
+ifeq ($(SYSNAME:IRIX%=),)
+  C_FLGS += -use_readonly_const
+  DBGC_FLGS += -DEBUG:trap_uninitialized:subscript_check:verbose_runtime
+  # warning 158 : Expecting MIPS3 objects: ... MIPS4.
+  LD_FLGS += -rdata_shared -DEBUG:error=158 -woff 47
+  CLD_FLGS := -$(ABI) -$(INSTRUCTION)
+  OPTC_FLGS = -O3 -OPT:Olimit=8000
+endif
+ifeq ($(SYSNAME),Linux)
+  CPPFLAGS += -Dbool=char -DHAS_BOOL
+  OPTC_FLGS = -O2
+endif
+ifeq ($(SYSNAME),SunOS)
+  # need arch_flags after -fast
+  OPT_FLGS = -fast $(CLD_FLGS)
+  ifeq ($(ABI),64)
+    CE_FLGS := -xarch=native64
+  endif
+endif
+ifeq ($(SYSNAME),AIX)
+  CC = xlc
+  # 1506-743 (I) 64-bit portability: possible change of result through conversion ...
+  # FD_SET in sys/time.h does this
+  CCFLAGS += -qinfo=ini:por:pro:trd:tru:use -qsuppress=1506-743
+  ifeq ($(ABI),64)
+    ARFLAGS += -X64
+  endif
+  # may want -qsrcmsg
+  C_FLGS += -qfullpath
+  CE_FLGS += -q$(ABI) -qarch=auto
+  LD_FLGS += -b$(ABI)
+  ifeq ($(ABI),64)
+    C_FLGS += -qwarn64
+  endif
+  OPTC_FLGS = -O3 -qtune=auto -qstrict -qmaxmem=-1
+endif
 
 #-----------------------------------------------------------------------------
 #-----------------------------------------------------------------------------
@@ -236,20 +256,13 @@ ifeq ($(TASK),)
   OLD_FILES := $(filter-out $(PMH_FILES) $(foreach unit,$(C_UNITS),$(unit).%), \
     $(TMP_FILES))
 
-  .PHONY : main tidy clean all
+  .PHONY : main tidy clean allclean \
+	all debug opt debug64 opt64
 
   main : $(PERL_CMISS_MAKEFILE) $(WORKING_DIR) $(LIBRARY_DIR)
 	$(MAKE) --directory=$(PERL_WORKING_DIR) static
-	$(MAKE) TASK=source
-	$(MAKE) TASK=library
-
-  all :
-	$(MAKE)
-	$(MAKE) OPT=
-  ifneq ($(SYSNAME),Linux)
-	$(MAKE) ABI=64
-	$(MAKE) ABI=64 OPT=
-  endif
+	$(MAKE) --no-print-directory TASK=source
+	$(MAKE) --no-print-directory TASK=library
 
   tidy :
   ifneq ($(OLD_FILES),)
@@ -268,6 +281,27 @@ ifeq ($(TASK),)
   clean:
 	@echo "Cleaning house ..."
 	rm -rf $(PERL_WORKING_DIR) $(WORKING_DIR) $(LIBRARY)
+
+  allclean:
+	@echo "Cleaning house ..."
+	rm -rf Perl_cmiss/generated/* generated/* lib/*
+
+  debug opt debug64 opt64:
+	$(MAKE) --no-print-directory DEBUG=$(DEBUG) ABI=$(ABI)
+
+  debug debug64: DEBUG=true
+  opt opt64: DEBUG=false
+  ifeq ($(SYSNAME:IRIX%=),) #SGI
+    debug opt: ABI=n32
+  else
+    debug opt: ABI=32
+  endif
+  debug64 opt64: ABI=64
+
+  all : debug opt
+  ifneq ($(SYSNAME),Linux)
+    all: debug64 opt64
+  endif
 
 #-----------------------------------------------------------------------------
 endif
@@ -299,12 +333,6 @@ endif
 ifeq ($(TASK),library)
 #-----------------------------------------------------------------------------
 
-  # retain intermediate files
-  .PRECIOUS : $(WORKING_DIR)/%.mod_date \
-    $(WORKING_DIR)/%.mod_record $(WORKING_DIR)/%.mod
-
-  #-----------------------------------------------------------------------------
-
   # explicit rule for making the library
   # Including all necessary objects from archives into output archive.
   # This is done by producing a relocatable object first.
@@ -320,20 +348,14 @@ ifeq ($(TASK),library)
     $(DYNALOADER_LIB) $(PERL_CMISS_LIB) $(PERL_LIB)
 	$(LD_RELOCATABLE) -o $@ $^
 
-  #-----------------------------------------------------------------------------
-  # include the object (and .mod) dependencies)
+  # include the object dependencies
   ifneq ($(DEPEND_FILES),)
     include $(DEPEND_FILES)
   endif
 
-  #-----------------------------------------------------------------------------
   # implicit rules for making the objects
-
   $(WORKING_DIR)/%.o : $(SOURCE_DIR)/%.c
-	$(CC) -o $@ $(CPPFLAGS) $(CFLAGS) $<
-
-# $(WORKING_DIR)/%_.o : $(SOURCE_DIR)/%.c
-# 	$(CC) -o $@ $(CPPFLAGS) $(CFLAGS) -DFORTRAN_INTERPRETER_INTERFACE $<
+	$(CC) -o $@ $(CPPFLAGS) $(CCFLAGS) $<
 
 #-----------------------------------------------------------------------------
 endif
