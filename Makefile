@@ -586,7 +586,7 @@ endif
   else
     $(LIBRARY) : $(foreach unit, $(C_UNITS), $(WORKING_DIR)/$(unit).o ) \
          $(DYNALOADER_LIB) $(PERL_CMISS_LIB) $(STATIC_PERL_LIB)
-		$(LD_SHARED) -o $@ $^ -lcrypt -lc
+		$(LD_SHARED) -o $@ $^ -lcrypt -ldl -lc
   endif
 
   # include the object dependencies
