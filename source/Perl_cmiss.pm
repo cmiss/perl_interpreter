@@ -224,6 +224,47 @@ sub execute_command
 					 $token = $token . $1;
 					 $block_required = 1;
 				  }
+				elsif (($token =~ m/^\s*$/) && ($lc_command =~ m/^(itp)?\s*(ass\w*|set)?\s*(ech\w*|deb\w*)?\s*(\?+)/))
+				  {
+					 my $first_word = $1;
+					 my $second_word = $2;
+					 my $third_word = $3;
+					 my $fourth_word = $4;
+					 print "itp\n";
+					 if ((! $second_word) || ($second_word =~ m/ass\w*/))
+						{
+						  print "  assert blocks closed\n";
+						}
+					 if ((! $second_word) || ($second_word =~ m/set/))
+						{
+						  print "  set\n";
+						  if ((! $third_word) || ($third_word =~ m/ech\w*/))
+							 {
+								print "    echo\n";
+								print "      <on>\n";
+								print "      <off>\n";
+								print "      <prompt PROMPT_STRING>\n";
+							 }
+						  if ((! $third_word) || ($third_word =~ m/deb\w*/))
+							 {						  
+								print "    debug\n";
+								print "      <on>\n";
+								print "      <off>\n";
+							 }
+						}
+					 if (! $first_word)
+						{
+						  #Call Cmiss with the help command
+						  $token .= "Perl_cmiss::cmiss_array(\"$fourth_word\")";
+						  push(@tokens, $token);
+						  $token = "";						  
+						}
+					 $command =~ s/^([^}#]*)//;
+					 if ($cmiss_debug)
+						{
+						  print "itp?: $1\n";
+						}
+				  }
 				elsif ($lc_command =~ m/^itp/)
 				  {
 					 if ($lc_command =~ m/^itp\s+ass\w*\s+blo\w*\s+clo\w*/)
@@ -233,7 +274,7 @@ sub execute_command
 								$block_required = 0;
 								$block_count = 0;
 								@command_list = ();
-								die ("itp assert blocks closed failed");
+								die ("itp assert blocks closed failed\n");
 							 }
 						}
 					 elsif ($lc_command =~ m/^itp\s+set\s+echo\s*(\w*)\s*(?:[\"\']([^\"\']*)[\"\']|([^\"\']+\S*)|)/)
@@ -274,7 +315,7 @@ sub execute_command
 						}
 					 else
 						{
-						  die ("Unknown itp environment command");
+						  die ("Unknown itp environment command\n");
 						}
 					 $command =~ s/^([^}#]*)//;
 					 if ($cmiss_debug)
@@ -288,8 +329,7 @@ sub execute_command
 					 if ($token =~ m/^\s*$/)
 						{
 						  if (($lc_command =~ m/^(?:$match_string)\b/)
-								|| ($lc_command =~ m/^q$/)
-								|| ($lc_command =~ m/^\?+$/))
+								|| ($lc_command =~ m/^q$/))
 							 {
 								$token = $token . "(Perl_cmiss::cmiss_array(";
 								$part_token = "";
