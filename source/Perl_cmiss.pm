@@ -82,7 +82,8 @@ sub set_INC_for_platform
 				  {
 # GBS 6-March-2000  Directory changed
 # 			  my $cmiss_perl_lib = $ENV{CMISS_ROOT}.'/perl_lib';
-					my $cmiss_perl_lib = $ENV{CMISS_ROOT}.'/perl/lib';
+# 				my $cmiss_perl_lib = $ENV{CMISS_ROOT}.'/perl/lib';
+					my $cmiss_perl_lib = $ENV{CMISS_ROOT}.'/cmiss_perl/lib';
 					if( -d $cmiss_perl_lib )
 					  {
 						$perlinc = $cmiss_perl_lib.':'.$perlinc;
