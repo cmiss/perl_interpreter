@@ -114,6 +114,11 @@ ifeq ($(SYSNAME),AIX)
   INSTRUCTION := rs6000
   OPERATING_SYSTEM := aix
 endif
+ifeq ($(SYSNAME),Darwin)
+  OPERATING_SYSTEM := darwin
+  LIB_ARCH_DIR = ppc-32-$(OPERATING_SYSTEM)
+  ABI = 32
+endif
 
 ifneq ($(DEBUG),false)
   DEBUG_SUFFIX = -debug
@@ -226,6 +231,13 @@ else
     endif
     ifeq ($(SYSNAME),win32)
       PERL = c:/perl/5.6.1/bin/MSWin32-x86/perl.exe
+    endif
+    ifeq ($(SYSNAME),Darwin)
+        ifeq ($(ABI),32)
+          PERL = ${CMISS_ROOT}/bin/perl
+        else
+          PERL = ${CMISS_ROOT}/bin/perl64
+        endif
     endif
   endif
 endif
@@ -408,7 +420,7 @@ ifeq ($(SYSNAME),Linux)
     CPPFLAGS += -Dbool=char -DHAS_BOOL
   endif
   OPTCF_FLGS = -O2
-  SHARED_LINK_LIBRARIES += -lcrypt -ldl
+  SHARED_LINK_LIBRARIES += -lcrypt -ldl -lperl
 endif
 ifeq ($(SYSNAME),win32)
   CC = gcc -fnative-struct
