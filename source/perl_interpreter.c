@@ -254,6 +254,8 @@ and then executes the returned strings
 
 		handle_output();
 
+		quit = perl_interpreter_kept_quit;
+
 		kept_execute_command_function(command_string, perl_interpreter_kept_user_data,
 		  &quit, &return_code);
 
