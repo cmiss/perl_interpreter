@@ -189,10 +189,13 @@ Creates the interpreter for processing commands.
     ;
   char *load_commands[] =
   {
+#if ! defined (WIN32)
+    /* This code is not working in Win32 at the moment */
 #if ! defined (SHARED_OBJECT)
 		"Perl_cmiss::set_INC_for_platform('" ABI_ENV "')",
 #endif /* defined (SHARED_OBJECT) */
 		"Perl_cmiss::add_cmiss_perl_to_INC('" ABI_ENV "')",
+#endif /* ! defined (WIN32) */
 		"Perl_cmiss::register_keyword assign",
 		"Perl_cmiss::register_keyword attach",
 		"Perl_cmiss::register_keyword cell",
@@ -383,6 +386,8 @@ routine can write this to the command window.
 
   return_code = 1;
 
+#if ! defined (WIN32)
+	/* Windows is not yet working with the redirect but that is OK */
   if (0 == pipe (filehandles))
   {
 	  perl_interpreter_filehandle_in = filehandles[1];
@@ -397,6 +402,7 @@ routine can write this to the command window.
 		  "Unable to create pipes") ;
 	  return_code = 0;
   }
+#endif /* ! defined (WIN32) */
 
   *status = return_code;
 }
@@ -415,6 +421,9 @@ and then executes the returned strings
 	char buffer[1000];
 	fd_set readfds;
 	int flags, return_code;
+#if defined (WIN32)
+#define ssize_t long
+#endif
   ssize_t read_length;
 	struct timeval timeout_struct;
 	
@@ -431,6 +440,7 @@ and then executes the returned strings
 		timeout_struct.tv_sec = 0;
 		timeout_struct.tv_usec = 0;
 		 
+#if ! defined (WIN32)
 		/* Empty the output buffer and send it to the screen */
 		flags = fcntl (perl_interpreter_filehandle_out, F_GETFL);
 		/*???DB.  Wouldn't compile at home.  O_NDELAY is equivalent to
@@ -440,6 +450,7 @@ and then executes the returned strings
 		flags &= O_NONBLOCK;
 		fcntl (perl_interpreter_filehandle_out, F_SETFL, flags);
 		/* fsync(perl_interpreter_filehandle_out); */
+#endif /* ! defined (WIN32) */
 		while (select(FD_SETSIZE, &readfds, NULL, NULL, &timeout_struct))
 		{
 			if (read_length = read(perl_interpreter_filehandle_out, (void *)buffer, sizeof(buffer) - 1))
