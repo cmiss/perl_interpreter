@@ -21,18 +21,17 @@ DESCRIPTION:
 ==============================================================================*/
 
 
-void create_interpreter_(int *status);
+void create_interpreter_(int argc, char **argv, char *initial_comfile, int *status);
 #if ! defined (FORTRAN_INTERPRETER_INTERFACE)
 #define create_interpreter create_interpreter_
 #endif /* defined (FORTRAN_INTERPRETER_INTERFACE) */
 /*******************************************************************************
-LAST MODIFIED : 22 August 2000
+LAST MODIFIED : 24 July 2001
 
 DESCRIPTION:
-Takes a <command_string>, processes this through the Perl interpreter
-and then executes the returned strings.  If <*redirect_output> is true then
-the output from the perl_interpreter will be redirected from the shell to
-the display_message routine.
+Creates the interpreter for processing commands.
+<argc>, <argv> and <initial_comfile> are used to initialise some internal variables.
+If <*warnings_flag> is true then perl is started with its -w option on..
 ==============================================================================*/
 
 void destroy_interpreter_(int *status);

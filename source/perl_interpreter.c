@@ -108,15 +108,16 @@ Frees the memory associated with a string allocated by the interpreter.
 	}
 } /* interpreter_duplicate_string */
 
-void create_interpreter_(int *status)
+void create_interpreter_(int argc, char **argv, char *initial_comfile, int *status)
 /*******************************************************************************
-LAST MODIFIED : 22 August 2000
+LAST MODIFIED : 24 July 2001
 
 DESCRIPTION:
 Creates the interpreter for processing commands.
 ==============================================================================*/
 {
-  char *embedding[] = { "", "-e", "0" };
+  char *embedding[3], e_string[] = "-e", zero_string[] = "0";
+	char *perl_invoke_command;
   char perl_start_code[] = 
 	 "local $SIG{__WARN__} = sub { die $_[0] };\n"
 	 "BEGIN {\n"
@@ -158,6 +159,9 @@ Creates the interpreter for processing commands.
 
   perl_interpreter = perl_alloc();
   perl_construct(perl_interpreter);
+	embedding[0] = argv[0];
+	embedding[1] = e_string;
+	embedding[2] = zero_string;
   perl_parse(perl_interpreter, xs_init, 3, embedding, NULL);
   perl_run(perl_interpreter);
   
@@ -169,6 +173,19 @@ Creates the interpreter for processing commands.
 	 SAVETMPS;
 
 	 PUSHMARK(sp) ;
+	 /* Override the $0 variable without actually executing the file */
+	 if (initial_comfile)
+	 {
+			perl_invoke_command = (char *)malloc(20 + strlen(initial_comfile));
+			sprintf(perl_invoke_command, "$0 = '%s';\n", initial_comfile);
+	 }
+	 else
+	 {
+			perl_invoke_command = (char *)malloc(20);
+			sprintf(perl_invoke_command, "$0 = '';\n");
+	 }
+	 perl_eval_pv(perl_invoke_command, FALSE);
+	 free(perl_invoke_command);
 	 perl_eval_pv(perl_start_code, FALSE);
 	 if (SvTRUE(ERRSV))
 		{
