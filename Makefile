@@ -254,6 +254,8 @@ endif
 ifeq ($(TASK),)
 #-----------------------------------------------------------------------------
 
+  vpath $(PERL) $(subst :, ,$(PATH))
+
   .NOTPARALLEL:
 
   TMP_FILES := $(notdir $(wildcard $(WORKING_DIR)/*.* ) )
@@ -282,15 +284,15 @@ ifeq ($(TASK),)
   $(LIBRARY_DIR) :
 	mkdir -p $@
 
-  clean:
+clean:
 	@echo "Cleaning house ..."
 	-rm -rf $(PERL_WORKING_DIR) $(WORKING_DIR) $(LIBRARY) $(LIB_EXP)
 
-  allclean:
+allclean:
 	@echo "Cleaning house ..."
 	-rm -rf Perl_cmiss/generated/* generated/* lib/*
 
-  debug opt debug64 opt64:
+debug opt debug64 opt64:
 	$(MAKE) --no-print-directory DEBUG=$(DEBUG) ABI=$(ABI)
 
   debug debug64: DEBUG=true
@@ -302,7 +304,7 @@ ifeq ($(TASK),)
   endif
   debug64 opt64: ABI=64
 
-  all : debug opt
+all : debug opt
   ifneq ($(SYSNAME),Linux)
     all: debug64 opt64
   endif
