@@ -310,7 +310,7 @@ Creates the interpreter for processing commands.
 							interpreter so it can be passed by the callback function,
 							preferable to having it global in this file. */
 					 sv_variable = perl_get_sv("Perl_cmiss::internal_interpreter_structure", TRUE);
-					 sv_setiv(sv_variable, (int)(*interpreter));
+					 sv_setiv(sv_variable, (long long)(*interpreter));
 				}
 
 				FREETMPS ;
