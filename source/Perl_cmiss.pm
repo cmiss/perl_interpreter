@@ -1,7 +1,7 @@
 #*******************************************************************************
 #FILE : Perl_cmiss.pm
 #
-#LAST MODIFIED : 22 August 2000
+#LAST MODIFIED : 9 March 2001
 #
 #DESCRIPTION :
 #With perl_interpreter.c provides an interface between cmiss and a 
@@ -17,7 +17,9 @@ bootstrap Perl_cmiss $VERSION;
 
 #Using a hash so that the strategy for action could be placed with
 #the word.  For now only one action.
-my %keywords;
+# GBS 9-March-2001 : Made this accessible to other package
+our %keywords;
+
 my @command_list = ();
 my $block_count = 0;
 my $block_required = 0;
