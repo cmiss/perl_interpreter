@@ -85,62 +85,6 @@ END SUBROUTINE EXECUTE_COMMAND
 !==============================================================================
 !
 
-SUBROUTINE FINALISE_INTERPRETER(ERR,F_ERROR)
-  
-  USE KINDS
-  USE INTERPRETER_STATUS
-  
-  IMPLICIT NONE
-
-  !Argument Variables
-  INTEGER(INTG), INTENT(OUT) :: ERR
-  CHARACTER(LEN=*), INTENT(OUT) :: F_ERROR
-  !Local Variables
-  INTEGER(INTG) :: STATUS
-
-  CALL DESTROY_INTERPRETER(STATUS)
-
-  IF(STATUS==SUCCESS_STATUS) THEN
-    ERR = 0
-  ELSE
-    ERR = 1
-    F_ERROR = " "
-  ENDIF
-
-END SUBROUTINE FINALISE_INTERPRETER
-
-!
-!==============================================================================
-!
-
-SUBROUTINE INITIALISE_INTERPRETER(ERR,F_ERROR)
-  
-  USE KINDS
-  USE INTERPRETER_STATUS
-  
-  IMPLICIT NONE
-
-  !Argument Variables
-  INTEGER(INTG), INTENT(OUT) :: ERR
-  CHARACTER(LEN=*), INTENT(OUT) :: F_ERROR
-  !Local Variables
-  INTEGER(INTG) :: STATUS
-
-  CALL CREATE_INTERPRETER(STATUS)
-
-  IF(STATUS==SUCCESS_STATUS) THEN
-    ERR = 0
-  ELSE
-    ERR = 1
-    F_ERROR = " "
-  ENDIF
-
-END SUBROUTINE INITIALISE_INTERPRETER
-
-!
-!==============================================================================
-!
-
 RECURSIVE SUBROUTINE PROCESS_COMMAND(COMFILE_READ_LEVEL,QUIT,F_COMMAND_LINE,&
   & PROMPT,ERR,F_ERROR)
   
