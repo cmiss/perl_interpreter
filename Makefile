@@ -171,6 +171,7 @@ DEBUG_CFLAGS = -g
 DEBUG_F90FLAGS = -g
 DEFINE = '-DABI_ENV="$(ABI_ENV)"'
 LD_RELOCATABLE = ld -r
+F90_ARCHIVES =
 AR = ar
 ARFLAGS = -cr
 ifeq (${HOSTTYPE},iris4d)
@@ -188,6 +189,12 @@ ifeq (${HOSTTYPE},iris4d)
 else
   ifeq (${HOSTTYPE},i386-linux)
     F90C = pgf90
+    # Include pgf90 objects required by f90
+    # so that pgf90 is not required to link cm.
+    # pgf90rtl is included before pgf90 (unlike pgf90 command)
+    # because ftncharsup.o needs __hpf_exi.  pgftnrtl not required.
+    F90_ARCHIVES = $(foreach library, pgf90rtl pgf90 pgf90_rpm1 pgf902 pgc, \
+      /usr/local/pgi/linux86/lib/lib$(library).a )
     OPT_F90FLAGS = -fast
     DEFINE += -Dbool=char -DHAS_BOOL
   else
@@ -198,10 +205,10 @@ else
 endif
 ifneq ($(DEBUG),false)
   CFLAGS += $(DEBUG_CFLAGS)
-  FFLAGS += $(DEBUG_CFLAGS)
+  F90FLAGS += $(DEBUG_F90FLAGS)
 else
   CFLAGS += $(OPT_CFLAGS)
-  FFLAGS += $(OPT_CFLAGS)
+  F90FLAGS += $(OPT_F90FLAGS)
 endif
 CPPFLAGS = $(addprefix -I, $(C_INCLUDE_DIRS) $(WORKING_DIR) ) $(DEFINE)
 
@@ -314,7 +321,8 @@ ifeq ($(TASK),library)
     $(DYNALOADER_LIB) $(PERL_CMISS_LIB) $(PERL_LIB)
 	$(LD_RELOCATABLE) -o $@ $^
 
-  $(F_OBJ) : $(foreach unit, $(F_UNITS), $(WORKING_DIR)/$(unit).o )
+  $(F_OBJ) : $(foreach unit, $(F_UNITS), $(WORKING_DIR)/$(unit).o ) \
+	$(F90_ARCHIVES)
 	$(LD_RELOCATABLE) -o $@ $^
 
 # $(LIBRARY) : $(foreach unit, $(UNITS), $(WORKING_DIR)/$(unit).o ) $(DYNALOADER_LIB) $(PERL_CMISS_LIB) $(PERL_LIB)
