@@ -338,7 +338,7 @@ Takes a <command_string>, processes this through the F90 interpreter
 and then executes the returned strings
 ==============================================================================*/
 {
-	 if (interpreter->my_perl)
+	 if (interpreter && (interpreter->my_perl))
 	 {
 			perl_destruct(interpreter->my_perl);
 			perl_free(interpreter->my_perl);
@@ -363,6 +363,8 @@ and then executes the returned strings
 				 close(interpreter->keep_stderr);
 				 interpreter->keep_stderr = 0;
 			}
+
+			free (interpreter);
 			*status = 1;
 	 }
 	 else

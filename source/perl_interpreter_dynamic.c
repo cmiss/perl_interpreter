@@ -644,6 +644,7 @@ Dynamic loader wrapper
 	{
 		__destroy_interpreter_(interpreter->real_interpreter, status);
 	}
+	free (interpreter);
 } /* destroy_interpreter */
 
 void interpreter_set_display_message_function_(struct Interpreter *interpreter, 
