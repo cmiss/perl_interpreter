@@ -203,6 +203,7 @@ else
       ifeq ($(SYSNAME),AIX)
         OPT_CFLAGS = -O2
         ifeq ($(ABI),64)
+          DEBUG_CFLAGS = -g -q64
           OPT_CFLAGS = -O2 -q64
           LD_RELOCATABLE = ld -r -b64 
           ARFLAGS = -cr -X64
