@@ -88,34 +88,34 @@ sub set_INC_for_platform
 
 sub add_cmiss_perl_to_INC
   {
-#	use Config;
+	use Config;
 
     my ($abi_env) = @_;
 
 	my @path_list;
 
 	#Check the environment variables which specify this lib
-#    foreach my $varname ("CMISS${abi_env}_PERLLIB","CMISS_PERLLIB")
-#	{
-#	  if ( exists $ENV{$varname} )
-#	 {
-#		my @env_list = split (':', $ENV{$varname});
-#		#Add in a version/archname specific derivative of any paths if they exist
-#		@path_list = (@env_list,
-#		   grep { -d $_ } map { "$_/$Config{version}/$Config{archname}" } @env_list);
-#		last;
-#	  }
-#    }
-#	# If no CMISS*_PERLLIB variable is set then see if there is a CMISS_ROOT version
-#	if (! defined @path_list)
-#	{
-#	  if (exists $ENV{CMISS_ROOT})
-#	  {
-#		my $cmissroot_perl_lib = "$ENV{CMISS_ROOT}/cmiss_perl/lib";
-#		my $cmissroot_perl_lib_arch = "$ENV{CMISS_ROOT}/cmiss_perl/lib/$Config{version}/$Config{archname}";
-#		@path_list = grep { -d $_ } ($cmissroot_perl_lib, $cmissroot_perl_lib_arch);
-#	  }
-#	}
+    foreach my $varname ("CMISS${abi_env}_PERLLIB","CMISS_PERLLIB")
+	{
+	  if ( exists $ENV{$varname} )
+	 {
+		my @env_list = split (':', $ENV{$varname});
+		#Add in a version/archname specific derivative of any paths if they exist
+		@path_list = (@env_list,
+		   grep { -d $_ } map { "$_/$Config{version}/$Config{archname}" } @env_list);
+		last;
+	  }
+    }
+	# If no CMISS*_PERLLIB variable is set then see if there is a CMISS_ROOT version
+	if (! defined @path_list)
+	{
+	  if (exists $ENV{CMISS_ROOT})
+	  {
+		my $cmissroot_perl_lib = "$ENV{CMISS_ROOT}/cmiss_perl/lib";
+		my $cmissroot_perl_lib_arch = "$ENV{CMISS_ROOT}/cmiss_perl/lib/$Config{version}/$Config{archname}";
+		@path_list = grep { -d $_ } ($cmissroot_perl_lib, $cmissroot_perl_lib_arch);
+	  }
+	}
 	# If a CMISS_PERLLIB has been found prepend it to the path.
 	if (defined @path_list)
 	{
