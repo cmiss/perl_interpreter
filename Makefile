@@ -30,7 +30,7 @@ ifndef DEBUG
 endif
 
 # set architecture dependent directories and default options
-ARCH_DIR = $(SYSNAME)-$(ABI)# default
+ARCH_DIR := $(SYSNAME)-$(ABI)# default
 ifeq ($(filter-out IRIX%,$(SYSNAME)),)# SGI
   # Specify what application binary interface (ABI) to use i.e. 32, n32 or 64
   ifndef ABI
@@ -60,7 +60,7 @@ ifeq ($(SYSNAME),Linux)
   ARCH_DIR := i686-linux
 endif
 ifeq ($(SYSNAME),SunOS)
-  ARCH_DIR = solaris-$(ABI)
+  ARCH_DIR := solaris-$(ABI)
 endif
 ifeq ($(SYSNAME),AIX)
   ifndef ABI
@@ -70,7 +70,7 @@ ifeq ($(SYSNAME),AIX)
       endif
     endif
   endif
-  ARCH_DIR = aix-$(ABI)
+  ARCH_DIR := aix-$(ABI)
 endif
 
 ifndef ABI
