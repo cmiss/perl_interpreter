@@ -49,7 +49,7 @@ and then executes the returned strings
 
 void redirect_interpreter_output_(int *status);
 #if ! defined (FORTRAN_INTERPRETER_INTERFACE)
-#define redirect_output redirect_output_
+#define redirect_interpreter_output redirect_interpreter_output_
 #endif /* ! defined (FORTRAN_INTERPRETER_INTERFACE) */
 /*******************************************************************************
 LAST MODIFIED : 25 August 2000
