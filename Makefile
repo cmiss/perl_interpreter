@@ -321,6 +321,11 @@ ifeq ($(TASK),source)
   main : $(DEPEND_FILES) \
     $(foreach file,$(PMH_FILES), $(WORKING_DIR)/$(file) )
 
+  # include the depend file dependencies
+  ifneq ($(DEPEND_FILES),)
+    sinclude $(DEPEND_FILES)
+  endif
+
   # implicit rules for making the dependency files
 
   # KAT I think Solaris needed nawk rather than awk, but nawk is not usually
@@ -328,6 +333,8 @@ ifeq ($(TASK),source)
   # working with awk on the machines I have.
   $(WORKING_DIR)/%.d : $(SOURCE_DIR)/%.c
 	makedepend $(CPPFLAGS) -f- -Y $< 2> $@.tmp | sed -e 's%^source\([^ ]*\).o%$$(WORKING_DIR)\1.o $$(WORKING_DIR)\1.d%' > $@
+# See if there is a dependency on perl
+	@if grep /perl\\.h $@ > /dev/null; then set -x; echo '$$(WORKING_DIR)/perl_interpreter.o $$(WORKING_DIR)/perl_interpreter.d: $$(PERL)' >> $@; fi
 	(grep pmh $@.tmp | grep makedepend | awk -F "[ ,]" '{printf("%s.%s:",substr($$4, 1, length($$4) - 2),"o"); for(i = 1 ; i <= NF ; i++)  { if (match($$i,"pmh")) printf(" source/%s", substr($$i, 2, length($$i) -2)) } printf("\n");}' | sed -e 's%^$(SOURCE_DIR)\([^ ]*\).o%$$(WORKING_DIR)\1.o $$(WORKING_DIR)\1.d%' | sed -e 's%$(SOURCE_DIR)\([^ ]*\).pmh%$$(WORKING_DIR)\1.pmh%' >> $@)
 
 $(WORKING_DIR)/%.pmh : $(SOURCE_DIR)/%.pm
