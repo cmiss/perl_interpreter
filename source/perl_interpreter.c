@@ -67,7 +67,7 @@ The default interpreter_display_message_function.
 static Interpreter_display_message_function *display_message_function =
    interpreter_display_message;
 
-#if defined (USE_DYNAMIC_LOADER) || defined (SHARED_OBJECT)
+#if defined (USE_DYNAMIC_LOADER)
 /* Mangle the function names from now on so that function loaders 
 	 from the perl_interpreter_dynamic module are the ones that CMISS connects to. */
 #define create_interpreter_ __create_interpreter_

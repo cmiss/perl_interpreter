@@ -52,9 +52,9 @@ struct Interpreter_library_strings {   char *version; char *archname; char *base
 #include "dynamic_versions.h"
 
 #define LOAD_FUNCTION(symbol) \
-	if (return_code && (!(symbol ## handle = (void (*)())dlsym(interpreter_handle, "__" #symbol )))) \
+	if (return_code && (!(symbol ## handle = (void (*)())dlsym(interpreter_handle, #symbol )))) \
 	{ \
-		(*display_message_function)(ERROR_MESSAGE,"Unable to find symbol %s", "__" #symbol ); \
+		(*display_message_function)(ERROR_MESSAGE,"Unable to find symbol %s", #symbol ); \
 		return_code = 0; \
 	}
 
