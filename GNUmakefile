@@ -35,18 +35,10 @@ ifeq (${HOSTTYPE},iris4d)
     ifeq ($(ABI),n32)
       PERL = /usr/local/perl5.6/bin/perl
     else
-      ifeq ($(ABI),n32)
-        PERL = /usr/local/perl5.6/bin-$(ABI)/perl
-      else
-        PERL = /usr/local/perl5.6_64/bin/perl
-      endif
+      PERL = /usr/local/perl5.6/bin-$(ABI)/perl
     endif
   else
-    ifeq ($(INSTRUCTION),mips3)
-      PERL = /usr/local/perl5.6/bin/perl
-    else
-      PERL = /usr/local/perl5.6/bin-$(INSTRUCTION)/perl
-    endif
+    PERL = /usr/local/perl5.6/bin-$(INSTRUCTION)/perl
   endif
 endif
 ifeq (${HOSTTYPE},i386-linux)
@@ -110,7 +102,7 @@ $(F_OBJ) : $(foreach unit, $(F_UNITS), $(WORKING_DIR)/$(unit).o )
 # 	ld $(LDFLAGS) -o $(TEMP_OBJ) $^
 # 	$(AR) $(ARFLAGS) $@ $(TEMP_OBJ)
 
-$(PERL_CMISS_LIB) : Perl_cmiss/Makefile.PL
+$(PERL_CMISS_LIB) : $(PERL) Perl_cmiss/Makefile.PL
 	cd Perl_cmiss ; $(PERL) Makefile.PL LINKTYPE=static INST_ARCHLIB=../$(WORKING_DIR) FIRST_MAKEFILE=../$(PERL_CMISS_MAKEFILE)
 	$(MAKE) --directory=Perl_cmiss --file=../$(PERL_CMISS_MAKEFILE) CCFLAGS="$(CFLAGS) $(CPPFLAGS)" static
 
