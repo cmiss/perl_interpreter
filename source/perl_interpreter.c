@@ -20,7 +20,7 @@ Provides an interface between cmiss and a Perl interpreter.
 #include "perl_interpreter.h"
 #endif /* defined (CMGUI) */
 
-static PerlInterpreter *perl_interpreter;  /***    The Perl interpreter    ***/
+static PerlInterpreter *perl_interpreter = (PerlInterpreter *)NULL;  /***    The Perl interpreter    ***/
 
 static void xs_init _((void));
 
@@ -66,7 +66,8 @@ copied and the NULL termination is added after that length.
 			}
 			else
 			{
-				display_message(ERROR_MESSAGE,"interpreter_duplicate_string.  Not enough memory");
+				display_message(ERROR_MESSAGE,"interpreter_duplicate_string.  "
+					 "Not enough memory");
 			}
 		}
 		else
@@ -77,13 +78,15 @@ copied and the NULL termination is added after that length.
 			}
 			else
 			{
-				display_message(ERROR_MESSAGE,"interpreter_duplicate_string.  Not enough memory");
+				display_message(ERROR_MESSAGE,"interpreter_duplicate_string.  "
+					 "Not enough memory");
 			}
 		}
 	}
 	else
 	{
-		display_message(ERROR_MESSAGE,"interpreter_duplicate_string.  Invalid argument(s)");
+		display_message(ERROR_MESSAGE,"interpreter_duplicate_string.  "
+			 "Invalid argument(s)");
 		copy_of_string=(char *)NULL;
 	}
 
@@ -242,31 +245,37 @@ Takes a <command_string>, processes this through the F90 interpreter
 and then executes the returned strings
 ==============================================================================*/
 {
-	perl_destruct(perl_interpreter);
-	perl_free(perl_interpreter);
+	 if (perl_interpreter)
+	 {
+			perl_destruct(perl_interpreter);
+			perl_free(perl_interpreter);
 
-	if(perl_interpreter_filehandle_in)
-	{
-		close(perl_interpreter_filehandle_in);
-		perl_interpreter_filehandle_in = 0;
-	}
-	if(perl_interpreter_filehandle_out)
-	{
-		close(perl_interpreter_filehandle_out);
-		perl_interpreter_filehandle_out = 0;
-	}
-	if (keep_stdout)
-	{
-		close(keep_stdout);
-		keep_stdout = 0;
-	}
-	if (keep_stderr)
-	{
-		close(keep_stderr);
-		keep_stderr = 0;
-	}
-
-	*status = 1;
+			if(perl_interpreter_filehandle_in)
+			{
+				 close(perl_interpreter_filehandle_in);
+				 perl_interpreter_filehandle_in = 0;
+			}
+			if(perl_interpreter_filehandle_out)
+			{
+				 close(perl_interpreter_filehandle_out);
+				 perl_interpreter_filehandle_out = 0;
+			}
+			if (keep_stdout)
+			{
+				 close(keep_stdout);
+				 keep_stdout = 0;
+			}
+			if (keep_stderr)
+			{
+				 close(keep_stderr);
+				 keep_stderr = 0;
+			}
+			*status = 1;
+	 }
+	 else
+	 {
+			*status = 0;
+	 }
 }
 
 void redirect_interpreter_output_(int *status)
@@ -399,7 +408,8 @@ and then executes the returned strings
 	}
 	else
 	{
-		printf("cmiss_perl_callback.  Missing command_data");
+		display_message(ERROR_MESSAGE,"cmiss_perl_callback.  "
+			 "Missing command_data");
 		return_code=0;
 	}
 
@@ -424,131 +434,143 @@ Takes a <command_string>, processes this through the Perl interpreter.
 	ENTER ;
 	SAVETMPS;
 
-	if (command_string)
+	if (perl_interpreter)
 	{
-		PUSHMARK(sp) ;
-		perl_interpreter_kept_user_data = user_data;
-		perl_interpreter_kept_quit = *quit;
+		 if (command_string)
+		 {
+				PUSHMARK(sp) ;
+				perl_interpreter_kept_user_data = user_data;
+				perl_interpreter_kept_quit = *quit;
 
-		kept_execute_command_function = execute_command_function;
+				kept_execute_command_function = execute_command_function;
 
-		return_code = 1;
+				return_code = 1;
 
-		if (wrapped_command = (char *)malloc(strlen(command_string) + 100))
-		{
-			/* Escape any 's in the string */
-			if ((quote_pointer = strchr (command_string, '\'')) ||
-				(slash_pointer = strchr (command_string, '\\')))
-			{
-				if (escaped_command = (char *)malloc(strlen(command_string) + 100))
+				if (wrapped_command = (char *)malloc(strlen(command_string) + 100))
 				{
-					slash_pointer = strchr (command_string, '\\');
-					new_pointer = escaped_command;
-					old_pointer = command_string;
-					strcpy(new_pointer, old_pointer);
-					while (slash_pointer)
-					{
-						new_pointer += slash_pointer - old_pointer;
-						old_pointer = slash_pointer;
-						*new_pointer = '\\';
-						new_pointer++;
+					 /* Escape any 's in the string */
+					 if ((quote_pointer = strchr (command_string, '\'')) ||
+							(slash_pointer = strchr (command_string, '\\')))
+					 {
+							if (escaped_command = (char *)malloc(strlen(command_string) + 100))
+							{
+								 slash_pointer = strchr (command_string, '\\');
+								 new_pointer = escaped_command;
+								 old_pointer = command_string;
+								 strcpy(new_pointer, old_pointer);
+								 while (slash_pointer)
+								 {
+										new_pointer += slash_pointer - old_pointer;
+										old_pointer = slash_pointer;
+										*new_pointer = '\\';
+										new_pointer++;
 					  
-						strcpy(new_pointer, old_pointer);
+										strcpy(new_pointer, old_pointer);
 
-						slash_pointer = strchr (slash_pointer + 1, '\\');
-					}
-					strcpy(wrapped_command, escaped_command);
-					new_pointer = escaped_command;
-					old_pointer = wrapped_command;
-					quote_pointer = strchr (wrapped_command, '\'');
-					while (quote_pointer)
-					{
-						new_pointer += quote_pointer - old_pointer;
-						old_pointer = quote_pointer;
-						*new_pointer = '\\';
-						new_pointer++;
+										slash_pointer = strchr (slash_pointer + 1, '\\');
+								 }
+								 strcpy(wrapped_command, escaped_command);
+								 new_pointer = escaped_command;
+								 old_pointer = wrapped_command;
+								 quote_pointer = strchr (wrapped_command, '\'');
+								 while (quote_pointer)
+								 {
+										new_pointer += quote_pointer - old_pointer;
+										old_pointer = quote_pointer;
+										*new_pointer = '\\';
+										new_pointer++;
 					  
-						strcpy(new_pointer, old_pointer);
+										strcpy(new_pointer, old_pointer);
 
-						quote_pointer = strchr (quote_pointer + 1, '\'');
-					}
-					sprintf(wrapped_command, "Perl_cmiss::execute_command('%s')",
-						escaped_command);
+										quote_pointer = strchr (quote_pointer + 1, '\'');
+								 }
+								 sprintf(wrapped_command, "Perl_cmiss::execute_command('%s')",
+										escaped_command);
 
-					free (escaped_command);
+								 free (escaped_command);
+							}
+							else
+							{
+								 display_message(ERROR_MESSAGE,"cmiss_perl_execute_command.  "
+										"Unable to allocate escaped_string");
+								 return_code=0;
+							}
+					 }
+					 else
+					 {
+							sprintf(wrapped_command, "Perl_cmiss::execute_command('%s')",
+								 command_string);
+					 }
+#if defined (CMISS_DEBUG)
+					 printf("cmiss_perl_execute_command: %s\n", wrapped_command);
+#endif /* defined (CMISS_DEBUG) */
+
+					 if (perl_interpreter_filehandle_in)
+					 {
+							/* Redirect STDOUT and STDERR */
+							dup2(perl_interpreter_filehandle_in, STDOUT_FILENO);
+							dup2(perl_interpreter_filehandle_in, STDERR_FILENO);
+					 }
+				
+					 perl_eval_pv(wrapped_command, FALSE);
+
+					 /* Change STDOUT and STDERR back again */
+					 if (keep_stdout)
+					 {
+							dup2(keep_stdout, STDOUT_FILENO);
+					 }
+					 if (keep_stderr)
+					 {
+							dup2(keep_stderr, STDERR_FILENO);
+					 }
+
+					 *quit = perl_interpreter_kept_quit;
+ 
+					 handle_output();
+
+					 if (SvTRUE(ERRSV))
+					 {
+							display_message(ERROR_MESSAGE,
+								 "%s", SvPV(ERRSV, n_a)) ;
+							POPs ;
+							return_code = 0;
+					 }
+
+					 /*  This command needs to get the correct response from a 
+							 partially complete command before it is useful
+							 if (!SvTRUE(cvrv))
+							 {
+							 display_message(ERROR_MESSAGE,
+							 "Unable to compile command: %s\n", wrapped_command) ;
+							 POPs ;
+							 }*/
+
+					 free (wrapped_command);
 				}
 				else
 				{
-					printf("cmiss_perl_execute_command.  Unable to allocate escaped_string");
-					return_code=0;
+					 display_message(ERROR_MESSAGE,"interpret_command.  "
+							"Unable to allocate wrapped_string");
+					 return_code=0;
 				}
-			}
-			else
-			{
-				sprintf(wrapped_command, "Perl_cmiss::execute_command('%s')",
-					command_string);
-			}
-#if defined (CMISS_DEBUG)
-			printf("cmiss_perl_execute_command: %s\n", wrapped_command);
-#endif /* defined (CMISS_DEBUG) */
-
-			if (perl_interpreter_filehandle_in)
-			{
-				/* Redirect STDOUT and STDERR */
-				dup2(perl_interpreter_filehandle_in, STDOUT_FILENO);
-				dup2(perl_interpreter_filehandle_in, STDERR_FILENO);
-			}
-				
-			perl_eval_pv(wrapped_command, FALSE);
-
-			/* Change STDOUT and STDERR back again */
-			if (keep_stdout)
-			{
-				dup2(keep_stdout, STDOUT_FILENO);
-			}
-			if (keep_stderr)
-			{
-				dup2(keep_stderr, STDERR_FILENO);
-			}
-
-			*quit = perl_interpreter_kept_quit;
- 
-			handle_output();
-
-			if (SvTRUE(ERRSV))
-			{
-				display_message(ERROR_MESSAGE,
-				  "%s", SvPV(ERRSV, n_a)) ;
-				POPs ;
-				return_code = 0;
-			}
-
-			/*  This command needs to get the correct response from a 
-				 partially complete command before it is useful
-			if (!SvTRUE(cvrv))
-			{
-				display_message(ERROR_MESSAGE,
-				  "Unable to compile command: %s\n", wrapped_command) ;
-				POPs ;
-			}*/
-
-			free (wrapped_command);
-		}
-		else
-		{
-			printf("cmiss_perl_execute_command.  Unable to allocate wrapped_string");
-			return_code=0;
-		}
+		 }
+		 else
+		 {
+				display_message(ERROR_MESSAGE,"interpret_command.  "
+					 "Missing command_data");
+				return_code=0;
+		 }
 	}
 	else
 	{
-		printf("cmiss_perl_execute_command.  Missing command_data");
-		return_code=0;
+		 display_message(ERROR_MESSAGE,"interpret_command.  "
+				"Missing interpreter");
+		 return_code=0;
 	}
-
+	
 	FREETMPS ;
 	LEAVE ;
-
+	
 	*status = return_code;
 } /* interpret_command_ */
 
@@ -573,56 +595,65 @@ as an integer then <status> will be set to zero.
 
 	return_code = 1;
 
-	if (expression && result && status)
+	if (perl_interpreter)
 	{
-		if (perl_interpreter_filehandle_in)
-		{
-			/* Redirect STDOUT and STDERR */
-			dup2(perl_interpreter_filehandle_in, STDOUT_FILENO);
-			dup2(perl_interpreter_filehandle_in, STDERR_FILENO);
-		}
+		 if (expression && result && status)
+		 {
+				if (perl_interpreter_filehandle_in)
+				{
+					 /* Redirect STDOUT and STDERR */
+					 dup2(perl_interpreter_filehandle_in, STDOUT_FILENO);
+					 dup2(perl_interpreter_filehandle_in, STDERR_FILENO);
+				}
 				
-		sv_result = perl_eval_pv(expression, FALSE);
+				sv_result = perl_eval_pv(expression, FALSE);
 
-		/* Change STDOUT and STDERR back again */
-		if (keep_stdout)
-		{
-			dup2(keep_stdout, STDOUT_FILENO);
-		}
-		if (keep_stderr)
-		{
-			dup2(keep_stderr, STDERR_FILENO);
-		}
+				/* Change STDOUT and STDERR back again */
+				if (keep_stdout)
+				{
+					 dup2(keep_stdout, STDOUT_FILENO);
+				}
+				if (keep_stderr)
+				{
+					 dup2(keep_stderr, STDERR_FILENO);
+				}
  
-		handle_output();
+				handle_output();
 
-		if (SvTRUE(ERRSV))
-		{
-			display_message(ERROR_MESSAGE,
-				"%s", SvPV(ERRSV, n_a)) ;
-			POPs ;
-			return_code = 0;
-		}
-		else
-		{
-			if (SvIOK(sv_result))
-			{
-				*result = SvIV(sv_result);
-				return_code = 1;
-			}
-			else
-			{
+				if (SvTRUE(ERRSV))
+				{
+					 display_message(ERROR_MESSAGE,
+							"%s", SvPV(ERRSV, n_a)) ;
+					 POPs ;
+					 return_code = 0;
+				}
+				else
+				{
+					 if (SvIOK(sv_result))
+					 {
+							*result = SvIV(sv_result);
+							return_code = 1;
+					 }
+					 else
+					 {
+							display_message(ERROR_MESSAGE,"interpreter_evaluate_integer.  "
+								 "String \"%s\" does not evaluate to an integer.", expression);
+							return_code = 0;
+					 }
+				}
+		 }
+		 else
+		 {
 				display_message(ERROR_MESSAGE,"interpreter_evaluate_integer.  "
-					"String \"%s\" does not evaluate to an integer.", expression);
+					 "Invalid arguments.") ;
 				return_code = 0;
-			}
-		}
+		 }
 	}
 	else
 	{
-		display_message(ERROR_MESSAGE,"interpreter_evaluate_integer.  "
-			"Invalid arguments.") ;
-		return_code = 0;
+		 display_message(ERROR_MESSAGE,"interpreter_evaluate_integer.  "
+				"Missing interpreter");
+		 return_code=0;
 	}
 
 	FREETMPS ;
@@ -648,16 +679,25 @@ Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
 
 	return_code = 1;
 
-	if (variable_name && value && status)
+	if (perl_interpreter)
 	{
-		sv_variable = perl_get_sv(variable_name, TRUE);
-		sv_setiv(sv_variable, *value);
-	}
+		 if (variable_name && value && status)
+		 {
+				sv_variable = perl_get_sv(variable_name, TRUE);
+				sv_setiv(sv_variable, *value);
+		 }
+		 else
+		 {
+				display_message(ERROR_MESSAGE,"interpreter_set_integer.  "
+					 "Invalid arguments.") ;
+				return_code = 0;
+		 }
+ 	}
 	else
 	{
-		display_message(ERROR_MESSAGE,"interpreter_evaluate_integer.  "
-			"Invalid arguments.") ;
-		return_code = 0;
+		 display_message(ERROR_MESSAGE,"interpreter_set_integer.  "
+				"Missing interpreter");
+		 return_code=0;
 	}
  
 	FREETMPS ;
@@ -687,56 +727,65 @@ as an double then <status> will be set to zero.
 
 	return_code = 1;
 
-	if (expression && result && status)
+	if (perl_interpreter)
 	{
-		if (perl_interpreter_filehandle_in)
-		{
-			/* Redirect STDOUT and STDERR */
-			dup2(perl_interpreter_filehandle_in, STDOUT_FILENO);
-			dup2(perl_interpreter_filehandle_in, STDERR_FILENO);
-		}
+		 if (expression && result && status)
+		 {
+				if (perl_interpreter_filehandle_in)
+				{
+					 /* Redirect STDOUT and STDERR */
+					 dup2(perl_interpreter_filehandle_in, STDOUT_FILENO);
+					 dup2(perl_interpreter_filehandle_in, STDERR_FILENO);
+				}
 				
-		sv_result = perl_eval_pv(expression, FALSE);
+				sv_result = perl_eval_pv(expression, FALSE);
 
-		/* Change STDOUT and STDERR back again */
-		if (keep_stdout)
-		{
-			dup2(keep_stdout, STDOUT_FILENO);
-		}
-		if (keep_stderr)
-		{
-			dup2(keep_stderr, STDERR_FILENO);
-		}
+				/* Change STDOUT and STDERR back again */
+				if (keep_stdout)
+				{
+					 dup2(keep_stdout, STDOUT_FILENO);
+				}
+				if (keep_stderr)
+				{
+					 dup2(keep_stderr, STDERR_FILENO);
+				}
  
-		handle_output();
+				handle_output();
 
-		if (SvTRUE(ERRSV))
-		{
-			display_message(ERROR_MESSAGE,
-				"%s", SvPV(ERRSV, n_a)) ;
-			POPs ;
-			return_code = 0;
-		}
-		else
-		{
-			if (SvNOK(sv_result))
-			{
-				*result = SvNV(sv_result);
-				return_code = 1;
-			}
-			else
-			{
+				if (SvTRUE(ERRSV))
+				{
+					 display_message(ERROR_MESSAGE,
+							"%s", SvPV(ERRSV, n_a)) ;
+					 POPs ;
+					 return_code = 0;
+				}
+				else
+				{
+					 if (SvNOK(sv_result))
+					 {
+							*result = SvNV(sv_result);
+							return_code = 1;
+					 }
+					 else
+					 {
+							display_message(ERROR_MESSAGE,"interpreter_evaluate_double.  "
+								 "String \"%s\" does not evaluate to a double.", expression);
+							return_code = 0;
+					 }
+				}
+		 }
+		 else
+		 {
 				display_message(ERROR_MESSAGE,"interpreter_evaluate_double.  "
-					"String \"%s\" does not evaluate to a double.", expression);
+					 "Invalid arguments.") ;
 				return_code = 0;
-			}
-		}
-	}
+		 }
+ 	}
 	else
 	{
-		display_message(ERROR_MESSAGE,"interpreter_evaluate_double.  "
-			"Invalid arguments.") ;
-		return_code = 0;
+		 display_message(ERROR_MESSAGE,"interpreter_evaluate_double.  "
+				"Missing interpreter");
+		 return_code=0;
 	}
 
 	FREETMPS ;
@@ -762,16 +811,25 @@ Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
 
 	return_code = 1;
 
-	if (variable_name && value && status)
+	if (perl_interpreter)
 	{
-		sv_variable = perl_get_sv(variable_name, TRUE);
-		sv_setnv(sv_variable, *value);
-	}
+		 if (variable_name && value && status)
+		 {
+				sv_variable = perl_get_sv(variable_name, TRUE);
+				sv_setnv(sv_variable, *value);
+		 }
+		 else
+		 {
+				display_message(ERROR_MESSAGE,"interpreter_set_double.  "
+					 "Invalid arguments.") ;
+				return_code = 0;
+		 }
+ 	}
 	else
 	{
-		display_message(ERROR_MESSAGE,"interpreter_evaluate_double.  "
-			"Invalid arguments.") ;
-		return_code = 0;
+		 display_message(ERROR_MESSAGE,"interpreter_set_double.  "
+				"Missing interpreter");
+		 return_code=0;
 	}
  
 	FREETMPS ;
@@ -805,63 +863,72 @@ as an string then <status> will be set to zero and <*result> will be NULL.
 	return_code = 1;
 
 	*result = (char *)NULL;
-	if (expression && result && status)
+	if (perl_interpreter)
 	{
-		if (perl_interpreter_filehandle_in)
-		{
-			/* Redirect STDOUT and STDERR */
-			dup2(perl_interpreter_filehandle_in, STDOUT_FILENO);
-			dup2(perl_interpreter_filehandle_in, STDERR_FILENO);
-		}
-				
-		sv_result = perl_eval_pv(expression, FALSE);
-
-		/* Change STDOUT and STDERR back again */
-		if (keep_stdout)
-		{
-			dup2(keep_stdout, STDOUT_FILENO);
-		}
-		if (keep_stderr)
-		{
-			dup2(keep_stderr, STDERR_FILENO);
-		}
- 
-		handle_output();
-
-		if (SvTRUE(ERRSV))
-		{
-			display_message(ERROR_MESSAGE,
-				"%s", SvPV(ERRSV, n_a)) ;
-			POPs ;
-			return_code = 0;
-		}
-		else
-		{
-			if (SvPOK(sv_result))
-			{
-				internal_string = SvPV(sv_result, string_length);
-				if (*result = interpreter_duplicate_string(internal_string, string_length))
+		 if (expression && result && status)
+		 {
+				if (perl_interpreter_filehandle_in)
 				{
-					return_code = 1;
+					 /* Redirect STDOUT and STDERR */
+					 dup2(perl_interpreter_filehandle_in, STDOUT_FILENO);
+					 dup2(perl_interpreter_filehandle_in, STDERR_FILENO);
+				}
+				
+				sv_result = perl_eval_pv(expression, FALSE);
+
+				/* Change STDOUT and STDERR back again */
+				if (keep_stdout)
+				{
+					 dup2(keep_stdout, STDOUT_FILENO);
+				}
+				if (keep_stderr)
+				{
+					 dup2(keep_stderr, STDERR_FILENO);
+				}
+ 
+				handle_output();
+
+				if (SvTRUE(ERRSV))
+				{
+					 display_message(ERROR_MESSAGE,
+							"%s", SvPV(ERRSV, n_a)) ;
+					 POPs ;
+					 return_code = 0;
 				}
 				else
 				{
-					return_code = 0;
+					 if (SvPOK(sv_result))
+					 {
+							internal_string = SvPV(sv_result, string_length);
+							if (*result = interpreter_duplicate_string(internal_string, string_length))
+							{
+								 return_code = 1;
+							}
+							else
+							{
+								 return_code = 0;
+							}
+					 }
+					 else
+					 {
+							display_message(ERROR_MESSAGE,"interpreter_evaluate_string.  "
+								 "String \"%s\" does not evaluate to a string.", expression);
+							return_code = 0;
+					 }
 				}
-			}
-			else
-			{
+		 }
+		 else
+		 {
 				display_message(ERROR_MESSAGE,"interpreter_evaluate_string.  "
-					"String \"%s\" does not evaluate to a string.", expression);
+					 "Invalid arguments.") ;
 				return_code = 0;
-			}
-		}
-	}
+		 }
+ 	}
 	else
 	{
-		display_message(ERROR_MESSAGE,"interpreter_evaluate_string.  "
-			"Invalid arguments.") ;
-		return_code = 0;
+		 display_message(ERROR_MESSAGE,"interpreter_evaluate_string.  "
+				"Missing interpreter");
+		 return_code=0;
 	}
 
 	FREETMPS ;
@@ -887,18 +954,26 @@ Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
 
 	return_code = 1;
 
-	if (variable_name && value && status)
+	if (perl_interpreter)
 	{
-		sv_variable = perl_get_sv(variable_name, TRUE);
-		sv_setpv(sv_variable, value);
-	}
+		 if (variable_name && value && status)
+		 {
+				sv_variable = perl_get_sv(variable_name, TRUE);
+				sv_setpv(sv_variable, value);
+		 }
+		 else
+		 {
+				display_message(ERROR_MESSAGE,"interpreter_set_string.  "
+					 "Invalid arguments.") ;
+				return_code = 0;
+		 }
+ 	}
 	else
 	{
-		display_message(ERROR_MESSAGE,"interpreter_evaluate_string.  "
-			"Invalid arguments.") ;
-		return_code = 0;
+		 display_message(ERROR_MESSAGE,"interpreter_set_string.  Missing interpreter");
+		 return_code=0;
 	}
- 
+
 	FREETMPS ;
 	LEAVE ;
 
