@@ -731,36 +731,44 @@ ifneq ($(SHARED_OBJECT), true)
 endif
 
   # explicit rule for making the library
-  # Including all necessary objects from archives into output archive.
-  # This is done by producing a relocatable object first.
-  # Is there a better way?
-
   ifneq ($(SHARED_OBJECT), true)
-    $(LIBRARY) : $(WORKING_DIR)/perl_interpreter_dynamic.o $(C_OBJ)
-		$(AR) $(ARFLAGS) $@ $^
-
-    # If there is an export file for libperl.a then use it for this library.
-    ifneq ($(PERL_EXP),)
-      main : $(LIB_EXP)
-
-      $(LIB_EXP) : $(PERL_EXP)
-			cp -f $^ $@
+    ifeq ($(USE_DYNAMIC_LOADER),true)
+      $(LIBRARY) : $(WORKING_DIR)/perl_interpreter_dynamic.o
     endif
 
-    # don't retain these relocatable objects
-    .INTERMEDIATE : $(C_OBJ)
+    $(LIBRARY):
+	rm $@
+	$(AR) $(ARFLAGS) $@ $^
 
-    LIBRARY_LIBS = 
     ifneq (,$(STATIC_PERL_LIB)) # have a static perl
+      # Including all necessary objects from archives into output archive.
+      # This is done by producing a relocatable object first.
+      # Is there a better way?
+
+      $(LIBRARY) : $(C_OBJ)
+      # don't retain these relocatable objects
+      .INTERMEDIATE : $(C_OBJ)
+
       #I have not got Win32 to work with building the libararies into the
       #perl_interpreter lib, instead I link them all together at the final link
       ifneq ($(SYSNAME),win32)
         LIBRARY_LIBS = $(DYNALOADER_LIB) $(PERL_CMISS_LIB) $(STATIC_PERL_LIB)
+      else
+        LIBRARY_LIBS = 
       endif
+      $(C_OBJ) : $(WORKING_DIR)/perl_interpreter.o $(LIBRARY_LIBS)
+		$(LD_RELOCATABLE) -o $@ $^
+
+      # If there is an export file for libperl.a then use it for this library.
+      ifneq ($(PERL_EXP),)
+        main : $(LIB_EXP)
+
+        $(LIB_EXP) : $(PERL_EXP)
+			cp -f $^ $@
+      endif
+
     endif
 
-    $(C_OBJ) : $(WORKING_DIR)/perl_interpreter.o $(LIBRARY_LIBS)
-		$(LD_RELOCATABLE) -o $@ $^
   else
     $(LIBRARY) : $(foreach unit, $(C_UNITS), $(WORKING_DIR)/$(unit).o ) \
          $(DYNALOADER_LIB) $(PERL_CMISS_LIB) $(STATIC_PERL_LIB)
