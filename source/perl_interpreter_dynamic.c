@@ -245,58 +245,127 @@ It is up to the calling routine to free the string returned and to
 remove the temporary file it refers to.
 ==============================================================================*/
 {
-	char *ptr_temp_uid_name,*return_string,temp_uid_name[L_tmpnam],*total_uid;
-	FILE *uid_file;
-	int i,j,string_length;
-	long uid_long_data;
+	char *ptr_temp_bin_name,*return_string,temp_bin_name[L_tmpnam],*total_bin,
+		*total_bin_ptr;
+	FILE *bin_file;
+	int bin_length, bytes_in, bytes_out, i, j, string_length;
+	long bin_long_data;
 
 	if (base64_string)
 	{
 		string_length=strlen(base64_string);
-		if (tmpnam(temp_uid_name) && (uid_file=fopen(temp_uid_name, "w"))
-			&& (total_uid = (char *)malloc(string_length+1))
-			&& (return_string = (char *)malloc(strlen(temp_uid_name)+1)))
+		if (tmpnam(temp_bin_name) && (bin_file=fopen(temp_bin_name, "w"))
+			&& (total_bin = (char *)malloc(string_length+1))
+			&& (return_string = (char *)malloc(strlen(temp_bin_name)+1)))
 		{
-			j=0;
-			for (i=0;i<string_length-1;i+=6)
+			total_bin_ptr = total_bin;
+			for (i=0;i<string_length;i+=6)
 			{
+				if (string_length - i < 6)
+				{
+					bytes_in = string_length - i;
+					switch (bytes_in)
+					{
+						case 2:
+						{
+							bytes_out = 1;
+						} break;
+						case 3:
+						{
+							bytes_out = 2;
+						} break;
+						case 5:
+						{
+							bytes_out = 3;
+						} break;
+						default:
+						{
+							(*display_message_function)(ERROR_MESSAGE,
+								"write_base64_string_to_binary_file.  Unexpected remaining length: %d",
+								bytes_in);
+						} break;
+					}
 #if defined (BYTE_ORDER)
 #if (1234==BYTE_ORDER)
-				if (glibc_version_greater_than_2_2_4())
-				{
-					/* Don't need to swap now */
-					uid_long_data=a64l(base64_string + i);
+					if (glibc_version_greater_than_2_2_4())
+					{
+						/* Don't need to swap now */
+						bin_long_data=a64l(base64_string + i);
+					}
+					else
+					{
+						char tmp_string[6];
+						for (j = 0 ; j < bytes_in ; j++)
+						{
+							tmp_string[j] = base64_string[i + bytes_in - 1 - j];
+						}
+						tmp_string[j] = 0;
+						bin_long_data=a64l(tmp_string);
+					}
+#else /* (1234==BYTE_ORDER) */
+					bin_long_data=a64l(base64_string + i);
+#endif /* (1234==BYTE_ORDER) */
+#else /* defined (BYTE_ORDER) */
+					bin_long_data=a64l(base64_string + i);
+#endif /* defined (BYTE_ORDER) */
+					*total_bin_ptr = (char)(255 & bin_long_data);
+					total_bin_ptr++;
+					if (bytes_out > 1)
+					{
+						*total_bin_ptr = (char)(255 & (bin_long_data >> 8));
+						total_bin_ptr++;
+						if (bytes_out > 2)
+						{
+							*total_bin_ptr = (char)(255 & (bin_long_data >> 16));
+							total_bin_ptr++;
+						}
+					}
 				}
 				else
 				{
-					char tmp_string[6];
-					tmp_string[0]=base64_string[i + 5];
-					tmp_string[1]=base64_string[i + 4];
-					tmp_string[2]=base64_string[i + 3];
-					tmp_string[3]=base64_string[i + 2];
-					tmp_string[4]=base64_string[i + 1];
-					tmp_string[5]=base64_string[i];
-					uid_long_data=a64l(tmp_string);
-				}
+#if defined (BYTE_ORDER)
+#if (1234==BYTE_ORDER)
+					if (glibc_version_greater_than_2_2_4())
+					{
+						/* Don't need to swap now */
+						bin_long_data=a64l(base64_string + i);
+					}
+					else
+					{
+						char tmp_string[6];
+						tmp_string[0]=base64_string[i + 5];
+						tmp_string[1]=base64_string[i + 4];
+						tmp_string[2]=base64_string[i + 3];
+						tmp_string[3]=base64_string[i + 2];
+						tmp_string[4]=base64_string[i + 1];
+						tmp_string[5]=base64_string[i];
+						bin_long_data=a64l(tmp_string);
+					}
 #else /* (1234==BYTE_ORDER) */
-				uid_long_data=a64l(base64_string + i);
+					bin_long_data=a64l(base64_string + i);
 #endif /* (1234==BYTE_ORDER) */
 #else /* defined (BYTE_ORDER) */
-				uid_long_data=a64l(base64_string + i);
+					bin_long_data=a64l(base64_string + i);
 #endif /* defined (BYTE_ORDER) */
-				total_uid[j]=(char)(255 & uid_long_data);
-				j++;
-				total_uid[j]=(char)(255 & (uid_long_data >> 8));
-				j++;
-				total_uid[j]=(char)(255 & (uid_long_data >> 16));
-				j++;
-				total_uid[j]=(char)(255 & (uid_long_data >> 24));
-				j++;
+					*total_bin_ptr = (char)(255 & bin_long_data);
+					total_bin_ptr++;
+					*total_bin_ptr = (char)(255 & (bin_long_data >> 8));
+					total_bin_ptr++;
+					*total_bin_ptr = (char)(255 & (bin_long_data >> 16));
+					total_bin_ptr++;
+					*total_bin_ptr = (char)(255 & (bin_long_data >> 24));
+					total_bin_ptr++;
+				}
 			}
-			fwrite(total_uid,1,4*string_length/6,uid_file);
-			free(total_uid);
-			fclose(uid_file);
-			strcpy(return_string, temp_uid_name);
+			bin_length = total_bin_ptr - total_bin;
+			if (bin_length != fwrite(total_bin,1,bin_length,bin_file))
+			{
+				(*display_message_function)(ERROR_MESSAGE,
+					"write_base64_string_to_binary_file.  Short write of temporary binary file.");				
+			}
+			free(total_bin);
+			fclose(bin_file);
+			strcpy(return_string, temp_bin_name);
 		}
 		else
 		{
@@ -342,6 +411,9 @@ the function pointers and then calls create_interpreter_ for that instance.
 	*perl_archname = 0;
 	*perl_version = 0;
 	*perl_archlib = 0;
+
+	interpreter_handle = NULL;
+	perl_handle = NULL;
 
 	number_of_perl_interpreters = sizeof(interpreter_strings) /
 		sizeof(struct Interpreter_library_strings);
@@ -422,10 +494,6 @@ the function pointers and then calls create_interpreter_ for that instance.
 				{
 					return_code = 1;
 				}
-				else
-				{
-					dlclose(perl_handle);
-				}
 			}
 		}
 	}
@@ -433,7 +501,7 @@ the function pointers and then calls create_interpreter_ for that instance.
 	if (!return_code)
 	{
 		(*display_message_function)(ERROR_MESSAGE,
-			"Unable to open a dynamic perl_interpreter to match your perl \"%s\".",
+			"Unable to open the dynamic perl_interpreter to match your perl \"%s\".",
 			perl_executable);
 		if (perl_interpreter_string)
 		{
@@ -457,6 +525,12 @@ the function pointers and then calls create_interpreter_ for that instance.
 						interpreter_strings[i].version, interpreter_strings[i].archname);
 				}
 			}
+		}
+		if (perl_handle)
+		{
+			/* Don't do this as soon as the interpreter_handle fails otherwise this call 
+				overwrites the dlerror message from the interpreter_handle */
+			dlclose(perl_handle);
 		}
 	}
 

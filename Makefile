@@ -623,22 +623,22 @@ ifeq ($(USE_DYNAMIC_LOADER),true)
    endif
    SHARED_LIBRARY_HEADERS = $(patsubst %.so, %.soh, $(SHARED_LIBRARIES))
 
-   UID2UIDH = ${CMISS_ROOT}/cmgui/utilities/$(BIN_ARCH_DIR)/uid2uidh
+   UID2UIDH = $(CMISS_ROOT)/utilities/bin/$(BIN_ARCH_DIR)/bin2base64h
 
   .SUFFIXES : .so .soh
 
   # implicit rules for making the objects
   %.soh : %.so
-	$(UID2UIDH) $< $@ libperlinterpreter
+	$(UID2UIDH) $< $@
 
   #Always regenerate the dynamic_versions file as it has recorded for
   #us the versions that are built into this executable
   $(WORKING_DIR)/dynamic_versions.h.new : $(SHARED_LIBRARY_HEADERS)
 	echo > $@;
 	$(foreach header, $(SHARED_LIBRARY_HEADERS), \
-      echo '#define libperlinterpreter_uidh libperlinterpreter$(word 3, $(subst /,' ',$(subst .,_,$(header))))$(word 4, $(subst /,' ',$(subst -,_,$(header))))' >> $@; \
+      echo 'static char libperlinterpreter$(word 3, $(subst /,' ',$(subst .,_,$(header))))$(word 4, $(subst /,' ',$(subst -,_,$(header))))[] = ' >> $@; \
       echo '#include "../../../$(header)"' >> $@; \
-      echo '#undef libperlinterpreter_uidh' >> $@; )
+      echo ';' >> $@; )
 	echo 'static struct Interpreter_library_strings interpreter_strings[] = {' >> $@;
 	$(foreach header, $(SHARED_LIBRARY_HEADERS), \
       echo '{"$(word 3, $(subst /,' ',$(header)))","$(word 4, $(subst /,' ',$(header)))", libperlinterpreter$(word 3, $(subst /,' ',$(subst .,_,$(header))))$(word 4, $(subst /,' ',$(subst -,_,$(header)))) },' >> $@; )
