@@ -416,16 +416,23 @@ ifeq ($(SYSNAME),Linux)
     # gcc
     CPPFLAGS += -Dbool=char -DHAS_BOOL
 #    CFE_FLGS += -m$(ABI)
-    # !!! Position independent code is actually only required for objects
-    # in shared libraries.
-#    CF_FLGS += -fpic
+    # Position independent code is only required for shared objects.
+    ifeq ($(SHARED_OBJECT),true)
+      CFE_FLGS += -fPIC
+      # gcc 3.3.3 documentation recommends using the same code generation
+      # flags when linking shared libraries as when compiling.
+      # Linker option -Bsymbolic binds references to global symbols to those
+      # within the shared library, if any.  This avoids picking up the symbols
+      # like boot_Perl_cmiss from the static interpreter.
+      LD_SHARED = $(CC) -shared -Wl,-Bsymbolic $(CFE_FLGS)
+    endif
   endif
+#   DBGCF_FLGS = -g3
   OPTCF_FLGS = -O2
   # Don't include a dependency on libperl.so in the shared link libraries as
   # the perl_interpreter does not say where to find libperl.so when loading the
   # shared link libraries.
   SHARED_LINK_LIBRARIES += -lcrypt -ldl
-#  LD_SHARED = $(CC) -shared $(CFE_FLGS)
 endif
 ifeq ($(SYSNAME),win32)
   CC = gcc -fnative-struct
@@ -783,6 +790,9 @@ endif
   # implicit rules for making the objects
   $(WORKING_DIR)/%.o : $(SOURCE_DIR)/%.c
 	$(CC) -o $@ $(CPPFLAGS) $(CFLAGS) $<
+# Useful when using the debugger to find out which subroutine of the same name.
+# 	[ -L $(@D)/$*.c ] || ln -s $(CURDIR)/$< $(@D)/$*.c
+# 	$(CC) -o $@ -I$(<D) $(CPPFLAGS) $(CFLAGS) $(@D)/$*.c
 
 #-----------------------------------------------------------------------------
 endif
