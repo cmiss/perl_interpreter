@@ -54,6 +54,7 @@ sub cmiss_array
 	 my $token;
 	 my $subtoken;
 	 my $first;
+	 my $return_code;
 
 	 for $token (@_)
 		{
@@ -111,11 +112,13 @@ sub cmiss_array
 		{
 		  print "Perl_cmiss::cmiss_array final: $command\n";
 		}
-
-	 $return_code = cmiss($command);
+	 {
+		package cmiss;
+		$return_code = Perl_cmiss::cmiss($command);
+	 }
 	 if ($cmiss_debug)
 		{
-		  print "Perl_cmiss::cmiss return_code $return_code\n";
+		  print "Perl_cmiss::cmiss_array cmiss return_code $return_code\n";
 		}
 	 return ($return_code);
   }
