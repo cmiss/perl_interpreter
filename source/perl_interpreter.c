@@ -42,7 +42,7 @@ void xs_init()
 	newXS("DynaLoader::boot_DynaLoader", boot_DynaLoader, file);
 }
 
-static char *interpreter_duplicate_string(char *source_string, int length)
+static char *interpreter_duplicate_string(char *source_string, size_t length)
 /*******************************************************************************
 LAST MODIFIED : 7 September 2000
 
@@ -295,7 +295,8 @@ and then executes the returned strings
 {
 	char buffer[1000];
 	fd_set readfds;
-	int flags, read_length, return_code;
+	int flags, return_code;
+  ssize_t read_length;
 	struct timeval timeout_struct;
 	
 	return_code = 1;
