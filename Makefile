@@ -11,6 +11,13 @@ ifndef SYSNAME
   endif
 endif
 
+ifndef NODENAME
+  NODENAME = $(shell uname -n)
+  ifeq ($(NODENAME),)
+    $(error error with shell command uname -n)
+  endif
+endif
+
 ifndef DEBUG
   ifndef OPT
     OPT = false
@@ -34,7 +41,7 @@ ifneq ($(findstring IRIX,$(SYSNAME)),) #SGI
     # Using mips3 for most basic version on esu* machines
     # as there are still some Indys around.
     MIPS = 4
-    ifeq ($(HOST:esu%=),)
+    ifeq ($(NODENAME:esu%=),)
       ifeq ($(ABI),n32)
         ifneq ($(DEBUG),false)
           MIPS=3
@@ -59,7 +66,7 @@ else
         ARCH_FLAGS := -xarch=v9
       endif
     else
-      ARCH_DIR := ${HOSTTYPE}-$(ABI)
+      ARCH_DIR := $(SYSNAME)-$(ABI)
     endif
   endif
 endif
@@ -105,7 +112,7 @@ else
   # need a perl of the same architecture (and ABI) type
   # so don't just find the first perl in PATH
   ifneq ($(findstring IRIX,$(SYSNAME)),)
-    ifeq ($(HOST:esu%=),)
+    ifeq ($(NODENAME:esu%=),)
       ifeq ($(INSTRUCTION),mips3)
         PERL = /usr/local/perl5.6/bin-$(INSTRUCTION)/perl
       else
@@ -116,14 +123,14 @@ else
         endif
       endif
     endif
-    ifeq ($(HOST),hpc1)
+    ifeq ($(NODENAME),hpc1)
       ifeq ($(ABI),n32)
         PERL = /usr/local/perl5.6/bin/perl
       else
         PERL = /usr/local/perl5.6/bin-$(ABI)/perl
       endif
     endif
-    # What to oxford HOSTs look like?
+    # What to oxford NODENAMEs look like?
     CMISS_LOCALE ?=
     ifeq (${CMISS_LOCALE},OXFORD)
       ifeq ($(ABI),n32)
