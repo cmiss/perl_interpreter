@@ -12,10 +12,9 @@ DESCRIPTION:
 ==============================================================================*/
 
 
-#if defined (FORTRAN_INTERPRETER_INTERFACE)
 void create_interpreter_(int *error);
-#else /* defined (FORTRAN_INTERPRETER_INTERFACE) */
-int initialise_interpreter(void);
+#if ! defined (FORTRAN_INTERPRETER_INTERFACE)
+#define create_interpreter create_interpreter_
 #endif /* defined (FORTRAN_INTERPRETER_INTERFACE) */
 /*******************************************************************************
 LAST MODIFIED : 19 May 2000
@@ -25,11 +24,10 @@ Takes a <command_string>, processes this through the F90 interpreter
 and then executes the returned strings
 ==============================================================================*/
 
-#if defined (FORTRAN_INTERPRETER_INTERFACE)
 void destroy_interpreter_(int *error);
-#else /* defined (FORTRAN_INTERPRETER_INTERFACE) */
-int destroy_interpreter(void);
-#endif /* defined (FORTRAN_INTERPRETER_INTERFACE) */
+#if ! defined (FORTRAN_INTERPRETER_INTERFACE)
+#define destroy_interpreter destroy_interpreter_
+#endif /* ! defined (FORTRAN_INTERPRETER_INTERFACE) */
 /*******************************************************************************
 LAST MODIFIED : 19 May 2000
 
