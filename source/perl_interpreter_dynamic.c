@@ -1,7 +1,7 @@
 /*******************************************************************************
 FILE : perl_interpreter_dynamic.c
 
-LAST MODIFIED : 25 June 2003
+LAST MODIFIED : 25 January 2005
 
 DESCRIPTION :
 Puts a layer between cmiss and the perl interpreter which allows many different
@@ -20,10 +20,50 @@ selected at runtime according to the perl found in the users path.
 #include "static_version.h"       /* for NO_STATIC_FALLBACK */
 #include "perl_interpreter.h"
 
+struct Interpreter
+/*******************************************************************************
+LAST MODIFIED : 25 January 2005
+
+DESCRIPTION :
+The dynamic interpreter wrapper of an actual interpreter, both have the same
+name so as to maintain an identical functional interface.
+==============================================================================*/
+{
+	int use_dynamic_interpreter;
+	Interpreter_display_message_function *display_message_function;
+
+	void(*create_interpreter_handle)(int argc, char **argv, const char *initial_comfile,
+		struct Interpreter **interpreter, int *status);
+	void (*interpreter_destroy_string_handle)(struct Interpreter *interpreter, char *string);
+	void (*destroy_interpreter_handle)(struct Interpreter *interpreter, int *status);
+	void (*redirect_interpreter_output_handle)(struct Interpreter *interpreter, int *status);
+	void (*interpreter_set_display_message_function_handle)
+		(struct Interpreter *interpreter, Interpreter_display_message_function *function, int *status);
+	void (*interpret_command_handle)(struct Interpreter *interpreter, 
+		char *command_string, void *user_data, int *quit,
+		execute_command_function_type execute_command_function, int *status);
+	void (*interpreter_evaluate_integer_handle)(struct Interpreter *interpreter,
+		char *expression, int *result, int *status);
+	void (*interpreter_set_integer_handle)(struct Interpreter *interpreter,
+		char *variable_name, int *value, int *status);
+	void (*interpreter_evaluate_double_handle)(struct Interpreter *interpreter,
+		char *expression, double *result, int *status);
+	void (*interpreter_set_double_handle)(struct Interpreter *interpreter,
+		char *variable_name, double *value, int *status);
+	void (*interpreter_evaluate_string_handle)(struct Interpreter *interpreter,
+		char *expression, char **result, int *status);
+	void (*interpreter_set_string_handle)(struct Interpreter *interpreter,
+		char *variable_name, char *value, int *status);
+	void (*interpreter_set_pointer_handle)(struct Interpreter *interpreter,
+		char *variable_name, char *class_name, void *value, int *status);
+
+	struct Interpreter *real_interpreter;
+}; /* struct Interpreter */
+
 static int interpreter_display_message(enum Message_type message_type,
 	char *format, ... )
 /*******************************************************************************
-LAST MODIFIED : 9 June 2003
+LAST MODIFIED : 25 January 2005
 
 DESCRIPTION :
 The default interpreter_display_message_function.
@@ -40,139 +80,127 @@ The default interpreter_display_message_function.
 	return (return_code);
 } /* interpreter_display_message */
 
-static Interpreter_display_message_function *display_message_function =
-   interpreter_display_message;
-
 /* Used by dynamic_versions.h */
 struct Interpreter_library_strings {   char *version; char *archname; char *base64_string; };
 #include "dynamic_versions.h"
 
 #define LOAD_FUNCTION(symbol) \
-	if (return_code && (!(symbol ## handle = (void (*)())dlsym(interpreter_handle, #symbol )))) \
+	if (return_code && (!((*interpreter)->symbol ## handle =	\
+		(void (*)())dlsym(interpreter_handle, #symbol )))) \
 	{ \
-		(*display_message_function)(ERROR_MESSAGE,"Unable to find symbol %s", #symbol ); \
+		((*interpreter)->display_message_function)(ERROR_MESSAGE,"Unable to find symbol %s", #symbol ); \
 		return_code = 0; \
 	}
 
-static int use_dynamic_interpreter = 0;
-
-void (*create_interpreter_handle)(int argc, char **argv, const char *initial_comfile,
-	 int *status);
 #if ! defined (NO_STATIC_FALLBACK)
 void __create_interpreter_(int argc, char **argv, const char *initial_comfile,
-	 int *status);
+	struct Interpreter **interpreter, int *status);
 #else /* ! defined (NO_STATIC_FALLBACK) */
-#define __create_interpreter_(argc, argv, initial_comfile, status)
+#define __create_interpreter_(argc, argv, initial_comfile, interpreter, status)
 #endif /* ! defined (NO_STATIC_FALLBACK) */
 
-void (*interpreter_destroy_string_handle)(char *string);
 #if ! defined (NO_STATIC_FALLBACK)
-void __interpreter_destroy_string_(char *string);
+void __interpreter_destroy_string_(struct Interpreter *interpreter, char *string);
 #else /* ! defined (NO_STATIC_FALLBACK) */
-#define __interpreter_destroy_string_(string)
+#define __interpreter_destroy_string_(interpreter, string)
 #endif /* ! defined (NO_STATIC_FALLBACK) */
 
-void (*destroy_interpreter_handle)(int *status);
 #if ! defined (NO_STATIC_FALLBACK)
-void __destroy_interpreter_(int *status);
+void __destroy_interpreter_(struct Interpreter *interpreter, int *status);
 #else /* ! defined (NO_STATIC_FALLBACK) */
-#define __destroy_interpreter_(status)
+#define __destroy_interpreter_(interpreter, status)
 #endif /* ! defined (NO_STATIC_FALLBACK) */
 
-void (*redirect_interpreter_output_handle)(int *status);
 #if ! defined (NO_STATIC_FALLBACK)
-void __redirect_interpreter_output_(int *status);
+void __redirect_interpreter_output_(struct Interpreter *interpreter, int *status);
 #else /* ! defined (NO_STATIC_FALLBACK) */
-#define __redirect_interpreter_output_(status)
+#define __redirect_interpreter_output_(interpreter, status)
 #endif /* ! defined (NO_STATIC_FALLBACK) */
 
-void (*interpreter_set_display_message_function_handle)
-	  (Interpreter_display_message_function *function, int *status);
 #if ! defined (NO_STATIC_FALLBACK)
-void __interpreter_set_display_message_function_(Interpreter_display_message_function *function,
+void __interpreter_set_display_message_function_(struct Interpreter *interpreter, 
+	Interpreter_display_message_function *function, int *status);
+#else /* ! defined (NO_STATIC_FALLBACK) */
+#define __interpreter_set_display_message_function_(interpreter, function, status)
+#endif /* ! defined (NO_STATIC_FALLBACK) */
+
+#if ! defined (NO_STATIC_FALLBACK)
+void __interpret_command_(struct Interpreter *interpreter, char *command_string, 
+	void *user_data, int *quit, execute_command_function_type execute_command_function,
 	int *status);
 #else /* ! defined (NO_STATIC_FALLBACK) */
-#define __interpreter_set_display_message_function_(function, status)
+#define __interpret_command_(interpreter, command_string, user_data, quit, \
+	execute_command_function, status)
 #endif /* ! defined (NO_STATIC_FALLBACK) */
 
-void (*interpret_command_handle)(char *command_string, void *user_data, int *quit,
-	 execute_command_function_type execute_command_function, int *status);
 #if ! defined (NO_STATIC_FALLBACK)
-void __interpret_command_(char *command_string, void *user_data, int *quit,
-	 execute_command_function_type execute_command_function, int *status);
+void __interpreter_evaluate_integer_(struct Interpreter *interpreter, char *expression,
+	int *result, int *status);
 #else /* ! defined (NO_STATIC_FALLBACK) */
-#define __interpret_command_(command_string, user_data, quit, execute_command_function, status)
+#define __interpreter_evaluate_integer_(interpreter, expression, result, status);
 #endif /* ! defined (NO_STATIC_FALLBACK) */
 
-void (*interpreter_evaluate_integer_handle)(char *expression, int *result, int *status);
 #if ! defined (NO_STATIC_FALLBACK)
-void __interpreter_evaluate_integer_(char *expression, int *result, int *status);
+void __interpreter_set_integer_(struct Interpreter *interpreter,
+	char *variable_name, int *value, int *status);
 #else /* ! defined (NO_STATIC_FALLBACK) */
-#define __interpreter_evaluate_integer_(expression, result, status);
+#define __interpreter_set_integer_(interpreter, variable_name, value, status);
 #endif /* ! defined (NO_STATIC_FALLBACK) */
 
-void (*interpreter_set_integer_handle)(char *variable_name, int *value, int *status);
 #if ! defined (NO_STATIC_FALLBACK)
-void __interpreter_set_integer_(char *variable_name, int *value, int *status);
+void __interpreter_evaluate_double_(struct Interpreter *interpreter,
+	char *expression, double *result, int *status);
 #else /* ! defined (NO_STATIC_FALLBACK) */
-#define __interpreter_set_integer_(variable_name, value, status);
+#define __interpreter_evaluate_double_(interpreter, expression, result, status);
 #endif /* ! defined (NO_STATIC_FALLBACK) */
 
-void (*interpreter_evaluate_double_handle)(char *expression, double *result, int *status);
 #if ! defined (NO_STATIC_FALLBACK)
-void __interpreter_evaluate_double_(char *expression, double *result, int *status);
+void __interpreter_set_double_(struct Interpreter *interpreter, char *variable_name,
+	double *value, int *status);
 #else /* ! defined (NO_STATIC_FALLBACK) */
-#define __interpreter_evaluate_double_(expression, result, status);
+#define __interpreter_set_double_(interpreter, variable_name, value, status);
 #endif /* ! defined (NO_STATIC_FALLBACK) */
 
-void (*interpreter_set_double_handle)(char *variable_name, double *value, int *status);
 #if ! defined (NO_STATIC_FALLBACK)
-void __interpreter_set_double_(char *variable_name, double *value, int *status);
+void __interpreter_evaluate_string_(struct Interpreter *interpreter, char *expression, 
+	char **result, int *status);
 #else /* ! defined (NO_STATIC_FALLBACK) */
-#define __interpreter_set_double_(variable_name, value, status);
+#define __interpreter_evaluate_string_(interpreter, expression, result, status);
 #endif /* ! defined (NO_STATIC_FALLBACK) */
 
-void (*interpreter_evaluate_string_handle)(char *expression, char **result, int *status);
 #if ! defined (NO_STATIC_FALLBACK)
-void __interpreter_evaluate_string_(char *expression, char **result, int *status);
+void __interpreter_set_string_(struct Interpreter *interpreter, char *variable_name,
+	char *value, int *status);
 #else /* ! defined (NO_STATIC_FALLBACK) */
-#define __interpreter_evaluate_string_(expression, result, status);
+#define __interpreter_set_string_(interpreter, variable_name, value, status);
 #endif /* ! defined (NO_STATIC_FALLBACK) */
 
-void (*interpreter_set_string_handle)(char *variable_name, char *value, int *status);
 #if ! defined (NO_STATIC_FALLBACK)
-void __interpreter_set_string_(char *variable_name, char *value, int *status);
+void __interpreter_set_pointer_(struct Interpreter *interpreter, char *variable_name,
+	char *class_name, void *value, int *status);
 #else /* ! defined (NO_STATIC_FALLBACK) */
-#define __interpreter_set_string_(variable_name, value, status);
+#define __interpreter_set_pointer_(interpreter, variable_name, class_name, value, status);
 #endif /* ! defined (NO_STATIC_FALLBACK) */
 
-void (*interpreter_set_pointer_handle)(char *variable_name, char *class_name,
-	void *value, int *status);
-#if ! defined (NO_STATIC_FALLBACK)
-void __interpreter_set_pointer_(char *variable_name, char *class_name, void *value,
-	int *status);
-#else /* ! defined (NO_STATIC_FALLBACK) */
-#define __interpreter_set_pointer_(variable_name, class_name, value, status);
-#endif /* ! defined (NO_STATIC_FALLBACK) */
-
-void interpret_command_(char *command_string, void *user_data, int *quit,
-  execute_command_function_type execute_command_function, int *status)
+void interpret_command_(struct Interpreter *interpreter, char *command_string,
+	void *user_data, int *quit,
+	execute_command_function_type execute_command_function, int *status)
 /*******************************************************************************
-LAST MODIFIED : 19 May 2000
+LAST MODIFIED : 25 January 2005
 
 DESCRIPTION:
 Takes a <command_string>, processes this through the Perl interpreter.
 ==============================================================================*/
 {
-	if (use_dynamic_interpreter)
+	if (interpreter->use_dynamic_interpreter)
 	{
-		(*interpret_command_handle)(command_string, user_data, quit,
-			execute_command_function, status);
+		(interpreter->interpret_command_handle)(interpreter->real_interpreter,
+			command_string, user_data, quit, execute_command_function, status);
 	}
 	else
 	{
-		__interpret_command_(command_string, user_data, quit,
-			execute_command_function, status);
+		__interpret_command_(interpreter->real_interpreter, command_string,
+			user_data, quit, execute_command_function, status);
 	}
 } /* interpret_command */
 
@@ -183,7 +211,7 @@ Takes a <command_string>, processes this through the Perl interpreter.
 #if (1234==BYTE_ORDER)
 static int glibc_version_greater_than_2_2_4(void)
 /*******************************************************************************
-LAST MODIFIED : 26 November 2002
+LAST MODIFIED : 25 January 2005
 
 DESCRIPTION :
 Need to read the glibc version so that we can determine if we need to 
@@ -229,9 +257,10 @@ swap the endianness of values going into a64l
 #endif /* (1234==BYTE_ORDER) */
 #endif /* defined (BYTE_ORDER) */
 
-static char *write_base64_string_to_binary_file(char *base64_string)
+static char *write_base64_string_to_binary_file(struct Interpreter *interpreter,
+	char *base64_string)
 /*******************************************************************************
-LAST MODIFIED : 28 March 2003
+LAST MODIFIED : 25 January 2005
 
 DESCRIPTION :
 This wrapper allows the passing of the <base64_string> which is intended to
@@ -277,7 +306,7 @@ remove the temporary file it refers to.
 						} break;
 						default:
 						{
-							(*display_message_function)(ERROR_MESSAGE,
+							(*interpreter->display_message_function)(ERROR_MESSAGE,
 								"write_base64_string_to_binary_file.  Unexpected remaining length: %d",
 								bytes_in);
 						} break;
@@ -357,7 +386,7 @@ remove the temporary file it refers to.
 			bin_length = total_bin_ptr - total_bin;
 			if (bin_length != fwrite(total_bin,1,bin_length,bin_file))
 			{
-				(*display_message_function)(ERROR_MESSAGE,
+				(*interpreter->display_message_function)(ERROR_MESSAGE,
 					"write_base64_string_to_binary_file.  Short write of temporary binary file.");				
 			}
 			free(total_bin);
@@ -366,14 +395,14 @@ remove the temporary file it refers to.
 		}
 		else
 		{
-			(*display_message_function)(ERROR_MESSAGE,
+			(*interpreter->display_message_function)(ERROR_MESSAGE,
 				"write_base64_string_to_binary_file.  Invalid argument(s)");
 			return_string = (char *)NULL;
 		}
 	}
 	else
 	{
-		(*display_message_function)(ERROR_MESSAGE,
+		(*interpreter->display_message_function)(ERROR_MESSAGE,
 			"write_base64_string_to_binary_file.  Invalid argument(s)");
 		return_string = (char *)NULL;
 	}
@@ -382,9 +411,9 @@ remove the temporary file it refers to.
 } /* write_base64_string_to_binary_file */
 
 void create_interpreter_ (int argc, char **argv, const char *initial_comfile,
-	int *status)
+	struct Interpreter **interpreter, int *status)
 /*******************************************************************************
-LAST MODIFIED : 28 March 2003
+LAST MODIFIED : 25 January 2005
 
 DESCRIPTION:
 Dynamic loader wrapper which loads an appropriate interpreter, initialises all
@@ -402,208 +431,225 @@ the function pointers and then calls create_interpreter_ for that instance.
 	void *interpreter_handle, *perl_handle;
 
 	return_code = 0;
-	use_dynamic_interpreter = 0;
-	perl_interpreter_string = (char *)NULL;
-	library = (char *)NULL;
-
-	*perl_archname = 0;
-	*perl_version = 0;
-	*perl_archlib = 0;
-
-	interpreter_handle = NULL;
-	perl_handle = NULL;
-
-	number_of_perl_interpreters = sizeof(interpreter_strings) /
-		sizeof(struct Interpreter_library_strings);
-	if (number_of_perl_interpreters)
+	if (*interpreter = (struct Interpreter *)malloc (sizeof(struct Interpreter)))
 	{
-		if (0 == pipe(stdout_pipe))
+		(*interpreter)->use_dynamic_interpreter = 0;
+		(*interpreter)->display_message_function = interpreter_display_message;
+		(*interpreter)->real_interpreter = (struct Interpreter *)NULL;
+
+		perl_interpreter_string = (char *)NULL;
+		library = (char *)NULL;
+
+		*perl_archname = 0;
+		*perl_version = 0;
+		*perl_archlib = 0;
+
+		interpreter_handle = NULL;
+		perl_handle = NULL;
+
+		number_of_perl_interpreters = sizeof(interpreter_strings) /
+			sizeof(struct Interpreter_library_strings);
+		if (number_of_perl_interpreters)
 		{
-			/* Redirect stdout */
-			old_stdout = dup(STDOUT_FILENO);
-			dup2(stdout_pipe[1], STDOUT_FILENO);
-
-			/* We are only expecting a little bit of stuff so I am
-				hoping that the pipe can buffer it */
-			if (!(perl_executable = getenv("CMISS" ABI_ENV "_PERL")))
+			if (0 == pipe(stdout_pipe))
 			{
-				if (!(perl_executable = getenv("CMISS_PERL")))
+				/* Redirect stdout */
+				old_stdout = dup(STDOUT_FILENO);
+				dup2(stdout_pipe[1], STDOUT_FILENO);
+
+				/* We are only expecting a little bit of stuff so I am
+					hoping that the pipe can buffer it */
+				if (!(perl_executable = getenv("CMISS" ABI_ENV "_PERL")))
 				{
-					perl_executable = perl_executable_default;
-				}
-			}
-
-			sprintf(command, "%s -MConfig -e 'print \"$Config{archname} $Config{version} $Config{archlibexp}\\n\"'", perl_executable);
-			system(command);
-
-			/* Set stdout back */
-			dup2(old_stdout, STDOUT_FILENO);
-			close(stdout_pipe[1]);
-
-			FD_ZERO(&readfds);
-			FD_SET(stdout_pipe[0], &readfds);
-			timeout_struct.tv_sec = 2;
-			timeout_struct.tv_usec = 0;
-			if (select(FD_SETSIZE, &readfds, NULL, NULL, &timeout_struct))
-			{
-				if (number_read = read(stdout_pipe[0], perl_result_buffer, 499))
-				{
-					perl_result_buffer[number_read] = 0;
-					if (3 == sscanf(perl_result_buffer, "%190s %190s %190s", perl_archname, 
-						perl_version, perl_archlib))
+					if (!(perl_executable = getenv("CMISS_PERL")))
 					{
-						for (i = 0 ; i < number_of_perl_interpreters ; i++)
+						perl_executable = perl_executable_default;
+					}
+				}
+
+				sprintf(command, "%s -MConfig -e 'print \"$Config{archname} $Config{version} $Config{archlibexp}\\n\"'", perl_executable);
+				system(command);
+
+				/* Set stdout back */
+				dup2(old_stdout, STDOUT_FILENO);
+				close(stdout_pipe[1]);
+
+				FD_ZERO(&readfds);
+				FD_SET(stdout_pipe[0], &readfds);
+				timeout_struct.tv_sec = 2;
+				timeout_struct.tv_usec = 0;
+				if (select(FD_SETSIZE, &readfds, NULL, NULL, &timeout_struct))
+				{
+					if (number_read = read(stdout_pipe[0], perl_result_buffer, 499))
+					{
+						perl_result_buffer[number_read] = 0;
+						if (3 == sscanf(perl_result_buffer, "%190s %190s %190s", perl_archname, 
+								perl_version, perl_archlib))
 						{
-							if ((!strcmp(perl_archname, interpreter_strings[i].archname))
-								&& (!strcmp(perl_version, interpreter_strings[i].version)))
+							for (i = 0 ; i < number_of_perl_interpreters ; i++)
 							{
-								perl_interpreter_string = interpreter_strings[i].base64_string;
+								if ((!strcmp(perl_archname, interpreter_strings[i].archname))
+									&& (!strcmp(perl_version, interpreter_strings[i].version)))
+								{
+									perl_interpreter_string = interpreter_strings[i].base64_string;
+								}
 							}
+						}
+						else
+						{
+							((*interpreter)->display_message_function)(ERROR_MESSAGE,
+								"Unexpected result from \"%s\"", command);
 						}
 					}
 					else
 					{
-						(*display_message_function)(ERROR_MESSAGE,
-							"Unexpected result from \"%s\"", command);
+						((*interpreter)->display_message_function)(ERROR_MESSAGE,
+							"No characters received from \"%s\"", command);
 					}
 				}
 				else
 				{
-					(*display_message_function)(ERROR_MESSAGE,
-						"No characters received from \"%s\"", command);
+					((*interpreter)->display_message_function)(ERROR_MESSAGE,
+						"Timed out executing \"%s\"", command);
 				}
+			}
+		}
+
+		if (perl_interpreter_string)
+		{
+			if (library = write_base64_string_to_binary_file(*interpreter,
+					perl_interpreter_string))
+			{
+				sprintf(perl_shared_library, "%s/CORE/libperl.so", perl_archlib);
+				if (perl_handle = dlopen(perl_shared_library, RTLD_LAZY | RTLD_GLOBAL))
+				{
+					if (interpreter_handle = dlopen(library, RTLD_LAZY))
+					{
+						return_code = 1;
+					}
+				}
+			}
+		}
+
+		if (!return_code)
+		{
+			((*interpreter)->display_message_function)(ERROR_MESSAGE,
+				"Unable to open the dynamic perl_interpreter to match your perl \"%s\".",
+				perl_executable);
+			if (perl_interpreter_string)
+			{
+				((*interpreter)->display_message_function)(ERROR_MESSAGE,
+					"dl library error: %s", dlerror());
 			}
 			else
 			{
-				(*display_message_function)(ERROR_MESSAGE,
-					"Timed out executing \"%s\"", command);
-			}
-		}
-	}
-
-	if (perl_interpreter_string)
-	{
-		if (library = write_base64_string_to_binary_file(perl_interpreter_string))
-		{
-			sprintf(perl_shared_library, "%s/CORE/libperl.so", perl_archlib);
-			if (perl_handle = dlopen(perl_shared_library, RTLD_LAZY | RTLD_GLOBAL))
-			{
-				if (interpreter_handle = dlopen(library, RTLD_LAZY))
+				if (*perl_version && *perl_archname)
 				{
-					return_code = 1;
+					/* We didn't get a match so lets list all the versions strings */
+					((*interpreter)->display_message_function)(ERROR_MESSAGE,
+						"Your perl reported version \"%s\" and archname \"%s\".",
+						perl_version, perl_archname);
+					((*interpreter)->display_message_function)(ERROR_MESSAGE,
+						"The version and archname interpreters included in this executable are:");
+					for (i = 0 ; i < number_of_perl_interpreters ; i++)
+					{
+						((*interpreter)->display_message_function)(ERROR_MESSAGE,
+							"                         %s             %s",
+							interpreter_strings[i].version, interpreter_strings[i].archname);
+					}
 				}
 			}
+			if (perl_handle)
+			{
+				/* Don't do this as soon as the interpreter_handle fails otherwise this call 
+					overwrites the dlerror message from the interpreter_handle */
+				dlclose(perl_handle);
+			}
 		}
-	}
 
-	if (!return_code)
-	{
-		(*display_message_function)(ERROR_MESSAGE,
-			"Unable to open the dynamic perl_interpreter to match your perl \"%s\".",
-			perl_executable);
-		if (perl_interpreter_string)
+		if (return_code)
 		{
-			(*display_message_function)(ERROR_MESSAGE,
-				"dl library error: %s", dlerror());
+			LOAD_FUNCTION(create_interpreter_);
+			if (return_code)
+			{
+				((*interpreter)->create_interpreter_handle)(argc, argv, initial_comfile,
+					&((*interpreter)->real_interpreter), status);
+				return_code = *status;
+			}
+			LOAD_FUNCTION(interpreter_destroy_string_);
+			LOAD_FUNCTION(destroy_interpreter_);
+			LOAD_FUNCTION(redirect_interpreter_output_);
+			LOAD_FUNCTION(interpreter_set_display_message_function_);
+			LOAD_FUNCTION(interpret_command_);
+			LOAD_FUNCTION(interpreter_evaluate_integer_);
+			LOAD_FUNCTION(interpreter_set_integer_);
+			LOAD_FUNCTION(interpreter_evaluate_double_);
+			LOAD_FUNCTION(interpreter_set_double_);
+			LOAD_FUNCTION(interpreter_evaluate_string_);
+			LOAD_FUNCTION(interpreter_set_string_);
+			LOAD_FUNCTION(interpreter_set_pointer_);
+		}
+		if (return_code)
+		{
+			/* All the functions should be valid if the return_code
+				is still 1 */
+			(*interpreter)->use_dynamic_interpreter = 1;
 		}
 		else
 		{
-			if (*perl_version && *perl_archname)
-			{
-				/* We didn't get a match so lets list all the versions strings */
-				(*display_message_function)(ERROR_MESSAGE,
-					"Your perl reported version \"%s\" and archname \"%s\".",
-					perl_version, perl_archname);
-				(*display_message_function)(ERROR_MESSAGE,
-					"The version and archname interpreters included in this executable are:");
-				for (i = 0 ; i < number_of_perl_interpreters ; i++)
-				{
-					(*display_message_function)(ERROR_MESSAGE,
-						"                         %s             %s",
-						interpreter_strings[i].version, interpreter_strings[i].archname);
-				}
-			}
-		}
-		if (perl_handle)
-		{
-			/* Don't do this as soon as the interpreter_handle fails otherwise this call 
-				overwrites the dlerror message from the interpreter_handle */
-			dlclose(perl_handle);
-		}
-	}
-
-	if (return_code)
-	{
-		LOAD_FUNCTION(create_interpreter_);
-		if (return_code)
-		{
-			(*create_interpreter_handle)(argc, argv, initial_comfile, status);
+#if ! defined (NO_STATIC_FALLBACK)
+			((*interpreter)->display_message_function)(ERROR_MESSAGE, "Falling back to using the internal perl interpreter.");
+			__create_interpreter_(argc, argv, initial_comfile,
+				&((*interpreter)->real_interpreter), status);
 			return_code = *status;
+#else /* ! defined (NO_STATIC_FALLBACK) */
+			((*interpreter)->display_message_function)(ERROR_MESSAGE,
+				"No fallback static perl interpreter was included in this executable."
+				"This executable will be unable to operate until your perl version matches one of the dynamically included versions.");
+			return_code = 0;
+			free (*interpreter);
+			*interpreter = (struct Interpreter *)NULL;
+#endif /* ! defined (NO_STATIC_FALLBACK) */
 		}
-		LOAD_FUNCTION(interpreter_destroy_string_);
-		LOAD_FUNCTION(destroy_interpreter_);
-		LOAD_FUNCTION(redirect_interpreter_output_);
-		LOAD_FUNCTION(interpreter_set_display_message_function_);
-		LOAD_FUNCTION(interpret_command_);
-		LOAD_FUNCTION(interpreter_evaluate_integer_);
-		LOAD_FUNCTION(interpreter_set_integer_);
-		LOAD_FUNCTION(interpreter_evaluate_double_);
-		LOAD_FUNCTION(interpreter_set_double_);
-		LOAD_FUNCTION(interpreter_evaluate_string_);
-		LOAD_FUNCTION(interpreter_set_string_);
-		LOAD_FUNCTION(interpreter_set_pointer_);
-	}
-	if (return_code)
-	{
-		/* All the functions should be valid if the return_code
-			is still 1 */
-		use_dynamic_interpreter = 1;
+		if (library)
+		{
+			/* Hopefully we can remove the file already and if the OS still
+				wants it, it will just keep a handle */
+			remove(library);
+			free(library);
+		}
 	}
 	else
 	{
-#if ! defined (NO_STATIC_FALLBACK)
-		(*display_message_function)(ERROR_MESSAGE, "Falling back to using the internal perl interpreter.");
-		__create_interpreter_(argc, argv, initial_comfile, status);
-		return_code = *status;
-#else /* ! defined (NO_STATIC_FALLBACK) */
-		(*display_message_function)(ERROR_MESSAGE,
-			"No fallback static perl interpreter was included in this executable."
-			"This executable will be unable to operate until your perl version matches one of the dynamically included versions.");
+		((*interpreter)->display_message_function)(ERROR_MESSAGE,
+			"Unable to allocate memory for internal dynamic perl interpreter structure.");
 		return_code = 0;
-#endif /* ! defined (NO_STATIC_FALLBACK) */
-	}
-	if (library)
-	{
-		/* Hopefully we can remove the file already and if the OS still
-			wants it, it will just keep a handle */
-		remove(library);
-		free(library);
 	}
 	*status = return_code;
 }
 
-void destroy_interpreter_(int *status)
+void destroy_interpreter_(struct Interpreter *interpreter, int *status)
 /*******************************************************************************
-LAST MODIFIED : 24 March 2003
+LAST MODIFIED : 25 January 2005
 
 DESCRIPTION :
 Dynamic loader wrapper
 ==============================================================================*/
 {
-	if (use_dynamic_interpreter)
+	if (interpreter->use_dynamic_interpreter)
 	{
-		(*destroy_interpreter_handle)(status);
+		(interpreter->destroy_interpreter_handle)(interpreter->real_interpreter, status);
 	}
 	else
 	{
-		__destroy_interpreter_(status);
+		__destroy_interpreter_(interpreter->real_interpreter, status);
 	}
 } /* destroy_interpreter */
 
-void interpreter_set_display_message_function_(Interpreter_display_message_function *function,
-	int *status)
+void interpreter_set_display_message_function_(struct Interpreter *interpreter, 
+	Interpreter_display_message_function *function, int *status)
 /*******************************************************************************
-LAST MODIFIED : 9 June 2003
+LAST MODIFIED : 25 January 2005
 
 DESCRIPTION :
 Dynamic loader wrapper
@@ -612,182 +658,200 @@ Dynamic loader wrapper
 	/* Set the display message function in this module */
 	if (function)
 	{
-		display_message_function = function;
+		interpreter->display_message_function = function;
 	}
 	else
 	{
-		display_message_function = interpreter_display_message;			
+		interpreter->display_message_function = interpreter_display_message;			
 	}
 	/* Now set it in the actual perl interpreter module */
-	if (use_dynamic_interpreter)
+	if (interpreter->use_dynamic_interpreter)
 	{
-		(*interpreter_set_display_message_function_handle)(function, status);
+		(interpreter->interpreter_set_display_message_function_handle)
+			(interpreter->real_interpreter, function, status);
 	}
 	else
 	{
-		__interpreter_set_display_message_function_(function, status);
+		__interpreter_set_display_message_function_(interpreter->real_interpreter, function, status);
 	}
 } /* redirect_interpreter_output */
 
-void redirect_interpreter_output_(int *status)
+void redirect_interpreter_output_(struct Interpreter *interpreter, int *status)
 /*******************************************************************************
-LAST MODIFIED : 24 March 2003
+LAST MODIFIED : 25 January 2005
 
 DESCRIPTION :
 Dynamic loader wrapper
 ==============================================================================*/
 {
-	if (use_dynamic_interpreter)
+	if (interpreter->use_dynamic_interpreter)
 	{
-		(*redirect_interpreter_output_handle)(status);
+		(interpreter->redirect_interpreter_output_handle)(interpreter->real_interpreter, status);
 	}
 	else
 	{
-		__redirect_interpreter_output_(status);
+		__redirect_interpreter_output_(interpreter->real_interpreter, status);
 	}
 } /* redirect_interpreter_output */
 
-void interpreter_evaluate_integer_(char *expression, int *result, int *status)
+void interpreter_evaluate_integer_(struct Interpreter *interpreter, 
+	char *expression, int *result, int *status)
 /*******************************************************************************
-LAST MODIFIED : 24 March 2003
+LAST MODIFIED : 25 January 2005
 
 DESCRIPTION :
 Dynamic loader wrapper
 ==============================================================================*/
 {
-	if (use_dynamic_interpreter)
+	if (interpreter->use_dynamic_interpreter)
 	{
-		(*interpreter_evaluate_integer_handle)(expression, result, status);
+		(interpreter->interpreter_evaluate_integer_handle)(interpreter->real_interpreter, expression, result,
+			status);
 	}
 	else
 	{
-		__interpreter_evaluate_integer_(expression, result, status);
+		__interpreter_evaluate_integer_(interpreter->real_interpreter, expression, result, status);
 	}
 } /* interpreter_evaluate_integer */
 
-void interpreter_set_integer_(char *variable_name, int *value, int *status)
+void interpreter_set_integer_(struct Interpreter *interpreter, 
+	char *variable_name, int *value, int *status)
 /*******************************************************************************
-LAST MODIFIED : 24 March 2003
+LAST MODIFIED : 25 January 2005
 
 DESCRIPTION :
 Dynamic loader wrapper
 ==============================================================================*/
 {
-	if (use_dynamic_interpreter)
+	if (interpreter->use_dynamic_interpreter)
 	{
-		(*interpreter_set_integer_handle)(variable_name, value, status);
+		(interpreter->interpreter_set_integer_handle)(interpreter->real_interpreter, variable_name, value,
+			status);
 	}
 	else
 	{
-		__interpreter_set_integer_(variable_name, value, status);
+		__interpreter_set_integer_(interpreter->real_interpreter, variable_name, value, status);
 	}
 } /* interpreter_set_integer */
 
-void interpreter_evaluate_double_(char *expression, double *result, int *status)
+void interpreter_evaluate_double_(struct Interpreter *interpreter, 
+	char *expression, double *result, int *status)
 /*******************************************************************************
-LAST MODIFIED : 24 March 2003
+LAST MODIFIED : 25 January 2005
 
 DESCRIPTION :
 Dynamic loader wrapper
 ==============================================================================*/
 {
-	if (use_dynamic_interpreter)
+	if (interpreter->use_dynamic_interpreter)
 	{
-		(*interpreter_evaluate_double_handle)(expression, result, status);
+		(interpreter->interpreter_evaluate_double_handle)(interpreter->real_interpreter, expression, result,
+			status);
 	}
 	else
 	{
-		__interpreter_evaluate_double_(expression, result, status);
+		__interpreter_evaluate_double_(interpreter->real_interpreter, expression, result, status);
 	}
 } /* interpreter_evaluate_double */
 
-void interpreter_set_double_(char *variable_name, double *value, int *status)
+void interpreter_set_double_(struct Interpreter *interpreter, 
+	char *variable_name, double *value, int *status)
 /*******************************************************************************
-LAST MODIFIED : 24 March 2003
+LAST MODIFIED : 25 January 2005
 
 DESCRIPTION :
 Dynamic loader wrapper
 ==============================================================================*/
 {
-	if (use_dynamic_interpreter)
+	if (interpreter->use_dynamic_interpreter)
 	{
-		(*interpreter_set_double_handle)(variable_name, value, status);
+		(interpreter->interpreter_set_double_handle)(interpreter->real_interpreter,
+			variable_name, value, status);
 	}
 	else
 	{
-		__interpreter_set_double_(variable_name, value, status);
+		__interpreter_set_double_(interpreter->real_interpreter, variable_name, value, status);
 	}
 } /* interpreter_set_double */
 
-void interpreter_evaluate_string_(char *expression, char **result, int *status)
+void interpreter_evaluate_string_(struct Interpreter *interpreter, 
+	char *expression, char **result, int *status)
 /*******************************************************************************
-LAST MODIFIED : 24 March 2003
+LAST MODIFIED : 25 January 2005
 
 DESCRIPTION :
 Dynamic loader wrapper
 ==============================================================================*/
 {
-	if (use_dynamic_interpreter)
+	if (interpreter->use_dynamic_interpreter)
 	{
-		(*interpreter_evaluate_string_handle)(expression, result, status);
+		(interpreter->interpreter_evaluate_string_handle)(
+			interpreter->real_interpreter, expression, result, status);
 	}
 	else
 	{
-		__interpreter_evaluate_string_(expression, result, status);
+		__interpreter_evaluate_string_(interpreter->real_interpreter, expression,
+			result, status);
 	}
 } /* interpreter_evaluate_string */
 
-void interpreter_destroy_string_(char *string)
+void interpreter_destroy_string_(struct Interpreter *interpreter, char *string)
 /*******************************************************************************
-LAST MODIFIED : 24 March 2003
+LAST MODIFIED : 25 January 2005
 
 DESCRIPTION :
 Dynamic loader wrapper
 ==============================================================================*/
 {
-	if (use_dynamic_interpreter)
+	if (interpreter->use_dynamic_interpreter)
 	{
-		(*interpreter_destroy_string_handle)(string);
+		(interpreter->interpreter_destroy_string_handle)(
+			interpreter->real_interpreter, string);
 	}
 	else
 	{
-		__interpreter_destroy_string_(string);
+		__interpreter_destroy_string_(interpreter->real_interpreter, string);
 	}
 } /* interpreter_destroy_string */
 
-void interpreter_set_string_(char *variable_name, char *value, int *status)
+void interpreter_set_string_(struct Interpreter *interpreter, 
+	char *variable_name, char *value, int *status)
 /*******************************************************************************
-LAST MODIFIED : 24 March 2003
+LAST MODIFIED : 25 January 2005
 
 DESCRIPTION :
 Dynamic loader wrapper
 ==============================================================================*/
 {
-	if (use_dynamic_interpreter)
+	if (interpreter->use_dynamic_interpreter)
 	{
-		(*interpreter_set_string_handle)(variable_name, value, status);
+		(interpreter->interpreter_set_string_handle)(interpreter->real_interpreter,
+			variable_name, value, status);
 	}
 	else
 	{
-		__interpreter_set_string_(variable_name, value, status);
+		__interpreter_set_string_(interpreter->real_interpreter, variable_name,
+			value, status);
 	}
 } /* interpreter_set_string */
 
-void interpreter_set_pointer_(char *variable_name, char *class_name, void *value, 
-	int *status)
+void interpreter_set_pointer_(struct Interpreter *interpreter, 
+	char *variable_name, char *class_name, void *value, int *status)
 /*******************************************************************************
-LAST MODIFIED : 30 May 2003
+LAST MODIFIED : 25 January 2005
 
 DESCRIPTION :
 Dynamic loader wrapper
 ==============================================================================*/
 {
-	if (use_dynamic_interpreter)
+	if (interpreter->use_dynamic_interpreter)
 	{
-		(*interpreter_set_pointer_handle)(variable_name, class_name, value, status);
+		(interpreter->interpreter_set_pointer_handle)(interpreter->real_interpreter,
+			variable_name, class_name, value, status);
 	}
 	else
 	{
-		__interpreter_set_pointer_(variable_name, class_name, value, status);
+		__interpreter_set_pointer_(interpreter->real_interpreter, variable_name,
+			class_name, value, status);
 	}
 } /* interpreter_set_pointer */
