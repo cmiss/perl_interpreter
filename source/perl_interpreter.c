@@ -16,7 +16,7 @@ Provides an interface between cmiss and a Perl interpreter.
 #include "perl_interpreter.h"
 
 /***    The Perl interpreter    ***/
-PerlInterpreter *my_perl = (PerlInterpreter *)NULL;
+static PerlInterpreter *my_perl = (PerlInterpreter *)NULL;
 
 static void xs_init(pTHX);
 
@@ -30,7 +30,7 @@ static execute_command_function_type kept_execute_command_function;
 static int keep_stdout = 0;
 static int keep_stderr = 0;
 
-void xs_init(pTHX)
+static void xs_init(pTHX)
 {
 	char *file_name = __FILE__;
 	newXS("Perl_cmiss::bootstrap", boot_Perl_cmiss, file_name);
