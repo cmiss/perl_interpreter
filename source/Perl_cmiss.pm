@@ -229,11 +229,14 @@ sub execute_command
 										  if (!$is_simple_token && $is_perl_token)
 											 {
 												# Let Perl parse this into a string
-												$token = $token . "\"." . "join(\",\",$part_token).\"$1";
+												$token = $token . "\\\"\"." . "join(\",\",$part_token).\"\\\"$1";
 											 }
 										  else
 											 {
 												# Just add it in normally 
+												# Escape \\ and " characters
+												$part_token =~ s/\\/\\\\/g;
+												$part_token =~ s/\"/\\\"/g;
 												$token = $token . $part_token . $1;
 											 }
 										  $token2 = $token2 . $part_token . $1;
@@ -319,16 +322,19 @@ sub execute_command
 									# Let Perl parse this into a string
 									if ($cmiss_debug)
 									  {
-										 $token = $token . "\".join(\",\",$part_token))) || die(\"Error in cmiss command \$return_code\");";
+										 $token = $token . "\\\"\".join(\",\",$part_token).\"\\\"\")) || die(\"Error in cmiss command \$return_code\");";
 									  }
 									else
 									  {
-										 $token = $token . "\".join(\",\",$part_token))) || die(\"Error in cmiss command $token2\");";
+										 $token = $token . "\\\"\".join(\",\",$part_token).\"\\\"\")) || die(\"Error in cmiss command $token2\");";
 									  }
 								 }
 							  else
 								 {
 									# Just add it in normally 
+									# Escape \\ and " characters
+									$part_token =~ s/\\/\\\\/g;
+									$part_token =~ s/\"/\\\"/g;
 									if ($cmiss_debug)
 									  {
 										 $token = $token . $part_token . "\")) || die(\"Error in cmiss command \$return_code\");";
