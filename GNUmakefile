@@ -18,19 +18,19 @@ C_OBJ = $(WORKING_DIR)/libperlinterpreter.o
 F_OBJ = $(WORKING_DIR)/libperlinterpreter_f.o
 LIBRARY = $(LIBRARY_DIR)/libperlinterpreter.a
 
-PERL_PATH = /usr/local/perl5/lib/5.00503
-DYNALOADER_LIB = $(PERL_PATH)/irix-n32/auto/DynaLoader/DynaLoader.a
-PERL_CMISS_LIB = /usr/people/blackett/cmgui/source/command/Perl_cmiss/blib/arch/auto/Perl_cmiss/Perl_cmiss.a
-PERL_LIB = $(PERL_PATH)/irix-n32/CORE/libperl.a
+PERL_PATH = $(shell perl -MConfig -e 'print "$$Config{archlib}\n"')
+DYNALOADER_LIB = $(PERL_PATH)/auto/DynaLoader/DynaLoader.a
+PERL_CMISS_LIB = Perl_cmiss/blib/arch/auto/Perl_cmiss/Perl_cmiss.a
+PERL_LIB = $(PERL_PATH)/CORE/libperl.a
 
-CINCLUDE_DIRS = $(PERL_PATH)/irix-n32/CORE
+CINCLUDE_DIRS = $(PERL_PATH)/CORE
 
 #-----------------------------------------------------------------------------
 # compiling commands
 
 CC = cc
 CFLAGS = -c -g -mips3
-CPPFLAGS = $(addprefix -I, $(CINCLUDE_DIRS) )
+CPPFLAGS = $(addprefix -I, $(CINCLUDE_DIRS) $(WORKING_DIR) )
 F90C = f90
 F90FLAGS = -c -g -mips3
 LDFLAGS = -r -mips3
@@ -48,7 +48,7 @@ ARFLAGS = -cr
 # This is done by producing a relocatable object first.
 # Is there a better way?
 
-$(LIBRARY) : $(C_OBJ) $(F_OBJ)
+$(LIBRARY) : $(C_OBJ) $(F_OBJ) $(PERL_CMISS_LIB)
 	@if [ ! -d $(LIBRARY_DIR) ]; then echo mkdir -p $(LIBRARY_DIR); mkdir -p $(LIBRARY_DIR); fi
 	$(AR) $(ARFLAGS) $@ $^
 
@@ -63,12 +63,17 @@ $(F_OBJ) : $(foreach unit, $(F_UNITS), $(WORKING_DIR)/$(unit).o )
 # 	ld $(LDFLAGS) -o $(TEMP_OBJ) $^
 # 	$(AR) $(ARFLAGS) $@ $(TEMP_OBJ)
 
+$(PERL_CMISS_LIB) : 
+	cd Perl_cmiss ; perl Makefile.PL ; $(MAKE) static
+
 #-----------------------------------------------------------------------------
 # implicit rules for making the object dependencies
 
 $(WORKING_DIR)/%.d : $(SOURCE_DIR)/%.c
 	@if [ ! -d $(WORKING_DIR) ]; then echo mkdir -p $(WORKING_DIR); mkdir -p $(WORKING_DIR); fi
-	makedepend $(CPPFLAGS) -f- $< | sed -e 's%^source\([^ ]*\).o%$$(WORKING_DIR)\1.o $$(WORKING_DIR)\1.d%' > $@
+	makedepend $(CPPFLAGS) -f- -Y $< 2> $@.tmp | sed -e 's%^source\([^ ]*\).o%$$(WORKING_DIR)\1.o $$(WORKING_DIR)\1.d%' > $@
+	(grep pmh $@.tmp | grep makedepend | awk -F "[ ,]" '{printf("%s.%s:",substr($$4, 1, length($$4) - 2),"o"); for(i = 1 ; i <= NF ; i++)  { if (match($$i,"pmh")) printf(" source/%s", substr($$i, 2, length($$i) -2)) } printf("\n");}' | sed -e 's%^source\([^ ]*\).o%$$(WORKING_DIR)\1.o $$(WORKING_DIR)\1.d%' | sed -e 's%source\([^ ]*\).pmh%$$(WORKING_DIR)\1.pmh%' >> $@)
+#	rm $@.tmp
 
 # $(WORKING_DIR)/%_.d : $(SOURCE_DIR)/%.c
 # 	@if [ ! -d $(WORKING_DIR) ]; then echo mkdir -p $(WORKING_DIR); mkdir -p $(WORKING_DIR); fi
@@ -77,6 +82,10 @@ $(WORKING_DIR)/%.d : $(SOURCE_DIR)/%.c
 $(WORKING_DIR)/%.d : $(SOURCE_DIR)/%.f90
 	@if [ ! -d $(WORKING_DIR) ]; then echo mkdir -p $(WORKING_DIR); mkdir -p $(WORKING_DIR); fi
 	make/f90makedepend.pl $< > $@
+
+$(WORKING_DIR)/%.pmh : $(SOURCE_DIR)/%.pm
+	@if [ ! -d $(WORKING_DIR) ]; then echo mkdir -p $(WORKING_DIR); mkdir -p $(WORKING_DIR); fi
+	utilities/pm2pmh $< > $@
 
 # $(WORKING_DIR)/%.d $(WORKING_DIR)/%.o : $(SOURCE_DIR)/%.c
 # 	@if [ ! -d $(WORKING_DIR) ]; then echo mkdir -p $(WORKING_DIR); mkdir -p $(WORKING_DIR); fi
