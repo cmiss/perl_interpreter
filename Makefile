@@ -4,6 +4,10 @@ MAKEFLAGS = --no-builtin-rules --warn-undefined-variables
 
 #-----------------------------------------------------------------------------
 
+ifndef TASK
+  TASK =#
+endif
+
 ifndef SYSNAME
   SYSNAME := $(shell uname)
   ifeq ($(SYSNAME),)
@@ -140,7 +144,7 @@ ifndef USE_DYNAMIC_LOADER
       #I have not even been including a dynaloader at all so far.
       USE_DYNAMIC_LOADER = false
     else
-      USE_DYNAMIC_LOADER = maybe # if shared libraries are found
+      USE_DYNAMIC_LOADER = maybe# if shared libraries are found
     endif
   endif
 endif
@@ -272,9 +276,9 @@ ifeq ($(TASK),)
     endif
     ifeq ($(USE_DYNAMIC_LOADER),maybe)
       ifeq ($(SHARED_PERL_EXECUTABLES),)
-        USE_DYNAMIC_LOADER=false
+        USE_DYNAMIC_LOADER = false
       else
-        USE_DYNAMIC_LOADER=true
+        USE_DYNAMIC_LOADER = true
       endif
     endif
   endif
@@ -447,9 +451,6 @@ vpath $(PERL) $(subst :, ,$(PATH))
 #-----------------------------------------------------------------------------
 #-----------------------------------------------------------------------------
 
-ifndef TASK
-  TASK =#
-endif
 ifeq ($(TASK),)
 #-----------------------------------------------------------------------------
 
