@@ -196,7 +196,7 @@ sub execute_command
 				else
 				  {
 					 $continue = 1;
-					 if ($token eq "")
+					 if ($token =~ m/^\s*$/)
 						{
 						  if (($lc_command =~ m/^(?:$match_string)/)
 								|| ($lc_command =~ m/^q$/)
@@ -204,11 +204,11 @@ sub execute_command
 							 {
 								if ($cmiss_debug)
 								  {
-									 $token = "(\$return_code = Perl_cmiss::cmiss(\"";
+									 $token = $token . "(\$return_code = Perl_cmiss::cmiss(\"";
 								  }
 								else
 								  {
-									 $token = "(Perl_cmiss::cmiss(\"";
+									 $token = $token . "(Perl_cmiss::cmiss(\"";
 								  }
 								$part_token = "";
 								$token2 = "";
