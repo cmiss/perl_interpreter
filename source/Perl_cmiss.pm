@@ -213,6 +213,7 @@ sub execute_command
 								$part_token = "";
 								$token2 = "";
 								$is_perl_token = 1;
+								$is_simple_token = 1;
 								while (($command ne "") && !($command =~ m/(^[}	#])/))
 								  {
 									 if ($cmiss_debug)
@@ -225,10 +226,10 @@ sub execute_command
 											 {
 												print "cmiss space: $1\n";
 											 }
-										  if ($is_perl_token)
+										  if (!$is_simple_token && $is_perl_token)
 											 {
 												# Let Perl parse this into a string
-												$token = $token . "\" . " . "($part_token) . \"$1";
+												$token = $token . "\" . " . "join(\",\",$part_token) . \"$1";
 											 }
 										  else
 											 {
@@ -237,15 +238,25 @@ sub execute_command
 											 }
 										  $token2 = $token2 . $part_token . $1;
 										  $is_perl_token = 1;
+										  $is_simple_token = 1;
 										  $part_token = "";
 										}
-									 elsif ($command =~ s%^([+\-*=/\\<>!.,0-9])%%)
+									 elsif ($command =~ s%^([.,0-9:])%%)
 										{
 										  if ($cmiss_debug)
 											 {
 												print "cmiss number/operator: $1\n";
 											 }
 										  $part_token = $part_token . $1;
+										}
+									 elsif ($command =~ s%^([+\-*=/\\<>!()])%%)
+										{
+										  if ($cmiss_debug)
+											 {
+												print "cmiss perl number/operator: $1\n";
+											 }
+										  $part_token = $part_token . $1;
+										  $is_simple_token = 0;
 										}
 									 elsif ($command =~ s%^(\w+\()%%)
 										{
@@ -254,17 +265,11 @@ sub execute_command
 												print "cmiss function: $1\n";
 											 }
 										  $part_token = $part_token . $1;
-										}
-									 elsif ($command =~ s%^(\))%%)
-										{
-										  if ($cmiss_debug)
-											 {
-												print "cmiss end function: $1\n";
-											 }
-										  $part_token = $part_token . $1;
+										  $is_simple_token = 0;
 										}
 									 else
 										{
+										  $is_simple_token = 0;
 										  ($extracted, $reduced_command) = 
 											 Text::Balanced::extract_variable($command);
 										  if ($extracted)
@@ -309,16 +314,16 @@ sub execute_command
 							    {
 									print "token2 $token2\n";
 								 }
-						     if ($is_perl_token)
+						     if (!$is_simple_token && $is_perl_token)
 								 {
 									# Let Perl parse this into a string
 									if ($cmiss_debug)
 									  {
-										 $token = $token . "\" . ($part_token) )) || die(\"Error in cmiss command \$return_code\");";
+										 $token = $token . "\" . join(\",\",$part_token))) || die(\"Error in cmiss command \$return_code\");";
 									  }
 									else
 									  {
-										 $token = $token . "\" . ($part_token) )) || die(\"Error in cmiss command $token2\");";
+										 $token = $token . "\" . join(\",\",$part_token))) || die(\"Error in cmiss command $token2\");";
 									  }
 								 }
 							  else
