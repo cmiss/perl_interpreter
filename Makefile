@@ -315,8 +315,16 @@ ifeq ($(TASK),)
   endif
 endif
 
-# if either SHARED_OBJECT or INCLUDE_PERL is true, set STATIC_PERL_LIB 
-ifneq ($(filter true, $(SHARED_OBJECT) $(INCLUDE_PERL)),)
+# if either SHARED_OBJECT is false or INCLUDE_PERL is true, set STATIC_PERL_LIB 
+ifneq ($(SHARED_OBJECT),true)
+  SET_STATIC_PERL_LIB = true
+else
+  ifeq ($(INCLUDE_PERL),true)
+    SET_STATIC_PERL_LIB = true
+  endif
+endif
+
+ifeq ($(SET_STATIC_PERL_LIB),true)
    STATIC_PERL_LIB = $(firstword $(wildcard $(PERL_ARCHLIB)/CORE/libperl.a) $(wildcard $(PERL_ARCHLIB)/CORE/libperl56.a))
    ifneq ($(USE_DYNAMIC_LOADER), true)
       ifeq ($(STATIC_PERL_LIB),)
@@ -354,7 +362,7 @@ else
 endif
 LIBRARY_NAME := libperlinterpreter$(INCLUDE_PERL_SUFFIX)$(DEBUG_SUFFIX)$(LIBRARY_SUFFIX)
 LIBRARY := $(LIBRARY_DIR)/$(LIBRARY_NAME)
-LIBRARY_LINK := $(LIBRARY_ROOT_DIR)/libperlinterpreter$(DEBUG_SUFFIX)$(LIBRARY_SUFFIX)
+LIBRARY_LINK := $(LIBRARY_ROOT_DIR)/libperlinterpreter$(INCLUDE_PERL_SUFFIX)$(DEBUG_SUFFIX)$(LIBRARY_SUFFIX)
 LIB_EXP := $(patsubst %$(LIBRARY_SUFFIX), %.exp, $(LIBRARY_LINK))
 
 SOURCE_FILES := $(notdir $(wildcard $(SOURCE_DIR)/*.*) )
