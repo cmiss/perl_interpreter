@@ -17,6 +17,7 @@ selected at runtime according to the perl found in the users path.
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <fcntl.h>
 #include <dlfcn.h>
