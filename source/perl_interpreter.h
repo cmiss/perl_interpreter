@@ -12,11 +12,7 @@ typedef void (*execute_command_function_type)(char *, void *, int *, int *);
 void interpret_command_(char *command_string, void *user_data, int *quit,
   execute_command_function_type execute_command_function, int *status);
 #if ! defined (FORTRAN_INTERPRETER_INTERFACE)
-#if !defined(_AIX)
 #define interpret_command interpret_command_
-#else
-#define interpret_command_ interpret_command
-#endif
 #endif /* defined (FORTRAN_INTERPRETER_INTERFACE) */
 /*******************************************************************************
 LAST MODIFIED : 19 May 2000
@@ -77,11 +73,7 @@ as an integer then <status> will be set to zero.
 
 void interpreter_set_integer_(char *variable_name, int *value, int *status);
 #if ! defined (FORTRAN_INTERPRETER_INTERFACE)
-#if !defined(_AIX)
 #define interpreter_set_integer interpreter_set_integer_
-#else
-#define interpreter_set_integer_ interpreter_set_integer
-#endif
 #endif /* ! defined (FORTRAN_INTERPRETER_INTERFACE) */
 /*******************************************************************************
 LAST MODIFIED : 6 September 2000
@@ -105,11 +97,7 @@ as an double then <status> will be set to zero.
 
 void interpreter_set_double_(char *variable_name, double *value, int *status);
 #if ! defined (FORTRAN_INTERPRETER_INTERFACE)
-#if !defined(_AIX)
 #define interpreter_set_double interpreter_set_double_
-#else
-#define interpreter_set_double_ interpreter_set_double
-#endif
 #endif /* ! defined (FORTRAN_INTERPRETER_INTERFACE) */
 /*******************************************************************************
 LAST MODIFIED : 7 September 2000
@@ -144,11 +132,7 @@ Frees the memory associated with a string allocated by the interpreter.
 
 void interpreter_set_string_(char *variable_name, char *value, int *status);
 #if ! defined (FORTRAN_INTERPRETER_INTERFACE)
-#if !defined(_AIX)
 #define interpreter_set_string interpreter_set_string_
-#else
-#define interpreter_set_string_ interpreter_set_string
-#endif
 #endif /* ! defined (FORTRAN_INTERPRETER_INTERFACE) */
 /*******************************************************************************
 LAST MODIFIED : 7 September 2000
