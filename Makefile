@@ -468,7 +468,6 @@ ifeq ($(TASK),)
 ifeq ($(SYSNAME),win32)
   $(warning *******************************)
   $(warning This still does not compile win32 out of the box)
-  $(warning link in the Perl_cmiss Makefile.pl needs to be changed to system("cp...") )
   $(warning The generated Perl_cmiss Makefile ends up with many \ where there need to be / which seems to work with dmake but the command called from this makefile fails with a -c error but works fine when executed in a shell)
   $(warning The library built does not have the perl or Perl_cmiss in it, these only seem to work when linked in the final link)
   $(warning *******************************)
@@ -553,7 +552,7 @@ ifneq ($(SYSNAME),win32)
 	$(MAKE) --directory=$(PERL_WORKING_DIR) static
 else
    #Use dmake as it supports back slashes for paths
-	( cd $(PERL_WORKING_DIR) ; dmake static )
+	cd $(PERL_WORKING_DIR) ; dmake static
 endif
 	$(MAKE) --no-print-directory USE_DYNAMIC_LOADER=$(USE_DYNAMIC_LOADER) \
 	  SHARED_LIBRARIES='$(SHARED_LIBRARIES)' TASK=source

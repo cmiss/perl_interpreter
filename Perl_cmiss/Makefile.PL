@@ -27,8 +27,10 @@ foreach my $link ( 'Makefile.PL', $xs ) {
     my $source = "$source_dir/$link";
         unless( -l $link ) {
         print "making link $link\n";
-        symlink $source,$link or
-	die "$0: can't link $source, $link: $!\n";
+        defined eval { symlink $source,$link } or
+          #Win32 does not have symlink in perl so lets fallback to cp
+	  (! system ("cp $source $link")) or
+	    die "$0: can't link $source, $link: $!\n";
     }
 }
 
