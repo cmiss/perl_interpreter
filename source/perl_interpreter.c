@@ -113,10 +113,7 @@ void create_interpreter_(int *status)
 LAST MODIFIED : 22 August 2000
 
 DESCRIPTION:
-Takes a <command_string>, processes this through the Perl interpreter
-and then executes the returned strings.  If <*redirect_output> is true then
-the output from the perl_interpreter will be redirected from the shell to
-the display_message routine.
+Creates the interpreter for processing commands.
 ==============================================================================*/
 {
   char *embedding[] = { "", "-e", "0" };
@@ -130,14 +127,15 @@ the display_message routine.
 #include "Perl_cmiss.pmh"
 	 "$| = 1;\n"
     ;
-
   char *load_commands[] =
   { "Perl_cmiss::set_INC_for_platform('" ABI_ENV "')",
 		"Perl_cmiss::register_keyword assign",
+		"Perl_cmiss::register_keyword attach",
 		"Perl_cmiss::register_keyword cell",
 		"Perl_cmiss::register_keyword command_window",
 		"Perl_cmiss::register_keyword create",
 		"Perl_cmiss::register_keyword define",
+		"Perl_cmiss::register_keyword detach",
 		"Perl_cmiss::register_keyword fem",
 		"Perl_cmiss::register_keyword gen",
 		"Perl_cmiss::register_keyword gfx",
