@@ -76,6 +76,9 @@ endif
 
 ifdef PERL
   PERL_ARCHLIB = $(shell $(PERL) -MConfig -e 'print "$$Config{archlib}\n"')
+  ifeq ($(PERL_ARCHLIB),)
+    $(error problem with $(PERL))
+  endif
   DYNALOADER_LIB = $(PERL_ARCHLIB)/auto/DynaLoader/DynaLoader.a
   PERL_CMISS_MAKEFILE = $(WORKING_DIR)/Perl_cmiss.make
   PERL_CMISS_LIB = $(WORKING_DIR)/auto/Perl_cmiss/Perl_cmiss.a
