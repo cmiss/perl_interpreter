@@ -85,13 +85,10 @@ LIBRARY_DIR := lib/$(ARCH_DIR)
 SOURCE_FILES := $(notdir $(wildcard $(SOURCE_DIR)/*.*) )
 PMH_FILES := $(patsubst %.pm, %.pmh, $(filter %.pm, $(SOURCE_FILES)))
 C_SOURCES := $(filter %.c, $(SOURCE_FILES) )
-F_SOURCES := $(filter %.f90, $(SOURCE_FILES) )
 C_UNITS := $(basename $(C_SOURCES) )
-F_UNITS := $(basename $(F_SOURCES) )
-DEPEND_FILES := $(foreach unit, $(C_UNITS) $(F_UNITS), $(WORKING_DIR)/$(unit).d )
+DEPEND_FILES := $(foreach unit, $(C_UNITS), $(WORKING_DIR)/$(unit).d )
 
 C_OBJ := $(WORKING_DIR)/libperlinterpreter.o
-F_OBJ := $(WORKING_DIR)/libperlinterpreter_f.o
 LIBRARY := $(LIBRARY_DIR)/libperlinterpreter$(OPT_SUFFIX).a
 
 # ABI string for environment variables
@@ -157,7 +154,7 @@ PERL_ARCHNAME = $(shell $(PERL) -MConfig -e 'print "$$Config{archname}\n"')
 ifeq ($(PERL_ARCHNAME),)
   $(error problem with $(PERL))
 endif
-PERL_ARCHLIB = $(shell $(PERL) -MConfig -e 'print "$$Config{archlib}\n"')
+PERL_ARCHLIB = $(shell $(PERL) -MConfig -e 'print "$$Config{archlibexp}\n"')
 ifeq ($(PERL_ARCHLIB),)
   $(error problem with $(PERL))
 endif
@@ -173,53 +170,37 @@ C_INCLUDE_DIRS = $(PERL_ARCHLIB)/CORE
 # compiling commands
 
 CC = cc
-F90C = f90
 CFLAGS = -c $(ARCH_FLAGS)
-F90FLAGS = -c $(ARCH_FLAGS)
 DEBUG_CFLAGS = -g
 DEBUG_F90FLAGS = -g
 DEFINE = '-DABI_ENV="$(ABI_ENV)"'
 LD_RELOCATABLE = ld -r $(ARCH_FLAGS)
-F90_ARCHIVES =
 AR = ar
 ARFLAGS = -cr
 
 ifneq ($(findstring IRIX,$(SYSNAME)),)
   DEBUG_CFLAGS += -DEBUG:trap_uninitialized:subscript_check:verbose_runtime
-  OPT_F90FLAGS = -O3
   OPT_CFLAGS = -O3 -OPT:Olimit=0
   ifeq ($(ABI),64)
     OPT_CFLAGS += -r10000
   endif
 else
   ifeq ($(SYSNAME),Linux)
-    F90C = pgf90
-    # Include pgf90 objects required by f90
-    # so that pgf90 is not required to link cm.
-    # pgf90rtl is included before pgf90 (unlike pgf90 command)
-    # because ftncharsup.o needs __hpf_exi.  pgftnrtl not required.
-    F90_ARCHIVES = $(foreach library, pgf90rtl pgf90 pgf90_rpm1 pgf902 pgc, \
-      /usr/local/pgi/linux86/lib/lib$(library).a )
-    OPT_F90FLAGS = -fast
     DEFINE += -Dbool=char -DHAS_BOOL
     OPT_CFLAGS = -O2
   else
     ifeq ($(SYSNAME),SunOS)
-      OPT_F90FLAGS = -O
       OPT_CFLAGS = -O
       LD_RELOCATABLE = ld -r
     else
-      OPT_F90FLAGS = -O2
       OPT_CFLAGS = -O2
     endif
   endif
 endif
 ifneq ($(DEBUG),false)
   CFLAGS += $(DEBUG_CFLAGS)
-  F90FLAGS += $(DEBUG_F90FLAGS)
 else
   CFLAGS += $(OPT_CFLAGS)
-  F90FLAGS += $(OPT_F90FLAGS)
 endif
 CPPFLAGS = $(addprefix -I, $(C_INCLUDE_DIRS) $(WORKING_DIR) ) $(DEFINE)
 
@@ -235,7 +216,7 @@ ifeq ($(TASK),)
   .NOTPARALLEL:
 
   TMP_FILES := $(notdir $(wildcard $(WORKING_DIR)/*.* ) )
-  OLD_FILES := $(filter-out $(PMH_FILES) $(foreach unit,$(C_UNITS) $(F_UNITS),$(unit).%), \
+  OLD_FILES := $(filter-out $(PMH_FILES) $(foreach unit,$(C_UNITS),$(unit).%), \
     $(TMP_FILES))
 
   .PHONY : main tidy clean all
@@ -280,9 +261,6 @@ endif
 ifeq ($(TASK),source)
 #-----------------------------------------------------------------------------
 
-  F90MAKEDEPEND_SCRIPT = make/f90makedepend.pl
-  F90MAKEDEPEND := $(PERL) -w $(F90MAKEDEPEND_SCRIPT)
-
   main : $(DEPEND_FILES) \
     $(foreach file,$(PMH_FILES), $(WORKING_DIR)/$(file) )
 
@@ -291,9 +269,6 @@ ifeq ($(TASK),source)
   $(WORKING_DIR)/%.d : $(SOURCE_DIR)/%.c
 	makedepend $(CPPFLAGS) -f- -Y $< 2> $@.tmp | sed -e 's%^source\([^ ]*\).o%$$(WORKING_DIR)\1.o $$(WORKING_DIR)\1.d%' > $@
 	(grep pmh $@.tmp | grep makedepend | nawk -F "[ ,]" '{printf("%s.%s:",substr($$4, 1, length($$4) - 2),"o"); for(i = 1 ; i <= NF ; i++)  { if (match($$i,"pmh")) printf(" source/%s", substr($$i, 2, length($$i) -2)) } printf("\n");}' | sed -e 's%^source\([^ ]*\).o%$$(WORKING_DIR)\1.o $$(WORKING_DIR)\1.d%' | sed -e 's%source\([^ ]*\).pmh%$$(WORKING_DIR)\1.pmh%' >> $@)
-
-$(WORKING_DIR)/%.d : $(SOURCE_DIR)/%.f90
-	$(F90MAKEDEPEND) $< > $@
 
 $(WORKING_DIR)/%.pmh : $(SOURCE_DIR)/%.pm
 	utilities/pm2pmh $< > $@
@@ -318,18 +293,14 @@ ifeq ($(TASK),library)
   # This is done by producing a relocatable object first.
   # Is there a better way?
 
-  $(LIBRARY) : $(C_OBJ) $(F_OBJ)
+  $(LIBRARY) : $(C_OBJ)
 	$(AR) $(ARFLAGS) $@ $^
 
   # don't retain these relocatable objects
-  .INTERMEDIATE : $(C_OBJ) $(F_OBJ)
+  .INTERMEDIATE : $(C_OBJ)
 
   $(C_OBJ) : $(foreach unit, $(C_UNITS), $(WORKING_DIR)/$(unit).o ) \
     $(DYNALOADER_LIB) $(PERL_CMISS_LIB) $(PERL_LIB)
-	$(LD_RELOCATABLE) -o $@ $^
-
-  $(F_OBJ) : $(foreach unit, $(F_UNITS), $(WORKING_DIR)/$(unit).o ) \
-	$(F90_ARCHIVES)
 	$(LD_RELOCATABLE) -o $@ $^
 
   #-----------------------------------------------------------------------------
@@ -346,25 +317,6 @@ ifeq ($(TASK),library)
 
 # $(WORKING_DIR)/%_.o : $(SOURCE_DIR)/%.c
 # 	$(CC) -o $@ $(CPPFLAGS) $(CFLAGS) -DFORTRAN_INTERPRETER_INTERFACE $<
-
-  $(WORKING_DIR)/%.o : $(SOURCE_DIR)/%.f90
-        # cd so that .mod files end up in WORKING_DIR
-	cd $(WORKING_DIR); $(F90C) $(F90FLAGS) $(CURDIR)/$<
-
-  #-----------------------------------------------------------------------------
-  # implicit rules for the f90 modules
-  # Keep the last modification times of module files as old as possible
-
-  $(WORKING_DIR)/%.mod_date : $(WORKING_DIR)/%.mod_record ;
-
-  $(WORKING_DIR)/%.mod_record : $(WORKING_DIR)/%.mod
-	@if [ -f $@ ] && cmp $@ $<; then \
-	  touch $@; \
-	else \
-	  echo $< has changed; cp $< $@; touch $<_date; \
-	fi
-
-  $(WORKING_DIR)/%.mod : ;
 
 #-----------------------------------------------------------------------------
 endif
