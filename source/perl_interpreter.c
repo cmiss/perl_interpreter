@@ -32,7 +32,7 @@ void xs_init()
 
 void create_interpreter_(int *status)
 /*******************************************************************************
-LAST MODIFIED : 19 May 2000
+LAST MODIFIED : 9 June 2000
 
 DESCRIPTION:
 Takes a <command_string>, processes this through the F90 interpreter
@@ -42,61 +42,18 @@ and then executes the returned strings
   char *embedding[] = { "", "-e", "0" };
   char perl_start_code[] = 
 	 "local $SIG{__WARN__} = sub { die $_[0] };\n"
-	 "use strict \"subs\";\n"
-	 "use Text::Balanced;\n"
+	 "BEGIN {\n"
+#include "strict.pmh"
+	 ";\n"
+	 "import strict \"subs\";\n"
+	 "}\n"
+#include "Balanced.pmh"
 	 "my $filedescriptor = shift;\n"
 	 /* Redirect all STDOUT and STDERR to a pipe */
 /*  	 "open (STDOUT, \">&=4\") || die \"can't open fd 4: $!\";\n" */
 	 "$| = 1;\n"
 	 "package Perl_cmiss;\n"
 
-	 "#OK I copied this directly from module Text::ParseWords so I didn't have to use\n"
-	 "sub parse_line {\n"
-	 "	# We will be testing undef strings\n"
-
-	 "    my($delimiter, $keep, $line) = @_;\n"
-	 "    my($quote, $quoted, $unquoted, $delim, $word, @pieces);\n"
-
-	 "    while (length($line)) {\n"
-
-	 "	($quote, $quoted, undef, $unquoted, $delim, undef) =\n"
-	 "	    $line =~ m/^([\"'])                 # a $quote\n"
-	 "                        ((?:\\\\.|(?!\\1)[^\\\\])*)    # and $quoted text\n"
-	 "                        \\1 		       # followed by the same quote\n"
-	 "                        ([\\000-\\377]*)	       # and the rest\n"
-	 "		       |                       # --OR--\n"
-	 "                       ^((?:\\\\.|[^\\\\\"'])*?)    # an $unquoted text\n"
-	 "		      (\\Z(?!\\n)|(?-x:$delimiter)|(?!^)(?=[\"']))  \n"
-	 "                                               # plus EOL, delimiter, or quote\n"
-	 "                      ([\\000-\\377]*)	       # the rest\n"
-	 "		      /x;		       # extended layout\n"
-	 "	return() unless( $quote || length($unquoted) || length($delim));\n"
-
-	 "	$line = $+;\n"
-
-	 "        if ($keep) {\n"
-	 "	    $quoted = \"$quote$quoted$quote\";\n"
-	 "	}\n"
-	 "        else {\n"
-	 "	    $unquoted =~ s/\\\\(.)/$1/g;\n"
-	 "	    if (defined $quote) {\n"
-	 "		$quoted =~ s/\\\\(.)/$1/g if ($quote eq '\"');\n"
-	 "		$quoted =~ s/\\\\([\\\\'])/$1/g if ( $PERL_SINGLE_QUOTE && $quote eq \"'\");\n"
-	 "            }\n"
-	 "	}\n"
-	 "        $word .= defined $quote ? $quoted : $unquoted;\n"
-
-	 "        if (length($delim)) {\n"
-	 "            push(@pieces, $word);\n"
-	 "            push(@pieces, $delim) if ($keep eq 'delimiters');\n"
-	 "            undef $word;\n"
-	 "        }\n"
-	 "        if (!length($line)) {\n"
-	 "            push(@pieces, $word);\n"
-	 "	}\n"
-	 "    }\n"
-	 "    return(@pieces);\n"
-	 "}\n"
 	 "$VERSION = '0.01';\n"
 	 "bootstrap Perl_cmiss $VERSION;\n"
 
@@ -205,8 +162,18 @@ and then executes the returned strings
 	 "                }\n"
 	 "                else\n"
 	 "                {\n"
-	 "                   $part_token = $part_token . substr($command, 0, 1);\n"
-	 "                   $command = substr($command, 1);\n"
+	 "                   ($extracted, $reduced_command) = "
+	 "                      Text::Balanced::extract_delimited($command, q{'\"`});\n"
+	 "                   if ($extracted)\n" 
+	 "                   {\n"
+	 "                      $command = $reduced_command;\n"
+	 "                      $part_token = $part_token . $extracted;\n"
+	 "                   }\n"
+	 "                   else\n"
+	 "                   {\n"
+	 "                      $part_token = $part_token . substr($command, 0, 1);\n"
+	 "                      $command = substr($command, 1);\n"
+	 "                   }\n"
 	 "                }\n"
 	 "             }\n"
 #if defined (CMISS_DEBUG_EXTRACT)
@@ -218,7 +185,7 @@ and then executes the returned strings
 	 "          }\n"
     "          if ($lc_command =~ m/^(?:assert)/)\n"
 	 "          {\n"
-	 "             $command =~ s/([^}#]*)//;\n"
+	 "             $command =~ s/^([^}#]*)//;\n"
 #if defined (CMISS_DEBUG_EXTRACT)
 	 "             print \"assert: $1\\n\";\n"
 #endif /* defined (CMISS_DEBUG_EXTRACT) */
@@ -292,7 +259,6 @@ and then executes the returned strings
 	 "		  elsif ($lc_token =~ m/^\\s*(?:$match_string)/ || $lc_token =~ m/^\\s*\\?$/)\n"
 	 "			 {\n"
 	 "          $token =~ s/\\\"/\\\\\"/g;\n"
-	 "          $token =~ s/\\#.*$//;\n"
 	 "          my $token2 = $token;\n"
 	 "          my @subtokens = split(\" \", $token);\n"
 	 "          my $subtoken;\n"
@@ -480,7 +446,7 @@ and then executes the returned strings
 
 void destroy_interpreter_(int *status)
 /*******************************************************************************
-LAST MODIFIED : 19 May 2000
+LAST MODIFIED : 8 June 2000
 
 DESCRIPTION:
 Takes a <command_string>, processes this through the F90 interpreter
