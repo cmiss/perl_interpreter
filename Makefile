@@ -160,6 +160,16 @@ ifndef SHARED_OBJECT
   SHARED_OBJECT = false
 endif
 
+# Include the static perl library or not
+ifndef INCLUDE_PERL
+  INCLUDE_PERL = false
+endif
+ifneq ($(INCLUDE_PERL),false)
+  INCLUDE_PERL_SUFFIX = -includeperl
+else
+  INCLUDE_PERL_SUFFIX =
+endif
+
 # ABI string for environment variables
 # (for location of perl librarys in execuatable)
 ABI_ENV = $(ABI)
@@ -304,7 +314,9 @@ ifeq ($(TASK),)
     endif
   endif
 endif
-ifneq ($(SHARED_OBJECT), true)
+
+# if either SHARED_OBJECT or INCLUDE_PERL is true, set STATIC_PERL_LIB 
+ifneq ($(filter true, $(SHARED_OBJECT) $(INCLUDE_PERL)),)
    STATIC_PERL_LIB = $(firstword $(wildcard $(PERL_ARCHLIB)/CORE/libperl.a) $(wildcard $(PERL_ARCHLIB)/CORE/libperl56.a))
    ifneq ($(USE_DYNAMIC_LOADER), true)
       ifeq ($(STATIC_PERL_LIB),)
@@ -340,7 +352,7 @@ ifneq ($(SHARED_OBJECT), true)
 else
    LIBRARY_SUFFIX = .so
 endif
-LIBRARY_NAME := libperlinterpreter$(DEBUG_SUFFIX)$(LIBRARY_SUFFIX)
+LIBRARY_NAME := libperlinterpreter$(INCLUDE_PERL_SUFFIX)$(DEBUG_SUFFIX)$(LIBRARY_SUFFIX)
 LIBRARY := $(LIBRARY_DIR)/$(LIBRARY_NAME)
 LIBRARY_LINK := $(LIBRARY_ROOT_DIR)/libperlinterpreter$(DEBUG_SUFFIX)$(LIBRARY_SUFFIX)
 LIB_EXP := $(patsubst %$(LIBRARY_SUFFIX), %.exp, $(LIBRARY_LINK))
@@ -473,6 +485,7 @@ endif
 ifeq ($(USE_DYNAMIC_LOADER), true)
   CPPFLAGS += -DUSE_DYNAMIC_LOADER
 endif
+
 SHARED_LINK_LIBRARIES += -lc
 CFLAGS += $(PERL_CFLAGS)
 .PHONY : main
