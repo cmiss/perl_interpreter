@@ -45,6 +45,18 @@ sub register_keyword
 	 $keywords{$word} = 1;
   }
 
+sub call_command
+  {
+	 local $command = shift;
+	 {
+#Need to import the cmiss command before we change to this package always
+#		package main;
+		# Catch all warnings as errors */
+		local $SIG{__WARN__} = sub { die $_[0] };
+		eval ($Perl_cmiss::command);
+	 }
+  }
+
 sub execute_command
   {
 	 my $command = shift;
@@ -320,14 +332,7 @@ sub execute_command
 							  if (!$is_simple_token && $is_perl_token)
 								 {
 									# Let Perl parse this into a string
-									if ($cmiss_debug)
-									  {
-										 $token = $token . "\\\"\".join(\",\",$part_token).\"\\\"\")) || die(\"Error in cmiss command \$return_code\");";
-									  }
-									else
-									  {
-										 $token = $token . "\\\"\".join(\",\",$part_token).\"\\\"\")) || die(\"Error in cmiss command $token2\");";
-									  }
+									$token = $token . "\\\"\".join(\",\",$part_token).\"\\\"\")) || die(\"Error in cmiss command \\\"$token2\\\".\\n\");";
 								 }
 							  else
 								 {
@@ -335,14 +340,7 @@ sub execute_command
 									# Escape \\ and " characters
 									$part_token =~ s/\\/\\\\/g;
 									$part_token =~ s/\"/\\\"/g;
-									if ($cmiss_debug)
-									  {
-										 $token = $token . $part_token . "\")) || die(\"Error in cmiss command \$return_code\");";
-									  }
-									else
-									  {
-										 $token = $token . $part_token . "\")) || die(\"Error in cmiss command $token2\");";
-									  }
+									$token = $token . $part_token . "\")) || die(\"Error in cmiss command \\\"$token2\\\".\\n\");";
 								 }
 							  if ($cmiss_debug)
 								 {
@@ -444,13 +442,13 @@ sub execute_command
 		  #Must reset this before the eval as it may call this function
 		  #recursively before returning from this function
 		  @command_list = ();
-# Catch all warnings as errors */
-      local $SIG{__WARN__} = sub { die $_[0] };
-		  eval ($command);
-      if ($@)
-        {
-          die;
-        }
+		  call_command($command);
+		  if ($@)
+			 {
+				#Trim the useless line number info if it has been added.
+				$@ =~ s/ at \(eval \d+\) line \d+//;
+				die("$@\n");
+			 }
 		  print "";
 		}
   }
