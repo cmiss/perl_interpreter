@@ -1,7 +1,7 @@
 /*******************************************************************************
 FILE : perl_interpreter.c
 
-LAST MODIFIED : 9 June 2003
+LAST MODIFIED : 25 June 2003
 
 DESCRIPTION :
 Provides an interface between cmiss and a Perl interpreter.
@@ -1118,14 +1118,14 @@ To override the cmiss:: package specify the full name in the string.
 #endif /* ! defined (NO_STATIC_FALLBACK) */
 
 #if ! defined (NO_STATIC_FALLBACK)
-void interpreter_set_pointer_(char *variable_name, char *class, void *value,
-	 int *status)
+void interpreter_set_pointer_(char *variable_name, char *class_name,
+  void *value,int *status)
 /*******************************************************************************
 LAST MODIFIED : 30 May 2003
 
 DESCRIPTION:
 Sets the value of the scalar variable cmiss::<variable_name> to be <value> and 
-sets the class of that variable to be <class>.
+sets the class of that variable to be <class_name>.
 To override the cmiss:: package specify the full name in the string.
 ==============================================================================*/
 {
@@ -1143,7 +1143,7 @@ To override the cmiss:: package specify the full name in the string.
 		 if (variable_name && value && status)
 		 {
 				sv_variable = perl_get_sv(variable_name, TRUE);
-				sv_setref_pv(sv_variable, class, value);
+				sv_setref_pv(sv_variable, class_name, value);
 		 }
 		 else
 		 {

@@ -1,7 +1,7 @@
 /*******************************************************************************
 FILE : perl_interpreter.h
 
-LAST MODIFIED : 30 May 2003
+LAST MODIFIED : 25 June 2003
 
 DESCRIPTION :
 Provides an interface between cmiss and a Perl interpreter.
@@ -140,11 +140,11 @@ LAST MODIFIED : 7 September 2000
 
 DESCRIPTION:
 Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
-To override the cmiss:: package specify the full name in the string.
+To override the cmiss: package specify the full name in the string.
 ==============================================================================*/
 
-void interpreter_set_pointer_(char *variable_name, char *class, void *value,
-	int *status);
+void interpreter_set_pointer_(char *variable_name, char *class_name,
+  void *value,int *status);
 #if ! defined (FORTRAN_INTERPRETER_INTERFACE)
 #define interpreter_set_pointer interpreter_set_pointer_
 #endif /* ! defined (FORTRAN_INTERPRETER_INTERFACE) */
@@ -153,7 +153,7 @@ LAST MODIFIED : 30 May 2003
 
 DESCRIPTION:
 Sets the value of the scalar variable cmiss::<variable_name> to be <value> and 
-sets the class of that variable to be <class>.
+sets the class of that variable to be <class_name>.
 To override the cmiss:: package specify the full name in the string.
 ==============================================================================*/
 

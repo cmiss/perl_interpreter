@@ -1,7 +1,7 @@
 /*******************************************************************************
 FILE : perl_interpreter_dynamic.c
 
-LAST MODIFIED : 9 June 2003
+LAST MODIFIED : 25 June 2003
 
 DESCRIPTION :
 Puts a layer between cmiss and the perl interpreter which allows many different
@@ -150,13 +150,13 @@ void __interpreter_set_string_(char *variable_name, char *value, int *status);
 #define __interpreter_set_string_(variable_name, value, status);
 #endif /* ! defined (NO_STATIC_FALLBACK) */
 
-void (*interpreter_set_pointer_handle)(char *variable_name, char *class,
+void (*interpreter_set_pointer_handle)(char *variable_name, char *class_name,
 	void *value, int *status);
 #if ! defined (NO_STATIC_FALLBACK)
-void __interpreter_set_pointer_(char *variable_name, char *class, void *value,
+void __interpreter_set_pointer_(char *variable_name, char *class_name, void *value,
 	int *status);
 #else /* ! defined (NO_STATIC_FALLBACK) */
-#define __interpreter_set_pointer_(variable_name, class, value, status);
+#define __interpreter_set_pointer_(variable_name, class_name, value, status);
 #endif /* ! defined (NO_STATIC_FALLBACK) */
 
 void interpret_command_(char *command_string, void *user_data, int *quit,
@@ -775,7 +775,7 @@ Dynamic loader wrapper
 	}
 } /* interpreter_set_string */
 
-void interpreter_set_pointer_(char *variable_name, char *class, void *value, 
+void interpreter_set_pointer_(char *variable_name, char *class_name, void *value, 
 	int *status)
 /*******************************************************************************
 LAST MODIFIED : 30 May 2003
@@ -786,10 +786,10 @@ Dynamic loader wrapper
 {
 	if (use_dynamic_interpreter)
 	{
-		(*interpreter_set_pointer_handle)(variable_name, class, value, status);
+		(*interpreter_set_pointer_handle)(variable_name, class_name, value, status);
 	}
 	else
 	{
-		__interpreter_set_pointer_(variable_name, class, value, status);
+		__interpreter_set_pointer_(variable_name, class_name, value, status);
 	}
 } /* interpreter_set_pointer */
