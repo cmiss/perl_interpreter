@@ -1,4 +1,4 @@
-#!gmake -f
+#!/usr/local/bin/gmake -f
 # no builtin implicit rules
 MAKEFLAGS = --no-builtin-rules -I
 
