@@ -578,6 +578,8 @@ endif
 	   @echo '     $(LIBRARY_LINK)'
       @echo 'It will work dynamically with the following versions of perl:'
       $(foreach perl_executable, $(SHARED_PERL_EXECUTABLES), $(VERSION_MESSAGE))
+      @echo 'and has compatibility defined for the following versions:'
+		@cat compatible_versions.txt
       ${SUB_WRITE_BUILD_MESSAGE}
    endef
   else
@@ -729,6 +731,8 @@ ifeq ($(USE_DYNAMIC_LOADER),true)
 	echo 'static struct Interpreter_library_strings interpreter_strings[] = {' && \
 	$(foreach header, $(SHARED_LIBRARY_HEADERS), \
       echo '{"$(word 3, $(subst /,' ',$(header)))","$(word 4, $(subst /,' ',$(header)))", libperlinterpreter$(word 3, $(subst /,' ',$(subst .,_,$(header))))$(word 4, $(subst /,' ',$(subst -,_,$(header)))) },' && ) \
+	$(foreach compatible_versions,$(wildcard compatible_versions.txt), \
+		cat $(compatible_versions) | awk '{gsub(/[",]/,"",$$3);gsub(/[.\-]/,"_",$$3);printf("{%s, libperlinterpreter%s},\n",$$1,$$3)}' && ) \
 	echo '};'; \
 	} > $@.new;
 	@set -xe && \
