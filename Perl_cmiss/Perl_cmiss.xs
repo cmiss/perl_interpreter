@@ -2,8 +2,6 @@
 #include "perl.h"
 #include "XSUB.h"
 
-#include "perl_cmiss.h"
-
 static int
 not_here(char *s)
 {
@@ -30,7 +28,6 @@ static XS(XS_Perl_cmiss_cmiss);
 
 MODULE = Perl_cmiss		PACKAGE = Perl_cmiss		
 
-
 double
 constant(name,arg)
 	char *		name
@@ -40,6 +37,6 @@ int
 cmiss(name)
 	char *		name
 	CODE:
-	RETVAL = cmiss_perl_callback(name);
+	RETVAL = CMISS_PERL_CALLBACK(name);
 	OUTPUT:
 	RETVAL

@@ -230,6 +230,7 @@ else
   endif
 endif
 
+#Make architecture directory names and lib name
 PERL_ARCHNAME := $(shell $(PERL) -MConfig -e 'print "$$Config{archname}\n"')
 ifeq ($(PERL_ARCHNAME),)
   $(error problem with $(PERL))
@@ -251,7 +252,16 @@ ifeq ($(PERL_CFLAGS),)
   $(error problem with $(CFLAGS))
 endif
 DYNALOADER_LIB = $(PERL_ARCHLIB)/auto/DynaLoader/DynaLoader.a
-PERL_WORKING_DIR = Perl_cmiss/generated/$(PERL_VERSION)/$(PERL_ARCHNAME)
+#Mangle the callback name so that we don't pick up the wrong version even when it is accidently visible
+ifeq ($(SHARED_OBJECT), true)
+   CMISS_PERL_CALLBACK_SUFFIX_A := $(PERL_VERSION)/$(PERL_ARCHNAME)
+   CMISS_PERL_CALLBACK_SUFFIX_B := $(subst .,_,$(CMISS_PERL_CALLBACK_SUFFIX_A))
+   CMISS_PERL_CALLBACK_SUFFIX_C := $(subst /,_,$(CMISS_PERL_CALLBACK_SUFFIX_B))
+   CMISS_PERL_CALLBACK_SUFFIX := $(subst -,_,$(CMISS_PERL_CALLBACK_SUFFIX_C))
+else
+   CMISS_PERL_CALLBACK_SUFFIX := static
+endif
+PERL_WORKING_DIR = Perl_cmiss/generated/$(PERL_VERSION)/$(PERL_ARCHNAME)-$(CMISS_PERL_CALLBACK_SUFFIX)
 PERL_CMISS_MAKEFILE = $(PERL_WORKING_DIR)/Makefile
 PERL_CMISS_LIB = $(PERL_WORKING_DIR)/auto/Perl_cmiss/Perl_cmiss.a
 ifeq ($(TASK),)
@@ -295,7 +305,6 @@ else
 endif
 PERL_EXP = $(wildcard $(PERL_ARCHLIB)/CORE/perl.exp)
 
-#Make architecture directory names and lib name
 SOURCE_DIR = source
 ifneq ($(USE_DYNAMIC_LOADER), true)
    ifneq ($(SHARED_OBJECT), true)
@@ -308,6 +317,7 @@ else
    SHARED_SUFFIX = -dynamic
    SHARED_LIB_SUFFIX = -dynamic
 endif
+
 WORKING_DIR := generated/$(PERL_VERSION)/$(PERL_ARCHNAME)$(DEBUG_SUFFIX)$(SHARED_SUFFIX)
 C_INCLUDE_DIRS = $(PERL_ARCHLIB)/CORE $(WORKING_DIR)
 
@@ -346,7 +356,7 @@ SHARED_LINK_LIBRARIES =
 AR = ar
 # Option lists
 # (suboption lists become more specific so that later ones overrule previous)
-CFLAGS = $(strip $(CFL_FLGS) $(CFE_FLGS) $(CF_FLGS))
+CFLAGS = $(strip $(CFL_FLGS) $(CFE_FLGS) $(CF_FLGS)) '-DCMISS_PERL_CALLBACK=cmiss_perl_callback_$(CMISS_PERL_CALLBACK_SUFFIX)'
 CPPFLAGS := $(addprefix -I, $(C_INCLUDE_DIRS) ) '-DABI_ENV="$(ABI_ENV)"'
 ARFLAGS = -cr
 ifneq ($(DEBUG),false)
@@ -556,7 +566,7 @@ endif
   endif
 
   $(PERL_CMISS_MAKEFILE) : $(PERL) Perl_cmiss/Makefile.PL
-	cd Perl_cmiss ; $(PERL) Makefile.PL
+	cd Perl_cmiss ; export CMISS_PERL_CALLBACK_SUFFIX=$(CMISS_PERL_CALLBACK_SUFFIX) ; $(PERL) Makefile.PL
 
   $(PERL_WORKING_DIR) :
 	mkdir -p $@

@@ -458,7 +458,9 @@ and then executes the returned strings
 #endif /* ! defined (NO_STATIC_FALLBACK) */
 
 #if ! defined (NO_STATIC_FALLBACK)
-int cmiss_perl_callback(char *command_string)
+/* This function is specified in a compile time define so that it can be mangled to match only
+   the corresponding Perl_cmiss XS code */
+int CMISS_PERL_CALLBACK(char *command_string)
 /*******************************************************************************
 LAST MODIFIED : 19 May 2000
 

@@ -8,6 +8,10 @@ my $name = 'Perl_cmiss';
 my $xs = "$name.xs";
 
 my $working_dir = "generated/$Config{version}/$Config{archname}";
+if (defined $ENV{CMISS_PERL_CALLBACK_SUFFIX})
+  {
+	 $working_dir .= "-" . $ENV{CMISS_PERL_CALLBACK_SUFFIX};
+  }
 unless( -d $working_dir ) {
     use File::Path;
     # make and print subdirectories
@@ -28,6 +32,16 @@ foreach my $link ( 'Makefile.PL', $xs ) {
     }
 }
 
+my @define_list = ();
+if (defined $ENV{CMISS_PERL_CALLBACK_SUFFIX})
+  {
+	 push @define_list, "-DCMISS_PERL_CALLBACK=\"cmiss_perl_callback_$ENV{CMISS_PERL_CALLBACK_SUFFIX}\"";
+  }
+else
+  {
+	 push @define_list, "-DCMISS_PERL_CALLBACK=\"cmiss_perl_callback\"";
+  }
+
 #my $object = "$name.o";
 WriteMakefile(
     'NAME'	=> $name,
@@ -35,7 +49,7 @@ WriteMakefile(
 #    'EXTRALIBS' => '',# to prevent undefined warnings in Makefile
     'MYEXTLIB'  => '',# to prevent undefined warnings in Makefile
     'INC'	=> "-I$source_dir",     # e.g., '-I/usr/include/other'
-    'DEFINE'	=> '',# to prevent undefined warnings in Makefile
+    'DEFINE'	=> @define_list,# to prevent undefined warnings in Makefile
     'LINKTYPE'  => 'static',
     'INST_ARCHLIB' => '.'
 );
