@@ -136,6 +136,11 @@ sub cmiss_array
 
 	 for $token (@_)
 		{
+		  if (! defined $token)
+		  {
+			 print ("Undefined variable referenced in command\n");
+			 return (0);
+		  }
 		  $ref_type = ref $token;
 		  if ($token =~ /^[\s;]+$/)
 			 {
@@ -147,6 +152,11 @@ sub cmiss_array
 				$first = 1;
 				for $subtoken (@{$token})
 				  {
+					if (! defined $subtoken)
+					  {
+						print ("Undefined variable referenced in command\n");
+						return(0);
+					  }
 					 if ($first)
 						{
 						  $first = 0;
@@ -523,6 +533,8 @@ sub execute_command
 							  $token2 = $token2 . $part_token;
 							  $token2 =~ s/\\/\\\\/g;
 							  $token2 =~ s/\"/\\\"/g;
+							  $token2 =~ s/\$/\\\$/g;
+							  $token2 =~ s/\@/\\\@/g;
 #							  if ($cmiss_debug)
 #							    {
 #									print "token2 $token2\n";
