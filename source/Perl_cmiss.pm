@@ -83,22 +83,26 @@ sub execute_command
 				  }
 				$token = $token . $1;
 			 }
+		  elsif ($command =~ s%^(#.*)%%)
+			 {
+			  if ($cmiss_debug)
+			    {
+					print "comment: $1\n";
+				 }
+			  if ($simple_perl && (!$block_required) && (! ($token =~ m/;\s*$/)))
+			  {
+				 $token = $token . ";";
+			  }
+			  if ($token ne "")
+			  {
+				 push(@tokens, $token);
+			  }
+			  $token = "";
+			 }
 		  else
 			 {
 				$simple_perl = 0;
-				if ($command =~ s%^(#.*)%%)
-				  {
-					if ($cmiss_debug)
-					{
-					  print "comment: $1\n";
-					}
-					if ($token ne "")
-					{
-					  push(@tokens, $token);
-					}
-					$token = "";
-				  }
-				elsif ($command =~ s%^({)%%)
+				if ($command =~ s%^({)%%)
 				  {
 					 if ($cmiss_debug)
 						{
@@ -260,7 +264,7 @@ sub execute_command
 											 }
 										  $part_token = $part_token . $1;
 										}
-									 elsif ($command =~ s%^([+\-*=/\\<>!()])%%)
+									 elsif ($command =~ s%^([+\-*=/\\<>!()?])%%)
 										{
 										  if ($cmiss_debug)
 											 {
