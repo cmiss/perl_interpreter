@@ -265,7 +265,6 @@ PERL_CMISS_MAKEFILE = $(PERL_WORKING_DIR)/Makefile
 PERL_CMISS_LIB = $(PERL_WORKING_DIR)/auto/Perl_cmiss/Perl_cmiss.a
 ifneq ($(SHARED_OBJECT), true)
    STATIC_PERL_LIB = $(firstword $(wildcard $(PERL_ARCHLIB)/CORE/libperl.a) $(wildcard $(PERL_ARCHLIB)/CORE/libperl56.a))
-$(warning STATIC_PERL $(STATIC_PERL_LIB) $(PERL_ARCHLIB) $(wildcard $(PERL_ARCHLIB)/CORE/libperl.a) )
    ifneq ($(USE_DYNAMIC_LOADER), true)
       ifeq ($(STATIC_PERL_LIB),)
          $(error 'Static $(PERL_ARCHLIB)/CORE/libperl.a not found for ${PERL} which is required for a non dynamic loading perl interpreter.')
@@ -567,11 +566,11 @@ all : debug opt
     all: debug64 opt64
   endif
 
-ESU_BUILD_PATH = '$${CMISS_ROOT}/perl_interpreter'
+ESU_BUILD_PATH = '\$${CMISS_ROOT}/perl_interpreter'
 ESU_BUILD_MACHINE = 130.216.208.35 #esu35
-ESP_BUILD_PATH = '$${CMISS_ROOT}/perl_interpreter'
+ESP_BUILD_PATH = '\$${CMISS_ROOT}/perl_interpreter'
 ESP_BUILD_MACHINE = 130.216.208.156 #esp56
-HPC1_BUILD_PATH = '$${CMISS_ROOT}/perl_interpreter'
+HPC1_BUILD_PATH = '\$${CMISS_ROOT}/perl_interpreter'
 HPC1_BUILD_MACHINE = 130.216.191.92 #hpc1
 
 #If not already cmiss become cmiss first and then propogate so that the user
