@@ -29,8 +29,6 @@ ifndef DEBUG
   endif
 endif
 
-# set architecture dependent directories and default options
-ARCH_DIR := $(SYSNAME)-$(ABI)# default
 ifeq ($(filter-out IRIX%,$(SYSNAME)),)# SGI
   # Specify what application binary interface (ABI) to use i.e. 32, n32 or 64
   ifndef ABI
@@ -71,6 +69,10 @@ ifeq ($(SYSNAME),AIX)
     endif
   endif
   ARCH_DIR := aix-$(ABI)
+endif
+ifndef ARCH_DIR
+   # set architecture dependent directories and default options
+   ARCH_DIR := $(SYSNAME)-$(ABI)# default
 endif
 
 ifndef ABI
