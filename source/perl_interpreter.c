@@ -186,6 +186,22 @@ Creates the interpreter for processing commands.
 	 }
 	 perl_eval_pv(perl_invoke_command, FALSE);
 	 free(perl_invoke_command);
+	 if (argc > 1)
+	 {
+			AV *perl_argv;
+			if (perl_argv = perl_get_av("ARGV", FALSE))
+			{
+				 for (i = 1 ; i < argc ; i++)
+				 {
+						av_push(perl_argv, newSVpv(argv[i], 0));
+				 }
+			}
+			else
+			{
+				 display_message(ERROR_MESSAGE,"initialise_interpreter.  "
+						"Unable to get ARGV\n") ;
+			}
+	 }
 	 perl_eval_pv(perl_start_code, FALSE);
 	 if (SvTRUE(ERRSV))
 		{
