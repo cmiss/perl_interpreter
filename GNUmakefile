@@ -48,7 +48,7 @@ ARFLAGS = -cr
 # This is done by producing a relocatable object first.
 # Is there a better way?
 
-$(LIBRARY) : $(C_OBJ) $(F_OBJ) $(PERL_CMISS_LIB)
+$(LIBRARY) : $(C_OBJ) $(F_OBJ)
 	@if [ ! -d $(LIBRARY_DIR) ]; then echo mkdir -p $(LIBRARY_DIR); mkdir -p $(LIBRARY_DIR); fi
 	$(AR) $(ARFLAGS) $@ $^
 
