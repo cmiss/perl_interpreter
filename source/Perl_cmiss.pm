@@ -214,7 +214,8 @@ sub execute_command
 					 $token = "";
 					 push(@tokens, $1);
 				  }
-				elsif ($command =~ s%^(if|while|unless|until|for|foreach|elsif|else|continue|sub)%%)
+				elsif (($token =~ m/(^|\W)$/) && 
+				  ($command =~ s%^(if|while|unless|until|for|foreach|elsif|else|continue|sub)\b%%))
 				  {
 					 if ($cmiss_debug)
 						{
@@ -325,7 +326,7 @@ sub execute_command
 										  $is_simple_token = 1;
 										  $part_token = "";
 										}
-									 elsif (($part_token eq "") && ($command =~ s%^(\?|[\-]?[.,0-9:]+)%%))
+									 elsif (($part_token eq "") && ($command =~ s%^(\?+|[\-]?[.,0-9:]+)%%))
 										{
 										  if ($cmiss_debug)
 											 {
