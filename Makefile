@@ -293,7 +293,7 @@ ifeq ($(TASK),)
           SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-i386-linux*/perl)
           SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-i686-linux*/perl)
         else
-	  SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-$(MACHNAME)-linux*/perl)
+          SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-$(MACHNAME)-linux*/perl)
         endif
       endif
       ifeq ($(SYSNAME),AIX)
@@ -303,7 +303,11 @@ ifeq ($(TASK),)
          SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-irix-${ABI}*/perl)
       endif
     endif
-    ifneq ($(filter-out ${SHARED_PERL_EXECUTABLES},${PERL}),)
+    #Check the CMISS_PERL version isn't already included from CMISS_ROOT perls
+    #Could additionally check between the versions listed above and also check that
+    #the executable actually runs.
+    SHARED_PERL_VERSIONS = $(foreach perl_executable,$(SHARED_PERL_EXECUTABLES),$(shell $(perl_executable) -MConfig -e 'print "$$Config{version}-$$Config{archname}\n"'))
+    ifneq ($(filter-out ${SHARED_PERL_VERSIONS},${PERL_VERSION}-${PERL_ARCHNAME}),)
       ifneq ($(wildcard $(PERL_ARCHLIB)/CORE/libperl.so),)
         SHARED_PERL_EXECUTABLES += ${PERL}
       endif
