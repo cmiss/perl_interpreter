@@ -1,7 +1,6 @@
 # For use with GNU make.
 # no builtin implicit rules
 MAKEFLAGS = --no-builtin-rules --warn-undefined-variables
-
 #-----------------------------------------------------------------------------
 
 ifndef TASK
@@ -12,6 +11,9 @@ ifndef SYSNAME
   SYSNAME := $(shell uname)
   ifeq ($(SYSNAME),)
     $(error error with shell command uname)
+  endif
+  ifeq ($(SYSNAME),MINGW32_NT-5.1)
+    SYSNAME=win32
   endif
 endif
 
@@ -89,14 +91,11 @@ ifeq ($(SYSNAME),Linux)
     endif
   endif
 endif
-ifeq (filter-out $(SYSNAME),)# CYGWIN
-  SYSNAME := win32
-endif
 ifeq ($(SYSNAME),win32)
-  LIB_ARCH_DIR = $(INSTRUCTION)-$(OPERATING_SYSTEM)# no ABI
   ABI=32
   INSTRUCTION := i386
   OPERATING_SYSTEM := win32
+  LIB_ARCH_DIR = $(INSTRUCTION)-$(OPERATING_SYSTEM)# no ABI
 endif
 ifeq ($(SYSNAME),SunOS)
   OPERATING_SYSTEM := solaris
@@ -144,7 +143,7 @@ ifndef USE_DYNAMIC_LOADER
     #a shared "libperl.a" I cannot seem to dlopen it.
     USE_DYNAMIC_LOADER = false
   else
-    ifeq ($(SYSNAME),win32)
+    ifeq ($(OPERATING_SYSTEM),win32)
       #I have not tried to make a dynamic perl interpreter in win32,
       #I have not even been including a dynaloader at all so far.
       USE_DYNAMIC_LOADER = false
@@ -231,6 +230,8 @@ else
     endif
     ifeq ($(SYSNAME),win32)
       PERL = c:/perl/5.6.1/bin/MSWin32-x86/perl.exe
+# eg for a MinGW system
+#      PERL = /usr/lib/perl5/5.9.1/bin/MSWin32-x86-multi-thread/perl.exe
     endif
   endif
 endif
@@ -243,7 +244,7 @@ endif
 ifeq ($(SYSNAME),win32)
   PERL_ARCHLIB := $(subst \,/,$(shell $(PERL) -MConfig -e 'print "$$Config{archlibexp}\n"'))
 else
-  PERL_ARCHLIB := $(shell $(PERL) -MConfig -e 'print "$$Config{archlibexp}\n"')
+  PERL_ARCHLIB := $(subst \,/,$(shell $(PERL) -MConfig -e 'print "$$Config{archlibexp}\n"'))
 endif
 ifeq ($(PERL_ARCHLIB),)
   $(error problem with $(PERL))
@@ -484,7 +485,7 @@ vpath $(PERL) $(subst :, ,$(PATH))
 ifeq ($(TASK),)
 #-----------------------------------------------------------------------------
 
-ifeq ($(SYSNAME),win32)
+ifeq ($(OPERATING_SYSTEM),win32)
   $(warning *******************************)
   $(warning This still does not compile win32 out of the box)
   $(warning The generated Perl_cmiss Makefile ends up with many \ where there need to be / which seems to work with dmake but the command called from this makefile fails with a -c error but works fine when executed in a shell)
@@ -567,11 +568,11 @@ endif
 	@echo
 	@echo 'Building library ${LIBRARY}'
 	@echo
-ifneq ($(SYSNAME),win32)
+ifneq ($(OPERATING_SYSTEM),win32)
 	$(MAKE) --directory=$(PERL_WORKING_DIR) static
 else
    #Use dmake as it supports back slashes for paths
-	cd $(PERL_WORKING_DIR) ; dmake static
+	cd $(PERL_WORKING_DIR) ; unset SHELL ; dmake static
 endif
 	$(MAKE) --no-print-directory USE_DYNAMIC_LOADER=$(USE_DYNAMIC_LOADER) \
 	  SHARED_LIBRARIES='$(SHARED_LIBRARIES)' TASK=source
@@ -758,7 +759,7 @@ endif
 
       #I have not got Win32 to work with building the libararies into the
       #perl_interpreter lib, instead I link them all together at the final link
-      ifneq ($(SYSNAME),win32)
+      ifneq ($(OPERATING_SYSTEM),win32)
         LIBRARY_LIBS = $(DYNALOADER_LIB) $(PERL_CMISS_LIB) $(STATIC_PERL_LIB)
       else
         LIBRARY_LIBS = 
