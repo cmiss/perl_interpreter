@@ -39,10 +39,18 @@ LIBRARY = $(LIBRARY_DIR)/libperlinterpreter.a
 
 ifeq (${HOSTTYPE},iris4d)
   ifeq ($(INSTRUCTION),mips4)
-    ifeq ($(ABI),n32)
-      PERL = /usr/local/perl5.6/bin/perl
+    ifeq (${CMISS_LOCALE},OXFORD)
+      ifeq ($(ABI),n32)
+        PERL = /usr/paterson/local/bin/perl
+      else
+        PERL = /usr/paterson/local64/bin/perl
+      endif
     else
-      PERL = /usr/local/perl5.6/bin-$(ABI)/perl
+      ifeq ($(ABI),n32)
+        PERL = /usr/local/perl5.6/bin/perl
+      else
+        PERL = /usr/local/perl5.6/bin-$(ABI)/perl
+      endif
     endif
   else
     PERL = /usr/local/perl5.6/bin-$(INSTRUCTION)/perl
