@@ -323,9 +323,12 @@ ifeq ($(TASK),source)
 
   # implicit rules for making the dependency files
 
+  # KAT I think Solaris needed nawk rather than awk, but nawk is not usually
+  # avaiable on Mandrake.  I don't have a Sun to try this out so I'll get it
+  # working with awk on the machines I have.
   $(WORKING_DIR)/%.d : $(SOURCE_DIR)/%.c
 	makedepend $(CPPFLAGS) -f- -Y $< 2> $@.tmp | sed -e 's%^source\([^ ]*\).o%$$(WORKING_DIR)\1.o $$(WORKING_DIR)\1.d%' > $@
-	(grep pmh $@.tmp | grep makedepend | nawk -F "[ ,]" '{printf("%s.%s:",substr($$4, 1, length($$4) - 2),"o"); for(i = 1 ; i <= NF ; i++)  { if (match($$i,"pmh")) printf(" source/%s", substr($$i, 2, length($$i) -2)) } printf("\n");}' | sed -e 's%^$(SOURCE_DIR)\([^ ]*\).o%$$(WORKING_DIR)\1.o $$(WORKING_DIR)\1.d%' | sed -e 's%$(SOURCE_DIR)\([^ ]*\).pmh%$$(WORKING_DIR)\1.pmh%' >> $@)
+	(grep pmh $@.tmp | grep makedepend | awk -F "[ ,]" '{printf("%s.%s:",substr($$4, 1, length($$4) - 2),"o"); for(i = 1 ; i <= NF ; i++)  { if (match($$i,"pmh")) printf(" source/%s", substr($$i, 2, length($$i) -2)) } printf("\n");}' | sed -e 's%^$(SOURCE_DIR)\([^ ]*\).o%$$(WORKING_DIR)\1.o $$(WORKING_DIR)\1.d%' | sed -e 's%$(SOURCE_DIR)\([^ ]*\).pmh%$$(WORKING_DIR)\1.pmh%' >> $@)
 
 $(WORKING_DIR)/%.pmh : $(SOURCE_DIR)/%.pm
 	utilities/pm2pmh $< > $@
