@@ -98,7 +98,7 @@ the display_message routine.
 	  perl_run(perl_interpreter);
 
 	  {
-		  
+		  STRLEN n_a;
 		  dSP ;
 	  
 		  perl_interpreter_filehandle = filehandles[0];
@@ -108,10 +108,10 @@ the display_message routine.
 
 		  PUSHMARK(sp) ;
 		  perl_eval_pv(perl_start_code, FALSE);
-		  if (SvTRUE(GvSV(errgv)))
+		  if (SvTRUE(ERRSV))
 		  {
 			  display_message(ERROR_MESSAGE,"initialise_interpreter.  "
-				  "Uh oh - %s\n", SvPV(GvSV(errgv), na)) ;
+				  "Uh oh - %s\n", SvPV(ERRSV, n_a)) ;
 			  POPs ;
 			  return_code = 0;
 		  }
@@ -129,10 +129,10 @@ the display_message routine.
 		  for (i = 0 ; i < number_of_load_commands && return_code ; i++)
 		  {
 			  perl_eval_pv(load_commands[i], FALSE);
-			  if (SvTRUE(GvSV(errgv)))
+			  if (SvTRUE(ERRSV))
 			  {
 				  display_message(ERROR_MESSAGE,"initialise_interpreter.  "
-					  "Uh oh - %s\n", SvPV(GvSV(errgv), na)) ;
+					  "Uh oh - %s\n", SvPV(ERRSV, n_a)) ;
 				  POPs ;
 				  return_code = 0;
 			  }
@@ -259,6 +259,7 @@ Takes a <command_string>, processes this through the Perl interpreter.
 	char *escaped_command, *new_pointer, *old_pointer, *quote_pointer,
 		*slash_pointer, *wrapped_command;
 	int return_code;
+	STRLEN n_a;
 	SV *cvrv;
 	dSP ;
  
@@ -336,11 +337,10 @@ Takes a <command_string>, processes this through the Perl interpreter.
  
 			handle_output();
 
-			/* Check the eval first */
-			if (SvTRUE(GvSV(errgv)))
+			if (SvTRUE(ERRSV))
 			{
 				display_message(ERROR_MESSAGE,
-				  "%s", SvPV(GvSV(errgv), na)) ;
+				  "%s", SvPV(ERRSV, n_a)) ;
 				POPs ;
 				return_code = 0;
 			}
