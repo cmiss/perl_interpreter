@@ -21,7 +21,7 @@ DESCRIPTION:
 ==============================================================================*/
 
 
-void create_interpreter_(int argc, char **argv, char *initial_comfile, int *status);
+void create_interpreter_(int argc, char **argv, const char *initial_comfile, int *status);
 #if ! defined (FORTRAN_INTERPRETER_INTERFACE)
 #define create_interpreter create_interpreter_
 #endif /* defined (FORTRAN_INTERPRETER_INTERFACE) */
@@ -141,6 +141,7 @@ DESCRIPTION:
 Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
 ==============================================================================*/
 
+#if ! defined (MESSAGE_H)
 /*
 From message.h:
 ===============
@@ -150,7 +151,7 @@ From message.h:
 Global types
 ------------
 */
-#if ! defined (CMGUI)
+
 enum Message_type
 /*******************************************************************************
 LAST MODIFIED : 31 May 1996
@@ -169,5 +170,4 @@ The different message types.
 Functions called from perl_interpreter.c
 ========================================
 */
-
 int display_message(enum Message_type message_type,char *format, ... );

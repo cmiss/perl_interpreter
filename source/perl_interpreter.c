@@ -108,7 +108,7 @@ Frees the memory associated with a string allocated by the interpreter.
 	}
 } /* interpreter_duplicate_string */
 
-void create_interpreter_(int argc, char **argv, char *initial_comfile, int *status)
+void create_interpreter_(int argc, char **argv, const char *initial_comfile, int *status)
 /*******************************************************************************
 LAST MODIFIED : 24 July 2001
 
