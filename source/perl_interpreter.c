@@ -7,20 +7,14 @@ DESCRIPTION :
 Provides an interface between cmiss and a Perl interpreter.
 ==============================================================================*/
 
-#if defined (USE_DYNAMIC_LOADER)
-#include "static_version.h"       /* for NO_STATIC_FALLBACK */
-#endif
-#if ! defined (NO_STATIC_FALLBACK)
 #include "EXTERN.h"               /* from the Perl distribution     */
 #include "perl.h"                 /* from the Perl distribution     */
-#endif /* ! defined (NO_STATIC_FALLBACK) */
 #include <stdio.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdarg.h>
 #include "perl_interpreter.h"
 
-#if ! defined (NO_STATIC_FALLBACK)
 /***    The Perl interpreter    ***/
 PerlInterpreter *my_perl = (PerlInterpreter *)NULL;
 
@@ -35,9 +29,7 @@ static void *perl_interpreter_kept_user_data;
 static execute_command_function_type kept_execute_command_function;
 static int keep_stdout = 0;
 static int keep_stderr = 0;
-#endif /* ! defined (NO_STATIC_FALLBACK) */
 
-#if ! defined (NO_STATIC_FALLBACK)
 void xs_init(pTHX)
 {
 	char *file_name = __FILE__;
@@ -45,7 +37,6 @@ void xs_init(pTHX)
 	/* DynaLoader is a special case */
 	newXS("DynaLoader::boot_DynaLoader", boot_DynaLoader, file_name);
 }
-#endif /* ! defined (NO_STATIC_FALLBACK) */
 
 static int interpreter_display_message(enum Message_type message_type,
 	char *format, ... )
@@ -88,7 +79,6 @@ static Interpreter_display_message_function *display_message_function =
 #define interpreter_set_pointer_ __interpreter_set_pointer_
 #endif /* defined (USE_DYNAMIC_LOADER) || defined (SHARED_OBJECT) */
 
-#if ! defined (NO_STATIC_FALLBACK)
 static char *interpreter_duplicate_string(char *source_string, size_t length)
 /*******************************************************************************
 LAST MODIFIED : 7 September 2000
@@ -139,9 +129,7 @@ copied and the NULL termination is added after that length.
 
 	return (copy_of_string);
 } /* interpreter_duplicate_string */
-#endif /* ! defined (NO_STATIC_FALLBACK) */
 
-#if ! defined (NO_STATIC_FALLBACK)
 void interpreter_destroy_string_(char *string)
 /*******************************************************************************
 LAST MODIFIED : 7 September 2000
@@ -159,9 +147,7 @@ Frees the memory associated with a string allocated by the interpreter.
 		(*display_message_function)(ERROR_MESSAGE,"interpreter_duplicate_string.  Invalid argument(s)");
 	}
 } /* interpreter_duplicate_string */
-#endif /* ! defined (NO_STATIC_FALLBACK) */
 
-#if ! defined (NO_STATIC_FALLBACK)
 void create_interpreter_(int argc, char **argv, const char *initial_comfile, int *status)
 /*******************************************************************************
 LAST MODIFIED : 24 July 2001
@@ -293,9 +279,7 @@ Creates the interpreter for processing commands.
   *status = return_code;
 
 }
-#endif /* ! defined (NO_STATIC_FALLBACK) */
 
-#if ! defined (NO_STATIC_FALLBACK)
 void destroy_interpreter_(int *status)
 /*******************************************************************************
 LAST MODIFIED : 8 June 2000
@@ -337,9 +321,7 @@ and then executes the returned strings
 			*status = 0;
 	 }
 }
-#endif /* ! defined (NO_STATIC_FALLBACK) */
 
-#if ! defined (NO_STATIC_FALLBACK)
 void interpreter_set_display_message_function_(Interpreter_display_message_function *function,
 	int *status)
 /*******************************************************************************
@@ -365,9 +347,7 @@ information.
 
 	 *status = return_code;
 }
-#endif /* ! defined (NO_STATIC_FALLBACK) */
 
-#if ! defined (NO_STATIC_FALLBACK)
 void redirect_interpreter_output_(int *status)
 /*******************************************************************************
 LAST MODIFIED : 25 August 2000
@@ -401,9 +381,7 @@ routine can write this to the command window.
 
   *status = return_code;
 }
-#endif /* ! defined (NO_STATIC_FALLBACK) */
 
-#if ! defined (NO_STATIC_FALLBACK)
 static int handle_output(void)
 /*******************************************************************************
 LAST MODIFIED : 19 May 2000
@@ -458,9 +436,7 @@ and then executes the returned strings
 	}
 	return (return_code);
 } /* handle_output */
-#endif /* ! defined (NO_STATIC_FALLBACK) */
 
-#if ! defined (NO_STATIC_FALLBACK)
 /* This function is specified in a compile time define so that it can be mangled to match only
    the corresponding Perl_cmiss XS code */
 int CMISS_PERL_CALLBACK(char *command_string)
@@ -519,9 +495,7 @@ and then executes the returned strings
 
 	return (return_code);
 } /* cmiss_perl_callback */
-#endif /* ! defined (NO_STATIC_FALLBACK) */
 
-#if ! defined (NO_STATIC_FALLBACK)
 void interpret_command_(char *command_string, void *user_data, int *quit,
   execute_command_function_type execute_command_function, int *status)
 /*******************************************************************************
@@ -700,9 +674,7 @@ Takes a <command_string>, processes this through the Perl interpreter.
 	
 	*status = return_code;
 } /* interpret_command_ */
-#endif /* ! defined (NO_STATIC_FALLBACK) */
 
-#if ! defined (NO_STATIC_FALLBACK)
 void interpreter_evaluate_integer_(char *expression, int *result, int *status)
 /*******************************************************************************
 LAST MODIFIED : 6 September 2000
@@ -790,9 +762,7 @@ as an integer then <status> will be set to zero.
 
 	*status = return_code;
 } /* interpreter_evaluate_integer_ */
-#endif /* ! defined (NO_STATIC_FALLBACK) */
 
-#if ! defined (NO_STATIC_FALLBACK)
 void interpreter_set_integer_(char *variable_name, int *value, int *status)
 /*******************************************************************************
 LAST MODIFIED : 6 September 2000
@@ -837,9 +807,7 @@ To override the cmiss:: package specify the full name in the string.
  
 	*status = return_code;
 } /* interpreter_set_integer_ */
-#endif /* ! defined (NO_STATIC_FALLBACK) */
 
-#if ! defined (NO_STATIC_FALLBACK)
 void interpreter_evaluate_double_(char *expression, double *result, int *status)
 /*******************************************************************************
 LAST MODIFIED : 6 September 2000
@@ -927,9 +895,7 @@ as an double then <status> will be set to zero.
 
 	*status = return_code;
 } /* interpreter_evaluate_double_ */
-#endif /* ! defined (NO_STATIC_FALLBACK) */
 
-#if ! defined (NO_STATIC_FALLBACK)
 void interpreter_set_double_(char *variable_name, double *value, int *status)
 /*******************************************************************************
 LAST MODIFIED : 6 September 2000
@@ -974,9 +940,7 @@ To override the cmiss:: package specify the full name in the string.
 
 	*status = return_code;
 } /* interpreter_set_double_ */
-#endif /* ! defined (NO_STATIC_FALLBACK) */
 
-#if ! defined (NO_STATIC_FALLBACK)
 void interpreter_evaluate_string_(char *expression, char **result, int *status)
 /*******************************************************************************
 LAST MODIFIED : 7 September 2000
@@ -1075,9 +1039,7 @@ as an string then <status> will be set to zero and <*result> will be NULL.
 
 	*status = return_code;
 } /* interpreter_evaluate_string_ */
-#endif /* ! defined (NO_STATIC_FALLBACK) */
 
-#if ! defined (NO_STATIC_FALLBACK)
 void interpreter_set_string_(char *variable_name, char *value, int *status)
 /*******************************************************************************
 LAST MODIFIED : 7 September 2000
@@ -1121,9 +1083,7 @@ To override the cmiss:: package specify the full name in the string.
 
 	*status = return_code;
 } /* interpreter_set_string_ */
-#endif /* ! defined (NO_STATIC_FALLBACK) */
 
-#if ! defined (NO_STATIC_FALLBACK)
 void interpreter_set_pointer_(char *variable_name, char *class_name,
   void *value,int *status)
 /*******************************************************************************
@@ -1169,7 +1129,6 @@ To override the cmiss:: package specify the full name in the string.
 
 	*status = return_code;
 } /* interpreter_set_string_ */
-#endif /* ! defined (NO_STATIC_FALLBACK) */
 
 /*
 	Local Variables: 
