@@ -66,11 +66,8 @@ ifeq ($(SYSNAME),AIX)
   ifndef ABI
     ifdef OBJECT_MODE
       ifneq ($(OBJECT_MODE),32_64)
-      ABI = $(OBJECT_MODE)
+        ABI = $(OBJECT_MODE)
       endif
-    endif
-    ifndef ABI
-      ABI = 64
     endif
   endif
   ARCH_DIR = aix-$(ABI)
@@ -98,6 +95,7 @@ DEPEND_FILES := $(foreach unit, $(C_UNITS), $(WORKING_DIR)/$(unit).d )
 
 C_OBJ := $(WORKING_DIR)/libperlinterpreter.o
 LIBRARY := $(LIBRARY_DIR)/libperlinterpreter$(OPT_SUFFIX).a
+LIB_EXP := $(patsubst %.a, %.exp, $(LIBRARY))
 
 # ABI string for environment variables
 # (for location of perl librarys in execuatable)
@@ -128,7 +126,7 @@ else
         endif
       endif
     endif
-    ifeq ($(NODENAME),hpc1)
+    ifeq ($(NODENAME),hpc2)
       ifeq ($(ABI),n32)
         PERL = /usr/local/perl5.6/bin/perl
       else
@@ -147,9 +145,9 @@ else
   endif
   ifeq ($(SYSNAME),AIX)
       ifeq ($(ABI),32)
-        PERL = /usr/opt/perl-5.6.1/bin/perl
+        PERL = ${CMISS_ROOT}/bin/perl
       else
-        PERL = /usr/opt/perl-5.6.1/bin-$(ABI)/perl
+        PERL = ${CMISS_ROOT}/bin/$(ABI)/perl
       endif
   endif
   ifeq ($(SYSNAME),Linux)
@@ -165,11 +163,11 @@ else
   endif
 endif
 
-PERL_ARCHNAME = $(shell $(PERL) -MConfig -e 'print "$$Config{archname}\n"')
+PERL_ARCHNAME := $(shell $(PERL) -MConfig -e 'print "$$Config{archname}\n"')
 ifeq ($(PERL_ARCHNAME),)
   $(error problem with $(PERL))
 endif
-PERL_ARCHLIB = $(shell $(PERL) -MConfig -e 'print "$$Config{archlibexp}\n"')
+PERL_ARCHLIB := $(shell $(PERL) -MConfig -e 'print "$$Config{archlibexp}\n"')
 ifeq ($(PERL_ARCHLIB),)
   $(error problem with $(PERL))
 endif
@@ -178,6 +176,7 @@ PERL_WORKING_DIR = Perl_cmiss/generated/$(PERL_ARCHNAME)
 PERL_CMISS_MAKEFILE = $(PERL_WORKING_DIR)/Makefile
 PERL_CMISS_LIB = $(PERL_WORKING_DIR)/auto/Perl_cmiss/Perl_cmiss.a
 PERL_LIB = $(PERL_ARCHLIB)/CORE/libperl.a
+PERL_EXP = $(wildcard $(PERL_ARCHLIB)/CORE/perl.exp)
 
 C_INCLUDE_DIRS = $(PERL_ARCHLIB)/CORE $(WORKING_DIR)
 
@@ -245,6 +244,7 @@ ifeq ($(SYSNAME),AIX)
   OPTC_FLGS += -qnoignerrno
 endif
 
+.PHONY : main
 #-----------------------------------------------------------------------------
 #-----------------------------------------------------------------------------
 
@@ -260,7 +260,7 @@ ifeq ($(TASK),)
   OLD_FILES := $(filter-out $(PMH_FILES) $(foreach unit,$(C_UNITS),$(unit).%), \
     $(TMP_FILES))
 
-  .PHONY : main tidy clean allclean \
+  .PHONY : tidy clean allclean \
 	all debug opt debug64 opt64
 
   main : $(PERL_CMISS_MAKEFILE) $(WORKING_DIR) $(LIBRARY_DIR)
@@ -284,11 +284,11 @@ ifeq ($(TASK),)
 
   clean:
 	@echo "Cleaning house ..."
-	rm -rf $(PERL_WORKING_DIR) $(WORKING_DIR) $(LIBRARY)
+	-rm -rf $(PERL_WORKING_DIR) $(WORKING_DIR) $(LIBRARY) $(LIB_EXP)
 
   allclean:
 	@echo "Cleaning house ..."
-	rm -rf Perl_cmiss/generated/* generated/* lib/*
+	-rm -rf Perl_cmiss/generated/* generated/* lib/*
 
   debug opt debug64 opt64:
 	$(MAKE) --no-print-directory DEBUG=$(DEBUG) ABI=$(ABI)
@@ -337,6 +337,8 @@ endif
 ifeq ($(TASK),library)
 #-----------------------------------------------------------------------------
 
+  main : $(LIBRARY)
+
   # explicit rule for making the library
   # Including all necessary objects from archives into output archive.
   # This is done by producing a relocatable object first.
@@ -344,6 +346,14 @@ ifeq ($(TASK),library)
 
   $(LIBRARY) : $(C_OBJ)
 	$(AR) $(ARFLAGS) $@ $^
+
+  # If there is an export file for libperl.a then use it for this library.
+  ifneq ($(PERL_EXP),)
+    main : $(LIB_EXP)
+
+    $(LIB_EXP) : $(PERL_EXP)
+	cp -f $^ $@
+  endif
 
   # don't retain these relocatable objects
   .INTERMEDIATE : $(C_OBJ)
