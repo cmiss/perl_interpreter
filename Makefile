@@ -732,7 +732,8 @@ ifeq ($(USE_DYNAMIC_LOADER),true)
 	$(foreach header, $(SHARED_LIBRARY_HEADERS), \
       echo '{"$(word 3, $(subst /,' ',$(header)))","$(word 4, $(subst /,' ',$(header)))", libperlinterpreter$(word 3, $(subst /,' ',$(subst .,_,$(header))))$(word 4, $(subst /,' ',$(subst -,_,$(header)))) },' && ) \
 	$(foreach compatible_versions,$(wildcard compatible_versions.txt), \
-		cat $(compatible_versions) | awk '{gsub(/[",]/,"",$$3);gsub(/[.\-]/,"_",$$3);printf("{%s, libperlinterpreter%s},\n",$$1,$$3)}' && ) \
+		$(foreach header, $(SHARED_LIBRARY_HEADERS), \
+			cat $(compatible_versions) | $(PERL) -ne '{$$version="$(word 3, $(subst /,' ',$(header)))";$$arch="$(word 4, $(subst /,' ',$(header)))";@words = split;if ($$words[2] eq $$version) { $$words[2]=~s/[-.]/_/g;$$archsub=$$arch;$$archsub=~s/[-.]/_/g;printf("{\"%s\",\"%s\", libperlinterpreter%s%s},\n",$$words[0],$$arch,$$words[2],$$archsub)}}' && )) \
 	echo '};'; \
 	} > $@.new;
 	@set -xe && \
