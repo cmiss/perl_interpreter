@@ -23,6 +23,7 @@ ifndef DEBUG
 endif
 
 # set architecture dependent directories
+ARCH_FLAGS :=
 ifneq ($(findstring IRIX,$(SYSNAME)),) #SGI
   # Specify what application binary interface (ABI) to use i.e. 32, n32 or 64
   ifndef ABI
@@ -43,6 +44,7 @@ ifneq ($(findstring IRIX,$(SYSNAME)),) #SGI
   endif
   INSTRUCTION := mips$(MIPS)
   ARCH_DIR := $(INSTRUCTION)-$(ABI)
+  ARCH_FLAGS := -$(ABI) -$(INSTRUCTION)
 else
   ifeq ($(SYSNAME),Linux)
     ABI = 32# for preprocess_fortran.pl
@@ -51,7 +53,14 @@ else
     ifndef ABI
       ABI = 32# for preprocess_fortran.pl
     endif
-    ARCH_DIR := $(ABI)
+    ifeq ($(SYSNAME),SunOS)
+      ARCH_DIR := solaris-$(ABI)
+      ifeq ($(ABI),64)
+        ARCH_FLAGS := -xarch=v9
+      endif
+    else
+      ARCH_DIR := ${HOSTTYPE}-$(ABI)
+    endif
   endif
 endif
 
@@ -86,105 +95,90 @@ else
   ABI_ENV=$(ABI)#
 endif
 
-# location of perl.
-# try to determine from environment
-# gmake doesn't do what I want with this
+# Location of perl.
+# Try to determine from environment.
+# gmake doesn't do what I want with this:
 # ifdef CMISS$(ABI_ENV)_PERL
 ifneq ($(origin CMISS$(ABI_ENV)_PERL),undefined)
   PERL := $(CMISS$(ABI_ENV)_PERL)
-# ifeq ($(ABI),n32)
-#   ifdef CMISSN32_PERL
-#     PERL := ${CMISSN32_PERL}
-#   endif
-# endif
-# ifeq ($(ABI),64)
-#   ifdef CMISS64_PERL
-#     PERL := ${CMISS64_PERL}
-#   endif
-# endif
 else
-  ifdef CMISS_PERL
-    PERL := ${CMISS_PERL}
-  else
-    ifneq ($(findstring IRIX,$(SYSNAME)),)
-      # need a perl of the same architecture (and ABI) type
-      # so don't just find the first perl in PATH
-      ifeq ($(HOST:esu%=),)
-	ifeq ($(INSTRUCTION),mips3)
-          PERL = /usr/local/perl5.6/bin-$(INSTRUCTION)/perl
-	else
-          ifeq ($(ABI),n32)
-            PERL = /usr/local/perl5.6/bin/perl
-          else
-            PERL = /usr/local/perl5.6/bin-$(ABI)/perl
-          endif
-        endif
-      endif
-      ifeq ($(HOST),hpc1)
+  # need a perl of the same architecture (and ABI) type
+  # so don't just find the first perl in PATH
+  ifneq ($(findstring IRIX,$(SYSNAME)),)
+    ifeq ($(HOST:esu%=),)
+      ifeq ($(INSTRUCTION),mips3)
+        PERL = /usr/local/perl5.6/bin-$(INSTRUCTION)/perl
+      else
         ifeq ($(ABI),n32)
           PERL = /usr/local/perl5.6/bin/perl
         else
           PERL = /usr/local/perl5.6/bin-$(ABI)/perl
         endif
       endif
-      # What to oxford HOSTs look like?
-      CMISS_LOCALE ?=
-      ifeq (${CMISS_LOCALE},OXFORD)
-        ifeq ($(ABI),n32)
-          PERL = /usr/paterson/local/bin/perl
-        else
-          PERL = /usr/paterson/local64/bin/perl
-        endif
+    endif
+    ifeq ($(HOST),hpc1)
+      ifeq ($(ABI),n32)
+        PERL = /usr/local/perl5.6/bin/perl
+      else
+        PERL = /usr/local/perl5.6/bin-$(ABI)/perl
       endif
     endif
-    ifeq ($(SYSNAME),Linux)
-      PERL = /usr/bin/perl
+    # What to oxford HOSTs look like?
+    CMISS_LOCALE ?=
+    ifeq (${CMISS_LOCALE},OXFORD)
+      ifeq ($(ABI),n32)
+        PERL = /usr/paterson/local/bin/perl
+      else
+        PERL = /usr/paterson/local64/bin/perl
+      endif
     endif
-    ifndef PERL
-      $(error PERL not defined)
-    endif
+  endif
+  ifeq ($(SYSNAME),Linux)
+    PERL = /usr/bin/perl
+  endif
+  ifndef PERL
+    $(error PERL not defined)
   endif
 endif
 
+PERL_ARCHNAME = $(shell $(PERL) -MConfig -e 'print "$$Config{archname}\n"')
+ifeq ($(PERL_ARCHNAME),)
+  $(error problem with $(PERL))
+endif
 PERL_ARCHLIB = $(shell $(PERL) -MConfig -e 'print "$$Config{archlib}\n"')
 ifeq ($(PERL_ARCHLIB),)
   $(error problem with $(PERL))
 endif
 DYNALOADER_LIB = $(PERL_ARCHLIB)/auto/DynaLoader/DynaLoader.a
-PERL_CMISS_MAKEFILE = $(WORKING_DIR)/Makefile
-PERL_CMISS_LIB = Perl_cmiss/$(WORKING_DIR)/auto/Perl_cmiss/Perl_cmiss.a
+PERL_WORKING_DIR = Perl_cmiss/generated/$(PERL_ARCHNAME)
+PERL_CMISS_MAKEFILE = $(PERL_WORKING_DIR)/Makefile
+PERL_CMISS_LIB = $(PERL_WORKING_DIR)/auto/Perl_cmiss/Perl_cmiss.a
 PERL_LIB = $(PERL_ARCHLIB)/CORE/libperl.a
 
 C_INCLUDE_DIRS = $(PERL_ARCHLIB)/CORE
-
-export WORKING_DIR# for Perl_cmiss/Makefile.PL
 
 #-----------------------------------------------------------------------------
 # compiling commands
 
 CC = cc
-CFLAGS = -c
-F90FLAGS = -c
+F90C = f90
+CFLAGS = -c $(ARCH_FLAGS)
+F90FLAGS = -c $(ARCH_FLAGS)
 DEBUG_CFLAGS = -g
 DEBUG_F90FLAGS = -g
 DEFINE = '-DABI_ENV="$(ABI_ENV)"'
-LD_RELOCATABLE = ld -r
+LD_RELOCATABLE = ld -r $(ARCH_FLAGS)
 F90_ARCHIVES =
 AR = ar
 ARFLAGS = -cr
 
 ifneq ($(findstring IRIX,$(SYSNAME)),)
-  F90C = f90
-  CFLAGS += -$(ABI) -$(INSTRUCTION)
-  F90FLAGS += -$(ABI) -$(INSTRUCTION)
   DEBUG_CFLAGS += -DEBUG:trap_uninitialized:subscript_check:verbose_runtime
   OPT_F90FLAGS = -O3
   OPT_CFLAGS = -O3 -OPT:Olimit=0
   ifeq ($(ABI),64)
     OPT_CFLAGS += -r10000
   endif
-  F90FLAGS += -$(ABI) -$(INSTRUCTION)
-  LD_RELOCATABLE += -$(ABI) -$(INSTRUCTION)
 else
   ifeq ($(SYSNAME),Linux)
     F90C = pgf90
@@ -196,11 +190,17 @@ else
       /usr/local/pgi/linux86/lib/lib$(library).a )
     OPT_F90FLAGS = -fast
     DEFINE += -Dbool=char -DHAS_BOOL
+    OPT_CFLAGS = -O2
   else
-    F90C = f90
-    OPT_F90FLAGS = -O2
+    ifeq ($(SYSNAME),SunOS)
+      OPT_F90FLAGS = -O
+      OPT_CFLAGS = -O
+      LD_RELOCATABLE = ld -r
+    else
+      OPT_F90FLAGS = -O2
+      OPT_CFLAGS = -O2
+    endif
   endif
-  OPT_CFLAGS = -O2
 endif
 ifneq ($(DEBUG),false)
   CFLAGS += $(DEBUG_CFLAGS)
@@ -222,16 +222,14 @@ ifeq ($(TASK),)
 
   .NOTPARALLEL:
 
-# needs some thought
-#   TMP_FILES := $(notdir $(wildcard $(WORKING_DIR)/*.* ) )
-#   OLD_FILES := $(filter-out $(PMH_FILES) $(foreach unit,$(UNITS),$(unit).%), \
-#     $(TMP_FILES))
+  TMP_FILES := $(notdir $(wildcard $(WORKING_DIR)/*.* ) )
+  OLD_FILES := $(filter-out $(PMH_FILES) $(foreach unit,$(C_UNITS) $(F_UNITS),$(unit).%), \
+    $(TMP_FILES))
 
-  .PHONY : main clean all# tidy
+  .PHONY : main tidy clean all
 
-  main : Perl_cmiss/$(PERL_CMISS_MAKEFILE) $(WORKING_DIR) $(LIBRARY_DIR)
-	$(MAKE) --directory=Perl_cmiss --file=$(PERL_CMISS_MAKEFILE) \
-	  CCFLAGS="$(CFLAGS)" DEFINE="$(DEFINE)" static
+  main : $(PERL_CMISS_MAKEFILE) $(WORKING_DIR) $(LIBRARY_DIR)
+	$(MAKE) --directory=$(PERL_WORKING_DIR) static
 	$(MAKE) TASK=source
 	$(MAKE) TASK=library
 
@@ -243,15 +241,13 @@ ifeq ($(TASK),)
 	$(MAKE) ABI=64 OPT=
   endif
 
-#   tidy :
-#   ifneq ($(OLD_FILES),)
-# 	rm $(foreach file,$(OLD_FILES), $(WORKING_DIR)/$(file) )
-#   endif
+  tidy :
+  ifneq ($(OLD_FILES),)
+	rm $(foreach file,$(OLD_FILES), $(WORKING_DIR)/$(file) )
+  endif
 
-  Perl_cmiss/$(PERL_CMISS_MAKEFILE) : $(PERL) Perl_cmiss/Makefile.PL
-	cd Perl_cmiss ; $(PERL) Makefile.PL \
-	  CCFLAGS="$(CFLAGS)" DEFINE="$(DEFINE)" \
-	  FIRST_MAKEFILE=$(PERL_CMISS_MAKEFILE)
+  $(PERL_CMISS_MAKEFILE) : $(PERL) Perl_cmiss/Makefile.PL
+	cd Perl_cmiss ; $(PERL) Makefile.PL
 
   $(WORKING_DIR) :
 	mkdir -p $@
@@ -261,7 +257,7 @@ ifeq ($(TASK),)
 
   clean:
 	@echo "Cleaning house ..."
-	rm -rf Perl_cmiss/$(WORKING_DIR) $(WORKING_DIR) $(LIBRARY)
+	rm -rf $(PERL_WORKING_DIR) $(WORKING_DIR) $(LIBRARY)
 
 #-----------------------------------------------------------------------------
 endif
@@ -282,7 +278,7 @@ ifeq ($(TASK),source)
 
   $(WORKING_DIR)/%.d : $(SOURCE_DIR)/%.c
 	makedepend $(CPPFLAGS) -f- -Y $< 2> $@.tmp | sed -e 's%^source\([^ ]*\).o%$$(WORKING_DIR)\1.o $$(WORKING_DIR)\1.d%' > $@
-	(grep pmh $@.tmp | grep makedepend | awk -F "[ ,]" '{printf("%s.%s:",substr($$4, 1, length($$4) - 2),"o"); for(i = 1 ; i <= NF ; i++)  { if (match($$i,"pmh")) printf(" source/%s", substr($$i, 2, length($$i) -2)) } printf("\n");}' | sed -e 's%^source\([^ ]*\).o%$$(WORKING_DIR)\1.o $$(WORKING_DIR)\1.d%' | sed -e 's%source\([^ ]*\).pmh%$$(WORKING_DIR)\1.pmh%' >> $@)
+	(grep pmh $@.tmp | grep makedepend | nawk -F "[ ,]" '{printf("%s.%s:",substr($$4, 1, length($$4) - 2),"o"); for(i = 1 ; i <= NF ; i++)  { if (match($$i,"pmh")) printf(" source/%s", substr($$i, 2, length($$i) -2)) } printf("\n");}' | sed -e 's%^source\([^ ]*\).o%$$(WORKING_DIR)\1.o $$(WORKING_DIR)\1.d%' | sed -e 's%source\([^ ]*\).pmh%$$(WORKING_DIR)\1.pmh%' >> $@)
 
 $(WORKING_DIR)/%.d : $(SOURCE_DIR)/%.f90
 	$(F90MAKEDEPEND) $< > $@
@@ -324,21 +320,6 @@ ifeq ($(TASK),library)
 	$(F90_ARCHIVES)
 	$(LD_RELOCATABLE) -o $@ $^
 
-# $(LIBRARY) : $(foreach unit, $(UNITS), $(WORKING_DIR)/$(unit).o ) $(DYNALOADER_LIB) $(PERL_CMISS_LIB) $(PERL_LIB)
-# 	@if [ ! -d $(LIBRARY_DIR) ]; then echo mkdir -p $(LIBRARY_DIR); mkdir -p $(LIBRARY_DIR); fi
-# 	ld $(LDFLAGS) -o $(TEMP_OBJ) $^
-# 	$(AR) $(ARFLAGS) $@ $(TEMP_OBJ)
-
-  #-----------------------------------------------------------------------------
-#  # implicit rules for making the object dependencies
-
-# $(WORKING_DIR)/%.d $(WORKING_DIR)/%.o : $(SOURCE_DIR)/%.c
-# 	@if [ ! -d $(WORKING_DIR) ]; then echo mkdir -p $(WORKING_DIR); mkdir -p $(WORKING_DIR); fi
-# 	$(CC) -o $(WORKING_DIR)/$*.o $(CPPFLAGS) $(CFLAGS) -MDupdate $(WORKING_DIR)/$*.d_tmp $<
-# 	sed -e 's%^%$(WORKING_DIR)/%' \
-# 		$(WORKING_DIR)/$*.d_tmp > $(WORKING_DIR)/$*.d
-# 	rm $(WORKING_DIR)/$*.d_tmp
-
   #-----------------------------------------------------------------------------
   # include the object (and .mod) dependencies)
   ifneq ($(DEPEND_FILES),)
@@ -365,7 +346,7 @@ ifeq ($(TASK),library)
   $(WORKING_DIR)/%.mod_date : $(WORKING_DIR)/%.mod_record ;
 
   $(WORKING_DIR)/%.mod_record : $(WORKING_DIR)/%.mod
-	@if [ -e $@ ] && cmp $@ $<; then \
+	@if [ -f $@ ] && cmp $@ $<; then \
 	  touch $@; \
 	else \
 	  echo $< has changed; cp $< $@; touch $<_date; \
