@@ -52,7 +52,7 @@ struct Interpreter_library_strings {   char *version; char *archname; char *base
 #include "dynamic_versions.h"
 
 #define LOAD_FUNCTION(symbol) \
-	if (return_code && (!(symbol ## handle = dlsym(interpreter_handle, "__" #symbol )))) \
+	if (return_code && (!(symbol ## handle = (void (*)())dlsym(interpreter_handle, "__" #symbol )))) \
 	{ \
 		(*display_message_function)(ERROR_MESSAGE,"Unable to find symbol %s", "__" #symbol ); \
 		return_code = 0; \
@@ -245,10 +245,11 @@ It is up to the calling routine to free the string returned and to
 remove the temporary file it refers to.
 ==============================================================================*/
 {
-	char *ptr_temp_bin_name,*return_string,temp_bin_name[L_tmpnam],*total_bin,
+	char *return_string,temp_bin_name[L_tmpnam],*total_bin,
 		*total_bin_ptr;
 	FILE *bin_file;
-	int bin_length, bytes_in, bytes_out, i, j, string_length;
+	size_t bin_length, string_length;
+	int bytes_in, bytes_out, i, j;
 	long bin_long_data;
 
 	if (base64_string)
@@ -398,8 +399,9 @@ the function pointers and then calls create_interpreter_ for that instance.
 		*perl_executable_default = "perl", *perl_interpreter_string, perl_version[200],
 		perl_archlib[200], perl_result_buffer[500], perl_shared_library[200];
 	fd_set readfds;
-	int flags, i, number_of_perl_interpreters, number_read, return_code,
+	int i, number_of_perl_interpreters, return_code,
 		stdout_pipe[2], old_stdout;
+	ssize_t number_read;
 	struct timeval timeout_struct;
 	void *interpreter_handle, *perl_handle;
 
