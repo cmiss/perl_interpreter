@@ -7,11 +7,17 @@ MAKEFLAGS = --no-builtin-rules -I
 # files and directories
 
 SOURCE_DIR = source
+# set architecture dependent directory
 ifeq (${HOSTTYPE},iris4d)
-WORKING_DIR = generated/mips3-n32-debug
+  # Specify what application binary interface (ABI) to use i.e. 32, n32 or 64
+  ABI = n32
+  # Specify what sort of instruction set to use i.e. -mips#
+  MIPS = 4
+  INSTRUCTION := mips$(MIPS)
+  WORKING_DIR := generated/$(INSTRUCTION)-$(ABI)-debug
 endif
 ifeq (${HOSTTYPE},i386-linux)
-WORKING_DIR = generated/linux-debug
+  WORKING_DIR = generated/linux-debug
 endif
 LIBRARY_DIR = $(WORKING_DIR)
 
@@ -24,13 +30,36 @@ C_OBJ = $(WORKING_DIR)/libperlinterpreter.o
 F_OBJ = $(WORKING_DIR)/libperlinterpreter_f.o
 LIBRARY = $(LIBRARY_DIR)/libperlinterpreter.a
 
-PERL_PATH = $(shell perl -MConfig -e 'print "$$Config{archlib}\n"')
-DYNALOADER_LIB = $(PERL_PATH)/auto/DynaLoader/DynaLoader.a
+ifeq (${HOSTTYPE},iris4d)
+  ifeq ($(INSTRUCTION),mips4)
+    ifeq ($(ABI),n32)
+      PERL = /usr/local/perl5.6/bin/perl
+    else
+      ifeq ($(ABI),n32)
+        PERL = /usr/local/perl5.6/bin-$(ABI)/perl
+      else
+        PERL = /usr/local/perl5.6_64/bin/perl
+      endif
+    endif
+  else
+    ifeq ($(INSTRUCTION),mips3)
+      PERL = /usr/local/perl5.6/bin/perl
+    else
+      PERL = /usr/local/perl5.6/bin-$(INSTRUCTION)/perl
+    endif
+  endif
+endif
+ifeq (${HOSTTYPE},i386-linux)
+  PERL = /usr/bin/perl
+endif
+
+PERL_ARCHLIB = $(shell $(PERL) -MConfig -e 'print "$$Config{archlib}\n"')
+DYNALOADER_LIB = $(PERL_ARCHLIB)/auto/DynaLoader/DynaLoader.a
 PERL_CMISS_MAKEFILE = $(WORKING_DIR)/Perl_cmiss.make
 PERL_CMISS_LIB = $(WORKING_DIR)/auto/Perl_cmiss/Perl_cmiss.a
-PERL_LIB = $(PERL_PATH)/CORE/libperl.a
+PERL_LIB = $(PERL_ARCHLIB)/CORE/libperl.a
 
-CINCLUDE_DIRS = $(PERL_PATH)/CORE
+CINCLUDE_DIRS = $(PERL_ARCHLIB)/CORE
 
 #-----------------------------------------------------------------------------
 # compiling commands
@@ -44,11 +73,11 @@ else
 F90C = f90 -c
 endif
 F90FLAGS = -g
-LDFLAGS = -r -mips3
+LDFLAGS = -r
 ifeq (${HOSTTYPE},iris4d)
-CFLAGS += -mips3
-F90FLAGS += -mips3
-LDFLAGS += -mips3
+CFLAGS += -$(ABI) -$(INSTRUCTION)
+F90FLAGS += -$(ABI) -$(INSTRUCTION)
+LDFLAGS += -$(ABI) -$(INSTRUCTION)
 else
 CPPFLAGS += -Dbool=char -DHAS_BOOL
 endif
@@ -82,7 +111,7 @@ $(F_OBJ) : $(foreach unit, $(F_UNITS), $(WORKING_DIR)/$(unit).o )
 # 	$(AR) $(ARFLAGS) $@ $(TEMP_OBJ)
 
 $(PERL_CMISS_LIB) : Perl_cmiss/Makefile.PL
-	cd Perl_cmiss ; perl Makefile.PL LINKTYPE=static INST_ARCHLIB=../$(WORKING_DIR) FIRST_MAKEFILE=../$(PERL_CMISS_MAKEFILE)
+	cd Perl_cmiss ; $(PERL) Makefile.PL LINKTYPE=static INST_ARCHLIB=../$(WORKING_DIR) FIRST_MAKEFILE=../$(PERL_CMISS_MAKEFILE)
 	$(MAKE) --directory=Perl_cmiss --file=../$(PERL_CMISS_MAKEFILE) CCFLAGS="$(CFLAGS) $(CPPFLAGS)" static
 
 #-----------------------------------------------------------------------------
