@@ -337,6 +337,7 @@ the function pointers and then calls create_interpreter_ for that instance.
 	return_code = 0;
 	use_dynamic_interpreter = 0;
 	perl_interpreter_string = (char *)NULL;
+	library = (char *)NULL;
 
 	*perl_archname = 0;
 	*perl_version = 0;
@@ -426,10 +427,6 @@ the function pointers and then calls create_interpreter_ for that instance.
 					dlclose(perl_handle);
 				}
 			}
-			/* Hopefully we can remove the file already and if the OS still
-				wants it, it will just keep a handle */
-			remove(library);
-			free(library);
 		}
 	}
 
@@ -502,6 +499,13 @@ the function pointers and then calls create_interpreter_ for that instance.
 			"This executable will be unable to operate until your perl version matches one of the dynamically included versions.");
 		return_code = 0;
 #endif /* ! defined (NO_STATIC_FALLBACK) */
+	}
+	if (library)
+	{
+		/* Hopefully we can remove the file already and if the OS still
+			wants it, it will just keep a handle */
+		remove(library);
+		free(library);
 	}
 	*status = return_code;
 }
