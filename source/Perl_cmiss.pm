@@ -515,7 +515,7 @@ sub execute_command
 										{
 										  $is_simple_token = 0;
 										  ($extracted, $reduced_command) = 
-											 Text::Balanced::extract_variable($command);
+											 Perl_cmiss::Text::Balanced::extract_variable($command);
 										  if ($extracted)
 											 {
 												$command = $reduced_command;
@@ -528,7 +528,7 @@ sub execute_command
 										  else
 											 {
 												($extracted, $reduced_command) =
-												  Text::Balanced::extract_delimited($command, '\'"`');
+												  Perl_cmiss::Text::Balanced::extract_delimited($command, '\'"`');
 												if ($extracted)
 												  {
 													 $command = $reduced_command;
@@ -604,7 +604,7 @@ sub execute_command
 						else
 						  {
 							 ($extracted, $reduced_command) =
-								Text::Balanced::extract_variable($command);
+								Perl_cmiss::Text::Balanced::extract_variable($command);
 							 if ($extracted)
 								{
 								  $command = $reduced_command;
@@ -617,7 +617,7 @@ sub execute_command
 							 else
 								{
 								  ($extracted, $reduced_command) =
-									 Text::Balanced::extract_quotelike($command);
+									 Perl_cmiss::Text::Balanced::extract_quotelike($command);
 								  if ($extracted)
 									 {
 										$command = $reduced_command;

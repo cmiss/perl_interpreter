@@ -3,7 +3,8 @@
 
 #use strict;
 
-package Text::Balanced;
+#Hide this implementation so that it does not conflict with any real use of the Text::Balanced module.
+package Perl_cmiss::Text::Balanced;
 
 #use Exporter;
 #use SelfLoader;
