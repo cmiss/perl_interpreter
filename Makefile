@@ -116,10 +116,10 @@ else
   ifeq ($(filter-out IRIX%,$(SYSNAME)),)# SGI
     ifeq ($(filter-out esu%,$(NODENAME)),)
       ifeq ($(INSTRUCTION),mips3)
-        PERL = /usr/local/perl5.6/bin-$(INSTRUCTION)/perl
+        PERL = ${CMISS_ROOT}/bin/perl 
       else
         ifeq ($(ABI),n32)
-          PERL = /usr/local/perl5.6/bin/perl
+          PERL = ${CMISS_ROOT}/bin/perl
         else
           PERL = ${CMISS_ROOT}/bin/mips-irix/perl64
         endif
