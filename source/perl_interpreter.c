@@ -14,6 +14,8 @@ Provides an interface between cmiss and a Perl interpreter.
 #include <stdio.h>
 #include <unistd.h>
 #if defined (USE_DYNAMIC_LOADER)
+#include <string.h>
+#include <stdlib.h>
 #include <sys/types.h>
 #include <fcntl.h>
 #include <dlfcn.h>
