@@ -289,6 +289,7 @@ C_OBJ := $(WORKING_DIR)/libperlinterpreter.o
 CC = cc
 LD_RELOCATABLE = ld -r $(CFL_FLGS) $(L_FLGS)
 LD_SHARED = ld -shared $(CFL_FLGS) $(L_FLGS)
+SHARED_LINK_LIBRARIES = 
 AR = ar
 # Option lists
 # (suboption lists become more specific so that later ones overrule previous)
@@ -322,6 +323,7 @@ endif
 ifeq ($(SYSNAME),Linux)
   CPPFLAGS += -Dbool=char -DHAS_BOOL
   OPTCF_FLGS = -O2
+  SHARED_LINK_LIBRARIES += -lcrypt -ldl
 endif
 ifeq ($(SYSNAME),SunOS)
   # need -xarch=native after -fast
@@ -358,6 +360,7 @@ ifneq ($(SHARED_OBJECT), true)
     CPPFLAGS += -DNO_STATIC_FALLBACK
   endif
 endif
+SHARED_LINK_LIBRARIES += -lc
 CFLAGS += $(PERL_CFLAGS)
 .PHONY : main
 
@@ -621,7 +624,7 @@ endif
   else
     $(LIBRARY) : $(foreach unit, $(C_UNITS), $(WORKING_DIR)/$(unit).o ) \
          $(DYNALOADER_LIB) $(PERL_CMISS_LIB) $(STATIC_PERL_LIB)
-		$(LD_SHARED) -o $@ $^ -lcrypt -ldl -lc
+		$(LD_SHARED) -o $@ $^ $(SHARED_LINK_LIBRARIES)
   endif
 
   # include the object dependencies
