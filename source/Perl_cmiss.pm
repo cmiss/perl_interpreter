@@ -88,27 +88,43 @@ sub set_INC_for_platform
 
 sub add_cmiss_perl_to_INC
   {
-	# include $ENV{CMISS_ROOT}/perl_lib if exists
-	if( exists $ENV{CMISS_ROOT} )
+	my $cmiss_perllib;
+
+	#Check the environment variables which specify this lib
+    foreach my $varname ("CMISS${abi_env}_PERLLIB","CMISS_PERLLIB")
+	{
+	  if ( exists $ENV{$varname} )
 	  {
-# GBS 6-March-2000  Directory changed
-# 		my $cmiss_perl_lib = $ENV{CMISS_ROOT}.'/perl_lib';
-# 		my $cmiss_perl_lib = $ENV{CMISS_ROOT}.'/perl/lib';
-		my $cmiss_perl_lib = $ENV{CMISS_ROOT}.'/cmiss_perl/lib';
-		if( -d $cmiss_perl_lib )
-		  {
-			unshift @INC, $cmiss_perl_lib;
-		  }
+		$cmiss_perllib = $ENV{$varname};
+		last;
 	  }
-  }
+    }
+	# If no CMISS*_PERLLIB variable is set then see if there is a CMISS_ROOT version
+	if (! defined $cmiss_perllib)
+	{
+	  if (exists $ENV{CMISS_ROOT})
+	  {
+		my $cmissroot_perl_lib = "$ENV{CMISS_ROOT}/cmiss_perl/lib";
+		if (-d $cmissroot_perl_lib)
+		{
+		  $cmiss_perllib = $cmissroot_perl_lib;
+		}
+	  }
+	}
+	# If a CMISS_PERLLIB has been found prepend it to the path.
+	if (defined $cmiss_perllib)
+	{
+	  unshift @INC, $cmiss_perllib;
+	}
+ }
 
 
 sub register_keyword
   {
 	 my $word = shift;
-	 
+
 	 #print \"register $word\\n\";
-	 
+
 	 $keywords{$word} = 1;
   }
 
