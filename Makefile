@@ -71,6 +71,9 @@ ifeq ($(SYSNAME),Linux)
   NEW_INSTRUCTION := i686
   OPERATING_SYSTEM := linux
 endif
+ifeq ($(SYSNAME:CYGWIN%=),)# CYGWIN
+  SYSNAME := win32
+endif
 ifeq ($(SYSNAME),win32)
   ARCH_DIR := win32
   ifndef STATIC
@@ -224,6 +227,12 @@ else
       PERL = perl
     endif
   endif
+  ifeq ($(SYSNAME),win32)
+	   PERL = c:/perl/5.6.1/bin/MSWin32-x86/perl.exe
+  endif
+  ifndef PERL
+    $(error PERL not defined)
+  endif
 endif
 
 PERL_ARCHNAME := $(shell $(PERL) -MConfig -e 'print "$$Config{archname}\n"')
@@ -350,7 +359,7 @@ ifeq ($(SYSNAME),SunOS)
   endif
 endif
 ifeq ($(SYSNAME),win32)
-  CC = gcc
+  CC = gcc -fnative-struct
 endif
 ifeq ($(SYSNAME),AIX)
   CC = xlc
@@ -395,14 +404,11 @@ endif
 ifeq ($(TASK),)
 #-----------------------------------------------------------------------------
 
-ifeq ($(SYSNAME:CYGWIN%=),)# CYGWIN
-  $(error use SYSNAME=win32)
-endif
 ifeq ($(SYSNAME),win32)
   $(warning *******************************)
   $(warning This still does not compile win32 out of the box)
   $(warning link in the Perl_cmiss Makefile.pl needs to be changed to system("cp...") )
-  $(warning The generated Perl_cmiss Makefile ends up with many \ where there need to be / and I just searched and replaced carefully)
+  $(warning The generated Perl_cmiss Makefile ends up with many \ where there need to be / which seems to work with dmake but the command called from this makefile fails with a -c error but works fine when executed in a shell)
   $(warning The library built does not have the perl or Perl_cmiss in it, these only seem to work when linked in the final link)
   $(warning *******************************)
   $(warning)
@@ -497,7 +503,12 @@ endif
 	@echo
 	@echo 'Building library ${LIBRARY}'
 	@echo
+ifneq ($(SYSNAME),win32)
 	$(MAKE) --directory=$(PERL_WORKING_DIR) static
+else
+	#Use dmake as it supports back slashes for paths
+	( cd $(PERL_WORKING_DIR) ; dmake static )
+endif
 ifeq ($(USE_DYNAMIC_LOADER),true)
 	$(MAKE) --no-print-directory TASK=source SHARED_LIBRARIES='$(SHARED_LIBRARIES)'
 else
