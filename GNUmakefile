@@ -9,11 +9,13 @@ SOURCE_DIR = source
 WORKING_DIR = generated/mips3-n32-debug
 LIBRARY_DIR = $(WORKING_DIR)
 
-# SOURCES := $(wildcard $(SOURCE_DIR)/*.c )
-SOURCES := $(wildcard $(SOURCE_DIR)/*.c $(SOURCE_DIR)/*.f90 )
-UNITS := $(basename $(notdir $(SOURCES) ) )
+C_SOURCES := $(wildcard $(SOURCE_DIR)/*.c )
+F_SOURCES := $(wildcard $(SOURCE_DIR)/*.f90 )
+C_UNITS := $(basename $(notdir $(C_SOURCES) ) )
+F_UNITS := $(basename $(notdir $(F_SOURCES) ) )
 
-TEMP_OBJ = $(WORKING_DIR)/libperlinterpreter.o
+C_OBJ = $(WORKING_DIR)/libperlinterpreter.o
+F_OBJ = $(WORKING_DIR)/libperlinterpreter_f.o
 LIBRARY = $(LIBRARY_DIR)/libperlinterpreter.a
 
 PERL_PATH = /usr/local/perl5/lib/5.00503
@@ -46,11 +48,20 @@ ARFLAGS = -cr
 # This is done by producing a relocatable object first.
 # Is there a better way?
 
-$(LIBRARY) : $(foreach unit, $(UNITS), $(WORKING_DIR)/$(unit).o ) $(DYNALOADER_LIB) $(PERL_CMISS_LIB) $(PERL_LIB)
+$(LIBRARY) : $(C_OBJ) $(F_OBJ)
 	@if [ ! -d $(LIBRARY_DIR) ]; then echo mkdir -p $(LIBRARY_DIR); mkdir -p $(LIBRARY_DIR); fi
-	ld $(LDFLAGS) -o $(TEMP_OBJ) $^
-	$(AR) $(ARFLAGS) $@ $(TEMP_OBJ)
-# 	rm $(TEMP_OBJ)
+	$(AR) $(ARFLAGS) $@ $^
+
+$(C_OBJ) : $(foreach unit, $(C_UNITS), $(WORKING_DIR)/$(unit).o ) $(DYNALOADER_LIB) $(PERL_CMISS_LIB) $(PERL_LIB)
+	ld $(LDFLAGS) -o $@ $^
+
+$(F_OBJ) : $(foreach unit, $(F_UNITS), $(WORKING_DIR)/$(unit).o )
+	ld $(LDFLAGS) -o $@ $^
+
+# $(LIBRARY) : $(foreach unit, $(UNITS), $(WORKING_DIR)/$(unit).o ) $(DYNALOADER_LIB) $(PERL_CMISS_LIB) $(PERL_LIB)
+# 	@if [ ! -d $(LIBRARY_DIR) ]; then echo mkdir -p $(LIBRARY_DIR); mkdir -p $(LIBRARY_DIR); fi
+# 	ld $(LDFLAGS) -o $(TEMP_OBJ) $^
+# 	$(AR) $(ARFLAGS) $@ $(TEMP_OBJ)
 
 #-----------------------------------------------------------------------------
 # implicit rules for making the object dependencies
@@ -77,7 +88,7 @@ $(WORKING_DIR)/%.d : $(SOURCE_DIR)/%.f90
 #-----------------------------------------------------------------------------
 # include the object (and .mod) dependencies)
 
-include $(foreach unit, $(UNITS), $(WORKING_DIR)/$(unit).d )
+include $(foreach unit, $(C_UNITS) $(F_UNITS), $(WORKING_DIR)/$(unit).d )
 
 #-----------------------------------------------------------------------------
 # implicit rules for making the objects
