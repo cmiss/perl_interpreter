@@ -84,10 +84,7 @@ ifeq ($(SYSNAME),Linux)
     ifeq ($(filter-out i%86,$(MACHNAME)),)
       ABI=32
     endif
-    ifeq ($(MACHNAME),ia64)
-      ABI=64
-    endif
-    ifeq ($(MACHNAME),x86_64)
+    ifneq (,$(filter $(MACHNAME),ia64 x86_64))# ia64 or x86_64
       ABI=64
     endif
   endif
@@ -425,13 +422,16 @@ ifeq ($(SYSNAME),Linux)
   else
     # gcc
     CPPFLAGS += -Dbool=char -DHAS_BOOL
+#    CFE_FLGS += -m$(ABI)
     # !!! Position independent code is actually only required for objects
     # in shared libraries.
     CF_FLGS += -fpic
-#    CFE_FLGS += -m$(ABI)
   endif
   OPTCF_FLGS = -O2
-  SHARED_LINK_LIBRARIES += -lcrypt -ldl -L$(PERL_ARCHLIB)/CORE -lperl
+  # Don't include a dependency on libperl.so in the shared link libraries as
+  # the perl_interpreter does not say where to find libperl.so when loading the
+  # shared link libraries.
+  SHARED_LINK_LIBRARIES += -lcrypt -ldl
 endif
 ifeq ($(SYSNAME),win32)
   CC = gcc -fnative-struct
@@ -613,7 +613,7 @@ debug opt debug64 opt64:
 
   debug debug64: DEBUG=true
   opt opt64: DEBUG=false
-  ifeq ($(MACHNAME),ia64)
+  ifneq (,$(filter $(MACHNAME),ia64 x86_64))# ia64 or x86_64
     debug opt: ABI=64
   else
   ifeq ($(filter-out IRIX%,$(SYSNAME)),) #SGI
