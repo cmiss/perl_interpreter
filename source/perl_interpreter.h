@@ -21,7 +21,7 @@ DESCRIPTION:
 ==============================================================================*/
 
 
-void create_interpreter_(int *redirect_output, int *status);
+void create_interpreter_(int *status);
 #if ! defined (FORTRAN_INTERPRETER_INTERFACE)
 #define create_interpreter create_interpreter_
 #endif /* defined (FORTRAN_INTERPRETER_INTERFACE) */
@@ -45,6 +45,18 @@ LAST MODIFIED : 19 May 2000
 DESCRIPTION:
 Takes a <command_string>, processes this through the F90 interpreter
 and then executes the returned strings
+==============================================================================*/
+
+void redirect_interpreter_output_(int *status);
+#if ! defined (FORTRAN_INTERPRETER_INTERFACE)
+#define redirect_output redirect_output_
+#endif /* ! defined (FORTRAN_INTERPRETER_INTERFACE) */
+/*******************************************************************************
+LAST MODIFIED : 25 August 2000
+
+DESCRIPTION:
+This redirects the output from stdout to a pipe so that the handle_output
+routine can write this to the command window.
 ==============================================================================*/
 
 /*

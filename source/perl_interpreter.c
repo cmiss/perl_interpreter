@@ -39,7 +39,7 @@ void xs_init()
 	newXS("DynaLoader::boot_DynaLoader", boot_DynaLoader, file);
 }
 
-void create_interpreter_(int *redirect_output, int *status)
+void create_interpreter_(int *status)
 /*******************************************************************************
 LAST MODIFIED : 22 August 2000
 
@@ -85,69 +85,48 @@ the display_message routine.
 	 "Perl_cmiss::register_keyword set",
 	 "Perl_cmiss::register_keyword unemap",
 	 "Perl_cmiss::register_keyword var"};
-  int i, filehandles[2], number_of_load_commands, return_code;
-  IV perl_filehandle;
+  int i, number_of_load_commands, return_code;
 
   return_code = 1;
 
-  if (0 == pipe (filehandles))
+  perl_interpreter = perl_alloc();
+  perl_construct(perl_interpreter);
+  perl_parse(perl_interpreter, xs_init, 3, embedding, NULL);
+  perl_run(perl_interpreter);
+  
   {
-	  perl_interpreter = perl_alloc();
-	  perl_construct(perl_interpreter);
-	  perl_parse(perl_interpreter, xs_init, 3, embedding, NULL);
-	  perl_run(perl_interpreter);
-
-	  {
-		  STRLEN n_a;
-		  dSP ;
+	 STRLEN n_a;
+	 dSP ;
 	  
-		  perl_interpreter_filehandle = filehandles[0];
-	  
-		  ENTER ;
-		  SAVETMPS;
+	 ENTER ;
+	 SAVETMPS;
 
-		  PUSHMARK(sp) ;
-		  perl_eval_pv(perl_start_code, FALSE);
+	 PUSHMARK(sp) ;
+	 perl_eval_pv(perl_start_code, FALSE);
+	 if (SvTRUE(ERRSV))
+		{
+		  display_message(ERROR_MESSAGE,"initialise_interpreter.  "
+			 "Uh oh - %s\n", SvPV(ERRSV, n_a)) ;
+		  POPs ;
+		  return_code = 0;
+		}
+
+	 number_of_load_commands = sizeof (load_commands) / sizeof (char *);
+	 for (i = 0 ; i < number_of_load_commands && return_code ; i++)
+		{
+		  perl_eval_pv(load_commands[i], FALSE);
 		  if (SvTRUE(ERRSV))
-		  {
-			  display_message(ERROR_MESSAGE,"initialise_interpreter.  "
-				  "Uh oh - %s\n", SvPV(ERRSV, n_a)) ;
-			  POPs ;
-			  return_code = 0;
-		  }
-
-		  if (*redirect_output)
 			 {
-				PUSHMARK(sp) ;
-				perl_filehandle = filehandles[1];
-				XPUSHs(sv_2mortal(newSViv(perl_filehandle)));
-				PUTBACK;
-				perl_call_pv("Perl_cmiss::remap_descriptor", G_DISCARD);
+				display_message(ERROR_MESSAGE,"initialise_interpreter.  "
+				  "Uh oh - %s\n", SvPV(ERRSV, n_a)) ;
+				POPs ;
+				return_code = 0;
 			 }
+		}
 
-		  number_of_load_commands = sizeof (load_commands) / sizeof (char *);
-		  for (i = 0 ; i < number_of_load_commands && return_code ; i++)
-		  {
-			  perl_eval_pv(load_commands[i], FALSE);
-			  if (SvTRUE(ERRSV))
-			  {
-				  display_message(ERROR_MESSAGE,"initialise_interpreter.  "
-					  "Uh oh - %s\n", SvPV(ERRSV, n_a)) ;
-				  POPs ;
-				  return_code = 0;
-			  }
-		  }
+	 FREETMPS ;
+	 LEAVE ;
 
-		  FREETMPS ;
-		  LEAVE ;
-	  }
-
-  }
-  else
-  {
-	  display_message(ERROR_MESSAGE,"initialise_interpreter.  "
-		  "Unable to create pipes") ;
-	  return_code = 0;
   }
 
   *status = return_code;
@@ -169,6 +148,49 @@ and then executes the returned strings
 	*status = 1;
 }
 
+void redirect_interpreter_output_(int *status)
+/*******************************************************************************
+LAST MODIFIED : 25 August 2000
+
+DESCRIPTION:
+This redirects the output from stdout to a pipe so that the handle_output
+routine can write this to the command window.
+==============================================================================*/
+{
+  int filehandles[2], return_code;
+  IV perl_filehandle;
+
+  return_code = 1;
+
+  if (0 == pipe (filehandles))
+  {
+	 dSP ;
+	 
+	 perl_interpreter_filehandle = filehandles[0];
+	  
+	 ENTER ;
+	 SAVETMPS;
+
+	 PUSHMARK(sp) ;
+	 perl_filehandle = filehandles[1];
+	 XPUSHs(sv_2mortal(newSViv(perl_filehandle)));
+	 PUTBACK;
+	 perl_call_pv("Perl_cmiss::remap_descriptor", G_DISCARD);
+	 
+	 FREETMPS ;
+	 LEAVE ;
+
+  }
+  else
+  {
+	  display_message(ERROR_MESSAGE,"redirect_interpreter_output.  "
+		  "Unable to create pipes") ;
+	  return_code = 0;
+  }
+
+  *status = return_code;
+}
+
 static int handle_output(void)
 /*******************************************************************************
 LAST MODIFIED : 19 May 2000
@@ -185,26 +207,29 @@ and then executes the returned strings
 	
 	return_code = 1;
 
-	FD_ZERO(&readfds);
-	FD_SET(perl_interpreter_filehandle, &readfds);
-	timeout_struct.tv_sec = 0;
-	timeout_struct.tv_usec = 0;
-	
-	/* Empty the output buffer and send it to the screen */
-	flags = fcntl (perl_interpreter_filehandle, F_GETFL);
-	/*???DB.  Wouldn't compile at home.  O_NDELAY is equivalent to
-	  FNDELAY */
-	/*					flags &= FNDELAY;*/
-	flags &= O_NDELAY;
-	flags &= O_NONBLOCK;
-	fcntl (perl_interpreter_filehandle, F_SETFL, flags);
-	while (select(FD_SETSIZE, &readfds, NULL, NULL, &timeout_struct))
+	if (perl_interpreter_filehandle)
 	  {
-		 if (read_length = read(perl_interpreter_filehandle, (void *)buffer, sizeof(buffer) - 1))
+		 FD_ZERO(&readfds);
+		 FD_SET(perl_interpreter_filehandle, &readfds);
+		 timeout_struct.tv_sec = 0;
+		 timeout_struct.tv_usec = 0;
+		 
+		 /* Empty the output buffer and send it to the screen */
+		 flags = fcntl (perl_interpreter_filehandle, F_GETFL);
+		 /*???DB.  Wouldn't compile at home.  O_NDELAY is equivalent to
+			FNDELAY */
+		 /*					flags &= FNDELAY;*/
+		 flags &= O_NDELAY;
+		 flags &= O_NONBLOCK;
+		 fcntl (perl_interpreter_filehandle, F_SETFL, flags);
+		 while (select(FD_SETSIZE, &readfds, NULL, NULL, &timeout_struct))
 			{
-			  buffer[read_length] = 0;
-			  display_message(INFORMATION_MESSAGE,
-				 "%s", buffer) ;				
+			  if (read_length = read(perl_interpreter_filehandle, (void *)buffer, sizeof(buffer) - 1))
+				 {
+					buffer[read_length] = 0;
+					display_message(INFORMATION_MESSAGE,
+					  "%s", buffer) ;				
+				 }
 			}
 	  }
 	return (return_code);
