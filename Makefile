@@ -319,6 +319,7 @@ ifeq ($(TASK),)
 endif
 
 # if either SHARED_OBJECT is false or INCLUDE_PERL is true, set STATIC_PERL_LIB 
+SET_STATIC_PERL_LIB = false
 ifneq ($(SHARED_OBJECT),true)
   SET_STATIC_PERL_LIB = true
 else
