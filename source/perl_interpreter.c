@@ -474,6 +474,8 @@ Takes a <command_string>, processes this through the Perl interpreter.
 					}
 					sprintf(wrapped_command, "Perl_cmiss::execute_command('%s')",
 						escaped_command);
+
+					free (escaped_command);
 				}
 				else
 				{
