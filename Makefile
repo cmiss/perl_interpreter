@@ -29,7 +29,9 @@ ifndef DEBUG
   endif
 endif
 
-ifeq ($(filter-out IRIX%,$(SYSNAME)),)# SGI
+# set architecture dependent directories and default options
+ARCH_DIR = $(SYSNAME)-$(ABI)# default
+ifeq ($(SYSNAME:IRIX%=),)# SGI
   # Specify what application binary interface (ABI) to use i.e. 32, n32 or 64
   ifndef ABI
     ifdef SGI_ABI
@@ -42,8 +44,10 @@ ifeq ($(filter-out IRIX%,$(SYSNAME)),)# SGI
   ifndef MIPS
     # Using mips3 for most basic version on esu* machines
     # as there are still some Indys around.
+    # Although mp versions are unlikely to need mips3 they are made this way
+    # because it makes finding library locations easier.
     MIPS = 4
-    ifeq ($(filter-out esu%,$(NODENAME)),)
+    ifeq ($(NODENAME:esu%=),)
       ifeq ($(ABI),n32)
         ifneq ($(DEBUG),false)
           MIPS=3
@@ -52,16 +56,33 @@ ifeq ($(filter-out IRIX%,$(SYSNAME)),)# SGI
     endif
   endif
   INSTRUCTION := mips$(MIPS)
-  ARCH_DIR := mips-$(ABI)-irix
+  ARCH_DIR := $(INSTRUCTION)-$(ABI)
+  NEW_INSTRUCTION := mips
+  OPERATING_SYSTEM := irix
 endif
 ifeq ($(SYSNAME),Linux)
-  ARCH_DIR := i686-linux
+  ARCH_DIR := linux86
+  ifndef STATIC
+    STATIC = true
+  endif
+  ifndef ABI
+    ABI = 32
+  endif
+  NEW_INSTRUCTION := i686
+  OPERATING_SYSTEM := linux
 endif
 ifeq ($(SYSNAME),win32)
-  ARCH_DIR := i386-win32
+  ARCH_DIR := win32
+  ifndef STATIC
+    STATIC = true
+  endif
+  NEW_INSTRUCTION := i386
+  OPERATING_SYSTEM := win32
 endif
 ifeq ($(SYSNAME),SunOS)
-  ARCH_DIR := solaris-$(ABI)
+  ARCH_DIR = solaris-$(ABI)
+  NEW_INSTRUCTION := sunos # ????
+  OPERATING_SYSTEM := solaris
 endif
 ifeq ($(SYSNAME),AIX)
   ifndef ABI
@@ -69,18 +90,26 @@ ifeq ($(SYSNAME),AIX)
       ifneq ($(OBJECT_MODE),32_64)
         ABI = $(OBJECT_MODE)
       endif
+    else
+      ABI = 32
     endif
   endif
-  ARCH_DIR := rs6000-$(ABI)-aix
-endif
-ifndef ARCH_DIR
-   # set architecture dependent directories and default options
-   ARCH_DIR := $(SYSNAME)-$(ABI)# default
+  ARCH_DIR = aix-$(ABI)
+  NEW_INSTRUCTION := rs6000
+  OPERATING_SYSTEM := aix
 endif
 
-ifndef ABI
-  ABI = 32# for preprocess_fortran.pl
-endif
+BIN_ARCH_DIR = $(NEW_INSTRUCTION)-$(OPERATING_SYSTEM)
+ifdef ABI
+  ifeq ($(SYSNAME),Linux)
+    # ABI always ends up getting set, but we don't want it for Linux
+    LIB_ARCH_DIR := $(NEW_INSTRUCTION)-$(OPERATING_SYSTEM)
+  else
+    LIB_ARCH_DIR := $(NEW_INSTRUCTION)-$(ABI)-$(OPERATING_SYSTEM)
+  endif
+else # ABI
+  LIB_ARCH_DIR = $(NEW_INSTRUCTION)-$(OPERATING_SYSTEM)
+endif # ABI
 
 ifneq ($(DEBUG),false)
   OPT_SUFFIX = -debug
@@ -101,12 +130,7 @@ endif
 #need to override this to false and you must have the corresponding
 #static libperl.a
 ifndef USE_DYNAMIC_LOADER
-  ifeq ($(SYSNAME),Linux)
-     #SAB Gradually adding OS's as I get it working.
-     USE_DYNAMIC_LOADER = true
-  else
-     USE_DYNAMIC_LOADER = false
-  endif
+  USE_DYNAMIC_LOADER = true
 endif
 
 #This routine is recursivly called for each possible dynamic version
@@ -237,7 +261,7 @@ endif
 WORKING_DIR := generated/$(PERL_VERSION)/$(PERL_ARCHNAME)$(OPT_SUFFIX)$(SHARED_SUFFIX)
 C_INCLUDE_DIRS = $(PERL_ARCHLIB)/CORE $(WORKING_DIR)
 
-LIBRARY_ROOT_DIR := lib/$(ARCH_DIR)
+LIBRARY_ROOT_DIR := lib/$(LIB_ARCH_DIR)
 LIBRARY_VERSION := $(PERL_VERSION)/$(PERL_ARCHNAME)$(SHARED_LIB_SUFFIX)
 LIBRARY_DIR := $(LIBRARY_ROOT_DIR)/$(LIBRARY_VERSION)
 ifneq ($(SHARED_OBJECT), true)
@@ -366,13 +390,19 @@ ifeq ($(USE_DYNAMIC_LOADER),true)
    #Dynamic loading perl interpreter
    #Note that the blank line in the define is useful.
    define SHARED_BUILD_RULE
-      $(MAKE) --no-print-directory USE_DYNAMIC_LOADER=false SHARED_OBJECT=true CMISS32_PERL=$(perl_executable)
+      $(MAKE) --no-print-directory USE_DYNAMIC_LOADER=false SHARED_OBJECT=true CMISS$(subst n,N,${ABI})_PERL=$(perl_executable)
 
    endef
    ifneq ($(wildcard ${CMISS_ROOT}/perl),)
-      SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-i386-linux*/perl)
-      SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-i686-linux*/perl)
-   else
+      ifeq ($(SYSNAME),Linux)
+         SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-i386-linux*/perl)
+         SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-i686-linux*/perl)
+      endif
+      ifeq ($(filter-out IRIX%,$(SYSNAME)),)# SGI
+         SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-irix-${ABI}*/perl)
+      endif
+   endif
+   ifeq ($(filter-out ${PERL},${SHARED_PERL_EXECUTABLES}),)
       SHARED_PERL_EXECUTABLES += ${PERL}
    endif
    SHARED_INTERPRETER_BUILDS = $(foreach perl_executable, $(SHARED_PERL_EXECUTABLES), $(SHARED_BUILD_RULE))
@@ -517,7 +547,7 @@ ifeq ($(USE_DYNAMIC_LOADER),true)
    endif
    SHARED_LIBRARY_HEADERS = $(patsubst %.so, %.soh, $(SHARED_LIBRARIES))
 
-   UID2UIDH = ${CMISS_ROOT}/cmgui/utilities/i686-linux/uid2uidh
+   UID2UIDH = ${CMISS_ROOT}/cmgui/utilities/$(BIN_ARCH_DIR)/uid2uidh
 
   .SUFFIXES : .so .soh
 
