@@ -42,6 +42,72 @@ void xs_init()
 	newXS("DynaLoader::boot_DynaLoader", boot_DynaLoader, file);
 }
 
+static char *interpreter_duplicate_string(char *source_string, int length)
+/*******************************************************************************
+LAST MODIFIED : 7 September 2000
+
+DESCRIPTION :
+Returns an allocated copy of <source_string>, or NULL in case of error.  If
+<length> is greater than zero than this is the maximum number of characters
+copied and the NULL termination is added after that length.
+==============================================================================*/
+{
+	char *copy_of_string;
+
+	if (source_string)
+	{
+		if (length)
+		{
+			/* Can't use ALLOCATE as this library is used by CM as well */
+			if (copy_of_string = (char *)malloc(length+1))
+			{
+				strncpy(copy_of_string,source_string,length);
+				copy_of_string[length] = 0;
+			}
+			else
+			{
+				display_message(ERROR_MESSAGE,"interpreter_duplicate_string.  Not enough memory");
+			}
+		}
+		else
+		{
+			if (copy_of_string = (char *)malloc(strlen(source_string)+1))
+			{
+				strcpy(copy_of_string,source_string);
+			}
+			else
+			{
+				display_message(ERROR_MESSAGE,"interpreter_duplicate_string.  Not enough memory");
+			}
+		}
+	}
+	else
+	{
+		display_message(ERROR_MESSAGE,"interpreter_duplicate_string.  Invalid argument(s)");
+		copy_of_string=(char *)NULL;
+	}
+
+	return (copy_of_string);
+} /* interpreter_duplicate_string */
+
+void interpreter_destroy_string_(char *string)
+/*******************************************************************************
+LAST MODIFIED : 7 September 2000
+
+DESCRIPTION :
+Frees the memory associated with a string allocated by the interpreter.
+==============================================================================*/
+{
+	if (string)
+	{
+		free(string);
+	}
+	else
+	{
+		display_message(ERROR_MESSAGE,"interpreter_duplicate_string.  Invalid argument(s)");
+	}
+} /* interpreter_duplicate_string */
+
 void create_interpreter_(int *status)
 /*******************************************************************************
 LAST MODIFIED : 22 August 2000
@@ -58,16 +124,15 @@ the display_message routine.
 	 "local $SIG{__WARN__} = sub { die $_[0] };\n"
 	 "BEGIN {\n"
 #include "strict.pmh"
-	 "$| = 1;\n"
 	 "import strict \"subs\";\n"
 	 "}\n"
 #include "Balanced.pmh"
 #include "Perl_cmiss.pmh"
+	 "$| = 1;\n"
     ;
 
   char *load_commands[] =
-  { "import cmiss",
-	 "Perl_cmiss::register_keyword assign",
+  { "Perl_cmiss::register_keyword assign",
 	 "Perl_cmiss::register_keyword cell",
 	 "Perl_cmiss::register_keyword command_window",
 	 "Perl_cmiss::register_keyword create",
@@ -451,3 +516,357 @@ Takes a <command_string>, processes this through the Perl interpreter.
 
 	*status = return_code;
 } /* interpret_command_ */
+
+void interpreter_evaluate_integer_(char *expression, int *result, int *status)
+/*******************************************************************************
+LAST MODIFIED : 6 September 2000
+
+DESCRIPTION:
+Use the perl_interpreter to evaluate the given string <expression> and return 
+its value as an integer <result>.  If the string <expression> does not evaluate
+as an integer then <status> will be set to zero.
+==============================================================================*/
+{
+	int return_code;
+
+	STRLEN n_a;
+	dSP ;
+	SV *sv_result;
+ 
+	ENTER ;
+	SAVETMPS;
+
+	return_code = 1;
+
+	if (expression && result && status)
+	{
+		if (perl_interpreter_filehandle_in)
+		{
+			/* Redirect STDOUT and STDERR */
+			dup2(perl_interpreter_filehandle_in, STDOUT_FILENO);
+			dup2(perl_interpreter_filehandle_in, STDERR_FILENO);
+		}
+				
+		sv_result = perl_eval_pv(expression, FALSE);
+
+		/* Change STDOUT and STDERR back again */
+		if (keep_stdout)
+		{
+			dup2(keep_stdout, STDOUT_FILENO);
+		}
+		if (keep_stderr)
+		{
+			dup2(keep_stderr, STDERR_FILENO);
+		}
+ 
+		handle_output();
+
+		if (SvTRUE(ERRSV))
+		{
+			display_message(ERROR_MESSAGE,
+				"%s", SvPV(ERRSV, n_a)) ;
+			POPs ;
+			return_code = 0;
+		}
+		else
+		{
+			if (SvIOK(sv_result))
+			{
+				*result = SvIV(sv_result);
+				return_code = 1;
+			}
+			else
+			{
+				display_message(ERROR_MESSAGE,"interpreter_evaluate_integer.  "
+					"String \"%s\" does not evaluate to an integer.", expression);
+				return_code = 0;
+			}
+		}
+	}
+	else
+	{
+		display_message(ERROR_MESSAGE,"interpreter_evaluate_integer.  "
+			"Invalid arguments.") ;
+		return_code = 0;
+	}
+
+	FREETMPS ;
+	LEAVE ;
+
+	*status = return_code;
+} /* interpreter_evaluate_integer_ */
+
+void interpreter_set_integer_(char *variable_name, int *value, int *status)
+/*******************************************************************************
+LAST MODIFIED : 6 September 2000
+
+DESCRIPTION:
+Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
+==============================================================================*/
+{
+	int return_code;
+
+	SV *sv_variable;
+
+	ENTER ;
+	SAVETMPS;
+
+	return_code = 1;
+
+	if (variable_name && value && status)
+	{
+		sv_variable = perl_get_sv(variable_name, TRUE);
+		sv_setiv(sv_variable, *value);
+	}
+	else
+	{
+		display_message(ERROR_MESSAGE,"interpreter_evaluate_integer.  "
+			"Invalid arguments.") ;
+		return_code = 0;
+	}
+ 
+	FREETMPS ;
+	LEAVE ;
+
+	*status = return_code;
+} /* interpreter_set_integer_ */
+
+void interpreter_evaluate_double_(char *expression, double *result, int *status)
+/*******************************************************************************
+LAST MODIFIED : 6 September 2000
+
+DESCRIPTION:
+Use the perl_interpreter to evaluate the given string <expression> and return 
+its value as an double <result>.  If the string <expression> does not evaluate
+as an double then <status> will be set to zero.
+==============================================================================*/
+{
+	int return_code;
+
+	STRLEN n_a;
+	dSP ;
+	SV *sv_result;
+ 
+	ENTER ;
+	SAVETMPS;
+
+	return_code = 1;
+
+	if (expression && result && status)
+	{
+		if (perl_interpreter_filehandle_in)
+		{
+			/* Redirect STDOUT and STDERR */
+			dup2(perl_interpreter_filehandle_in, STDOUT_FILENO);
+			dup2(perl_interpreter_filehandle_in, STDERR_FILENO);
+		}
+				
+		sv_result = perl_eval_pv(expression, FALSE);
+
+		/* Change STDOUT and STDERR back again */
+		if (keep_stdout)
+		{
+			dup2(keep_stdout, STDOUT_FILENO);
+		}
+		if (keep_stderr)
+		{
+			dup2(keep_stderr, STDERR_FILENO);
+		}
+ 
+		handle_output();
+
+		if (SvTRUE(ERRSV))
+		{
+			display_message(ERROR_MESSAGE,
+				"%s", SvPV(ERRSV, n_a)) ;
+			POPs ;
+			return_code = 0;
+		}
+		else
+		{
+			if (SvNOK(sv_result))
+			{
+				*result = SvNV(sv_result);
+				return_code = 1;
+			}
+			else
+			{
+				display_message(ERROR_MESSAGE,"interpreter_evaluate_double.  "
+					"String \"%s\" does not evaluate to a double.", expression);
+				return_code = 0;
+			}
+		}
+	}
+	else
+	{
+		display_message(ERROR_MESSAGE,"interpreter_evaluate_double.  "
+			"Invalid arguments.") ;
+		return_code = 0;
+	}
+
+	FREETMPS ;
+	LEAVE ;
+
+	*status = return_code;
+} /* interpreter_evaluate_double_ */
+
+void interpreter_set_double_(char *variable_name, double *value, int *status)
+/*******************************************************************************
+LAST MODIFIED : 6 September 2000
+
+DESCRIPTION:
+Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
+==============================================================================*/
+{
+	int return_code;
+
+	SV *sv_variable;
+
+	ENTER ;
+	SAVETMPS;
+
+	return_code = 1;
+
+	if (variable_name && value && status)
+	{
+		sv_variable = perl_get_sv(variable_name, TRUE);
+		sv_setnv(sv_variable, *value);
+	}
+	else
+	{
+		display_message(ERROR_MESSAGE,"interpreter_evaluate_double.  "
+			"Invalid arguments.") ;
+		return_code = 0;
+	}
+ 
+	FREETMPS ;
+	LEAVE ;
+
+	*status = return_code;
+} /* interpreter_set_double_ */
+
+void interpreter_evaluate_string(char *expression, char **result, int *status)
+/*******************************************************************************
+LAST MODIFIED : 7 September 2000
+
+DESCRIPTION:
+Use the perl_interpreter to evaluate the given string <expression> and return 
+its value as an string in <result>.  The string is allocated and it is up to 
+the calling routine to release the string with Interpreter_destroy_string when
+it is done.  If the string <expression> does not evaluate
+as an string then <status> will be set to zero and <*result> will be NULL.
+==============================================================================*/
+{
+	char *internal_string;
+	int return_code;
+
+	STRLEN n_a, string_length;
+	dSP ;
+	SV *sv_result;
+ 
+	ENTER ;
+	SAVETMPS;
+
+	return_code = 1;
+
+	*result = (char *)NULL;
+	if (expression && result && status)
+	{
+		if (perl_interpreter_filehandle_in)
+		{
+			/* Redirect STDOUT and STDERR */
+			dup2(perl_interpreter_filehandle_in, STDOUT_FILENO);
+			dup2(perl_interpreter_filehandle_in, STDERR_FILENO);
+		}
+				
+		sv_result = perl_eval_pv(expression, FALSE);
+
+		/* Change STDOUT and STDERR back again */
+		if (keep_stdout)
+		{
+			dup2(keep_stdout, STDOUT_FILENO);
+		}
+		if (keep_stderr)
+		{
+			dup2(keep_stderr, STDERR_FILENO);
+		}
+ 
+		handle_output();
+
+		if (SvTRUE(ERRSV))
+		{
+			display_message(ERROR_MESSAGE,
+				"%s", SvPV(ERRSV, n_a)) ;
+			POPs ;
+			return_code = 0;
+		}
+		else
+		{
+			if (SvPOK(sv_result))
+			{
+				internal_string = SvPV(sv_result, string_length);
+				if (*result = interpreter_duplicate_string(internal_string, string_length))
+				{
+					return_code = 1;
+				}
+				else
+				{
+					return_code = 0;
+				}
+			}
+			else
+			{
+				display_message(ERROR_MESSAGE,"interpreter_evaluate_string.  "
+					"String \"%s\" does not evaluate to a string.", expression);
+				return_code = 0;
+			}
+		}
+	}
+	else
+	{
+		display_message(ERROR_MESSAGE,"interpreter_evaluate_string.  "
+			"Invalid arguments.") ;
+		return_code = 0;
+	}
+
+	FREETMPS ;
+	LEAVE ;
+
+	*status = return_code;
+} /* interpreter_evaluate_string_ */
+
+void interpreter_set_string_(char *variable_name, char *value, int *status)
+/*******************************************************************************
+LAST MODIFIED : 7 September 2000
+
+DESCRIPTION:
+Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
+==============================================================================*/
+{
+	int return_code;
+
+	SV *sv_variable;
+
+	ENTER ;
+	SAVETMPS;
+
+	return_code = 1;
+
+	if (variable_name && value && status)
+	{
+		sv_variable = perl_get_sv(variable_name, TRUE);
+		sv_setpv(sv_variable, value);
+	}
+	else
+	{
+		display_message(ERROR_MESSAGE,"interpreter_evaluate_string.  "
+			"Invalid arguments.") ;
+		return_code = 0;
+	}
+ 
+	FREETMPS ;
+	LEAVE ;
+
+	*status = return_code;
+} /* interpreter_set_string_ */
+

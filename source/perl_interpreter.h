@@ -59,6 +59,89 @@ This redirects the output from stdout to a pipe so that the handle_output
 routine can write this to the command window.
 ==============================================================================*/
 
+void interpreter_evaluate_integer_(char *exprssion, int *result, int *status);
+#if ! defined (FORTRAN_INTERPRETER_INTERFACE)
+#define interpreter_evaluate_integer interpreter_evaluate_integer_
+#endif /* ! defined (FORTRAN_INTERPRETER_INTERFACE) */
+/*******************************************************************************
+LAST MODIFIED : 6 September 2000
+
+DESCRIPTION:
+Use the perl_interpreter to evaluate the given string <expression> and return 
+its value as an integer <result>.  If the string <expression> does not evaluate
+as an integer then <status> will be set to zero.
+==============================================================================*/
+
+void interpreter_set_integer_(char *variable_name, int *value, int *status);
+#if ! defined (FORTRAN_INTERPRETER_INTERFACE)
+#define interpreter_set_integer interpreter_set_integer_
+#endif /* ! defined (FORTRAN_INTERPRETER_INTERFACE) */
+/*******************************************************************************
+LAST MODIFIED : 6 September 2000
+
+DESCRIPTION:
+Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
+==============================================================================*/
+
+void interpreter_evaluate_double_(char *expression, double *result, int *status);
+#if ! defined (FORTRAN_INTERPRETER_INTERFACE)
+#define interpreter_evaluate_double interpreter_evaluate_double_
+#endif /* ! defined (FORTRAN_INTERPRETER_INTERFACE) */
+/*******************************************************************************
+LAST MODIFIED : 7 September 2000
+
+DESCRIPTION:
+Use the perl_interpreter to evaluate the given string <expression> and return 
+its value as an double <result>.  If the string <expression> does not evaluate
+as an double then <status> will be set to zero.
+==============================================================================*/
+
+void interpreter_set_double_(char *variable_name, double *value, int *status);
+#if ! defined (FORTRAN_INTERPRETER_INTERFACE)
+#define interpreter_set_double interpreter_set_double_
+#endif /* ! defined (FORTRAN_INTERPRETER_INTERFACE) */
+/*******************************************************************************
+LAST MODIFIED : 7 September 2000
+
+DESCRIPTION:
+Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
+==============================================================================*/
+
+void interpreter_evaluate_string_(char *expression, char **result, int *status);
+#if ! defined (FORTRAN_INTERPRETER_INTERFACE)
+#define interpreter_evaluate_string interpreter_evaluate_string_
+#endif /* ! defined (FORTRAN_INTERPRETER_INTERFACE) */
+/*******************************************************************************
+LAST MODIFIED : 7 September 2000
+
+DESCRIPTION:
+Use the perl_interpreter to evaluate the given string <expression> and return 
+its value as an string in <result>.  If the string <expression> does not evaluate
+as an string then <status> will be set to zero.
+==============================================================================*/
+
+void interpreter_destroy_string_(char *string);
+#if ! defined (FORTRAN_INTERPRETER_INTERFACE)
+#define interpreter_destroy_string interpreter_destroy_string_
+#endif /* ! defined (FORTRAN_INTERPRETER_INTERFACE) */
+/*******************************************************************************
+LAST MODIFIED : 7 September 2000
+
+DESCRIPTION :
+Frees the memory associated with a string allocated by the interpreter.
+==============================================================================*/
+
+void interpreter_set_string_(char *variable_name, char *value, int *status);
+#if ! defined (FORTRAN_INTERPRETER_INTERFACE)
+#define interpreter_set_string interpreter_set_string_
+#endif /* ! defined (FORTRAN_INTERPRETER_INTERFACE) */
+/*******************************************************************************
+LAST MODIFIED : 7 September 2000
+
+DESCRIPTION:
+Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
+==============================================================================*/
+
 /*
 From message.h:
 ===============
