@@ -58,7 +58,7 @@ the display_message routine.
 	 "local $SIG{__WARN__} = sub { die $_[0] };\n"
 	 "BEGIN {\n"
 #include "strict.pmh"
-	 ";\n"
+	 "$| = 1;\n"
 	 "import strict \"subs\";\n"
 	 "}\n"
 #include "Balanced.pmh"
@@ -219,31 +219,36 @@ and then executes the returned strings
 	
 	return_code = 1;
 
+	/* if (perl_interpreter_filehandle_in)
+	{
+		fsync(perl_interpreter_filehandle_in);
+		}*/
 	if (perl_interpreter_filehandle_out)
-	  {
-		 FD_ZERO(&readfds);
-		 FD_SET(perl_interpreter_filehandle_out, &readfds);
-		 timeout_struct.tv_sec = 0;
-		 timeout_struct.tv_usec = 0;
+	{
+		FD_ZERO(&readfds);
+		FD_SET(perl_interpreter_filehandle_out, &readfds);
+		timeout_struct.tv_sec = 0;
+		timeout_struct.tv_usec = 0;
 		 
-		 /* Empty the output buffer and send it to the screen */
-		 flags = fcntl (perl_interpreter_filehandle_out, F_GETFL);
-		 /*???DB.  Wouldn't compile at home.  O_NDELAY is equivalent to
-			FNDELAY */
-		 /*					flags &= FNDELAY;*/
-		 flags &= O_NDELAY;
-		 flags &= O_NONBLOCK;
-		 fcntl (perl_interpreter_filehandle_out, F_SETFL, flags);
-		 while (select(FD_SETSIZE, &readfds, NULL, NULL, &timeout_struct))
+		/* Empty the output buffer and send it to the screen */
+		flags = fcntl (perl_interpreter_filehandle_out, F_GETFL);
+		/*???DB.  Wouldn't compile at home.  O_NDELAY is equivalent to
+		  FNDELAY */
+		/*					flags &= FNDELAY;*/
+		flags &= O_NDELAY;
+		flags &= O_NONBLOCK;
+		fcntl (perl_interpreter_filehandle_out, F_SETFL, flags);
+		/* fsync(perl_interpreter_filehandle_out); */
+		while (select(FD_SETSIZE, &readfds, NULL, NULL, &timeout_struct))
+		{
+			if (read_length = read(perl_interpreter_filehandle_out, (void *)buffer, sizeof(buffer) - 1))
 			{
-			  if (read_length = read(perl_interpreter_filehandle_out, (void *)buffer, sizeof(buffer) - 1))
-				 {
-					buffer[read_length] = 0;
-					display_message(INFORMATION_MESSAGE,
-					  "%s", buffer) ;				
-				 }
+				buffer[read_length] = 0;
+				display_message(INFORMATION_MESSAGE,
+					"%s", buffer) ;				
 			}
-	  }
+		}
+	}
 	return (return_code);
 } /* handle_output */
 
