@@ -3,10 +3,16 @@
 MAKEFLAGS = --no-builtin-rules -I
 
 #-----------------------------------------------------------------------------
+
 # files and directories
 
 SOURCE_DIR = source
+ifeq (${HOSTTYPE},iris4d)
 WORKING_DIR = generated/mips3-n32-debug
+endif
+ifeq (${HOSTTYPE},i386-linux)
+WORKING_DIR = generated/linux-debug
+endif
 LIBRARY_DIR = $(WORKING_DIR)
 
 C_SOURCES := $(wildcard $(SOURCE_DIR)/*.c )
@@ -20,7 +26,8 @@ LIBRARY = $(LIBRARY_DIR)/libperlinterpreter.a
 
 PERL_PATH = $(shell perl -MConfig -e 'print "$$Config{archlib}\n"')
 DYNALOADER_LIB = $(PERL_PATH)/auto/DynaLoader/DynaLoader.a
-PERL_CMISS_LIB = Perl_cmiss/blib/arch/auto/Perl_cmiss/Perl_cmiss.a
+PERL_CMISS_MAKEFILE = $(WORKING_DIR)/Perl_cmiss.make
+PERL_CMISS_LIB = $(WORKING_DIR)/auto/Perl_cmiss/Perl_cmiss.a
 PERL_LIB = $(PERL_PATH)/CORE/libperl.a
 
 CINCLUDE_DIRS = $(PERL_PATH)/CORE
@@ -28,12 +35,23 @@ CINCLUDE_DIRS = $(PERL_PATH)/CORE
 #-----------------------------------------------------------------------------
 # compiling commands
 
-CC = cc
-CFLAGS = -c -g -mips3
+CC = cc -c
+CFLAGS = -g
 CPPFLAGS = $(addprefix -I, $(CINCLUDE_DIRS) $(WORKING_DIR) )
-F90C = f90
-F90FLAGS = -c -g -mips3
+ifeq (${HOSTTYPE},i386-linux)
+F90C = pgf90 -c
+else
+F90C = f90 -c
+endif
+F90FLAGS = -g
 LDFLAGS = -r -mips3
+ifeq (${HOSTTYPE},iris4d)
+CFLAGS += -mips3
+F90FLAGS += -mips3
+LDFLAGS += -mips3
+else
+CPPFLAGS += -Dbool=char -DHAS_BOOL
+endif
 AR = ar
 ARFLAGS = -cr
 
@@ -63,8 +81,9 @@ $(F_OBJ) : $(foreach unit, $(F_UNITS), $(WORKING_DIR)/$(unit).o )
 # 	ld $(LDFLAGS) -o $(TEMP_OBJ) $^
 # 	$(AR) $(ARFLAGS) $@ $(TEMP_OBJ)
 
-$(PERL_CMISS_LIB) : 
-	cd Perl_cmiss ; perl Makefile.PL ; $(MAKE) static
+$(PERL_CMISS_LIB) : Perl_cmiss/Makefile.PL
+	cd Perl_cmiss ; perl Makefile.PL LINKTYPE=static INST_ARCHLIB=../$(WORKING_DIR) FIRST_MAKEFILE=../$(PERL_CMISS_MAKEFILE)
+	$(MAKE) --directory=Perl_cmiss --file=../$(PERL_CMISS_MAKEFILE) CCFLAGS="$(CFLAGS) $(CPPFLAGS)" static
 
 #-----------------------------------------------------------------------------
 # implicit rules for making the object dependencies
