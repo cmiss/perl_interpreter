@@ -18,20 +18,32 @@ ifndef NODENAME
   endif
 endif
 
+ifndef MACHNAME
+  MACHNAME := $(shell uname -m)
+  ifeq ($(MACHNAME),)
+    $(error error with shell command uname -m)
+  endif
+endif
+
 ifndef DEBUG
   ifndef OPT
-    OPT = false
+    OPT := false
   endif
   ifeq ($(OPT),false)
-    DEBUG=true
+    DEBUG := true
   else
-    DEBUG=false
+    DEBUG := false
   endif
 endif
 
 # set architecture dependent directories and default options
-ARCH_DIR = $(SYSNAME)-$(ABI)# default
-ifeq ($(SYSNAME:IRIX%=),)# SGI
+
+# defaults
+INSTRUCTION=$(MACHNAME)
+BIN_ARCH_DIR = $(INSTRUCTION)-$(OPERATING_SYSTEM)
+LIB_ARCH_DIR = $(INSTRUCTION)-$(ABI)-$(OPERATING_SYSTEM)
+
+ifeq ($(filter-out IRIX%,$(SYSNAME)),)# SGI
   # Specify what application binary interface (ABI) to use i.e. 32, n32 or 64
   ifndef ABI
     ifdef SGI_ABI
@@ -47,7 +59,7 @@ ifeq ($(SYSNAME:IRIX%=),)# SGI
     # Although mp versions are unlikely to need mips3 they are made this way
     # because it makes finding library locations easier.
     MIPS = 4
-    ifeq ($(NODENAME:esu%=),)
+    ifeq ($(filter-out esu%,$(NODENAME)),)
       ifeq ($(ABI),n32)
         ifneq ($(DEBUG),false)
           MIPS=3
@@ -55,37 +67,34 @@ ifeq ($(SYSNAME:IRIX%=),)# SGI
       endif
     endif
   endif
-  INSTRUCTION := mips$(MIPS)
-  ARCH_DIR := $(INSTRUCTION)-$(ABI)
-  NEW_INSTRUCTION := mips
+  INSTRUCTION := mips
   OPERATING_SYSTEM := irix
 endif
 ifeq ($(SYSNAME),Linux)
-  ARCH_DIR := linux86
-  ifndef STATIC
-    STATIC = true
+  OPERATING_SYSTEM := linux
+  LIB_ARCH_DIR = $(INSTRUCTION)-$(OPERATING_SYSTEM)# no ABI
+  ifeq ($(filter-out i%86,$(MACHNAME)),)
+    INSTRUCTION := i686
   endif
   ifndef ABI
-    ABI = 32
+    ifeq ($(filter-out i%86,$(MACHNAME)),)
+      ABI=32
+    endif
+    ifeq ($(MACHNAME),ia64)
+      ABI=64
+    endif
   endif
-  NEW_INSTRUCTION := i686
-  OPERATING_SYSTEM := linux
 endif
-ifeq ($(SYSNAME:CYGWIN%=),)# CYGWIN
+ifeq (filter-out $(SYSNAME),)# CYGWIN
   SYSNAME := win32
 endif
 ifeq ($(SYSNAME),win32)
-  ARCH_DIR := win32
-  ifndef STATIC
-    STATIC = true
-  endif
+  LIB_ARCH_DIR = $(INSTRUCTION)-$(OPERATING_SYSTEM)# no ABI
   ABI=32
-  NEW_INSTRUCTION := i386
+  INSTRUCTION := i386
   OPERATING_SYSTEM := win32
 endif
 ifeq ($(SYSNAME),SunOS)
-  ARCH_DIR = solaris-$(ABI)
-  NEW_INSTRUCTION := sunos # ????
   OPERATING_SYSTEM := solaris
 endif
 ifeq ($(SYSNAME),AIX)
@@ -98,27 +107,14 @@ ifeq ($(SYSNAME),AIX)
       ABI = 32
     endif
   endif
-  ARCH_DIR = aix-$(ABI)
-  NEW_INSTRUCTION := rs6000
+  INSTRUCTION := rs6000
   OPERATING_SYSTEM := aix
 endif
 
-BIN_ARCH_DIR = $(NEW_INSTRUCTION)-$(OPERATING_SYSTEM)
-ifdef ABI
-  ifeq ($(SYSNAME),Linux)
-    # ABI always ends up getting set, but we don't want it for Linux
-    LIB_ARCH_DIR := $(NEW_INSTRUCTION)-$(OPERATING_SYSTEM)
-  else
-    LIB_ARCH_DIR := $(NEW_INSTRUCTION)-$(ABI)-$(OPERATING_SYSTEM)
-  endif
-else # ABI
-  LIB_ARCH_DIR = $(NEW_INSTRUCTION)-$(OPERATING_SYSTEM)
-endif # ABI
-
 ifneq ($(DEBUG),false)
-  OPT_SUFFIX = -debug
+  DEBUG_SUFFIX = -debug
 else
-  OPT_SUFFIX = -opt
+  DEBUG_SUFFIX =
 endif
 
 #This is now the default build version, each libperlinterpreter.so
@@ -158,10 +154,9 @@ endif
 
 # ABI string for environment variables
 # (for location of perl librarys in execuatable)
+ABI_ENV = $(ABI)
 ifeq ($(ABI),n32)
-  ABI_ENV=N32#
-else
-  ABI_ENV=$(ABI)#
+  ABI_ENV = N32
 endif
 
 # Location of perl.
@@ -174,10 +169,18 @@ else
   ifdef CMISS_PERL
     PERL := $(CMISS_PERL)
   else
+    # defaults first
+    PERL = perl# first perl in path
+    ifneq ($(MACHNAME),ia64)
+      ifeq ($(ABI),64)
+        # Need a perl of the same ABI
+        PERL = perl64
+      endif
+    endif
     # Specify the perl on some platforms so that everyone builds with the same.
     ifeq ($(filter-out IRIX%,$(SYSNAME)),)# SGI
       ifeq ($(filter-out esu%,$(NODENAME)),)
-        ifeq ($(INSTRUCTION),mips3)
+        ifeq ($(MIPS),3)
           PERL = ${CMISS_ROOT}/bin/perl 
         else
           ifeq ($(ABI),n32)
@@ -221,20 +224,8 @@ else
     ifeq ($(filter-out esp56%,$(NODENAME)),)
       PERL = ${CMISS_ROOT}/bin/i686-linux/perl
     endif
-    ifndef PERL
-      ifeq ($(ABI),64)
-        # Need a perl of the same ABI
-        PERL = perl64
-      else
-        # Assume 32-bit and first perl in path is suitable for this architecture
-        PERL = perl
-      endif
-    endif
     ifeq ($(SYSNAME),win32)
       PERL = c:/perl/5.6.1/bin/MSWin32-x86/perl.exe
-    endif
-    ifndef PERL
-      $(error PERL not defined)
     endif
   endif
 endif
@@ -288,7 +279,7 @@ else
    SHARED_SUFFIX = -dynamic
    SHARED_LIB_SUFFIX = -dynamic
 endif
-WORKING_DIR := generated/$(PERL_VERSION)/$(PERL_ARCHNAME)$(OPT_SUFFIX)$(SHARED_SUFFIX)
+WORKING_DIR := generated/$(PERL_VERSION)/$(PERL_ARCHNAME)$(DEBUG_SUFFIX)$(SHARED_SUFFIX)
 C_INCLUDE_DIRS = $(PERL_ARCHLIB)/CORE $(WORKING_DIR)
 
 LIBRARY_ROOT_DIR := lib/$(LIB_ARCH_DIR)
@@ -299,9 +290,9 @@ ifneq ($(SHARED_OBJECT), true)
 else
    LIBRARY_SUFFIX = .so
 endif
-LIBRARY_NAME := libperlinterpreter$(OPT_SUFFIX)$(LIBRARY_SUFFIX)
+LIBRARY_NAME := libperlinterpreter$(DEBUG_SUFFIX)$(LIBRARY_SUFFIX)
 LIBRARY := $(LIBRARY_DIR)/$(LIBRARY_NAME)
-LIBRARY_LINK := $(LIBRARY_ROOT_DIR)/libperlinterpreter$(OPT_SUFFIX)$(LIBRARY_SUFFIX)
+LIBRARY_LINK := $(LIBRARY_ROOT_DIR)/libperlinterpreter$(DEBUG_SUFFIX)$(LIBRARY_SUFFIX)
 LIB_EXP := $(patsubst %$(LIBRARY_SUFFIX), %.exp, $(LIBRARY_LINK))
 
 SOURCE_FILES := $(notdir $(wildcard $(SOURCE_DIR)/*.*) )
@@ -346,11 +337,16 @@ OPTCF_FLGS = -O#OPT=true flags for C and fortran only
 OPTC_FLGS =#	OPT=true flags for C only
 
 ifeq ($(filter-out IRIX%,$(SYSNAME)),)# SGI
-  CF_FLGS += -use_readonly_const
+  # The following warning means that the execution of the program is seriously
+  # different from that intended:
+  # cc-1999 cc: WARNING File = zle_tricky.c, Line = 2145
+  # "jumping out of a block containing VLAs" is not currently implemented
+  CFLAGS += -DEBUG:error=1999
+  CF_FLGS += -use_readonly_const -fullwarn
   DBGCF_FLGS += -DEBUG:trap_uninitialized:subscript_check:verbose_runtime
   # warning 158 : Expecting MIPS3 objects: ... MIPS4.
-  L_FLGS += -rdata_shared -DEBUG:error=158 -woff 47
-  CFL_FLGS = -$(ABI) -$(INSTRUCTION)
+  L_FLGS += -rdata_shared -DEBUG:error=158
+  CFL_FLGS = -$(ABI) -mips$(MIPS)
   OPTCF_FLGS = -O3 -OPT:Olimit=8000
   ifeq ($(ABI),n32)
     LD_SHARED += -check_registry /usr/lib32/so_locations
@@ -359,9 +355,23 @@ ifeq ($(filter-out IRIX%,$(SYSNAME)),)# SGI
   endif
 endif
 ifeq ($(SYSNAME),Linux)
-  CPPFLAGS += -Dbool=char -DHAS_BOOL
+  ifeq ($(MACHNAME),ia64)
+    # Intel compilers
+    CC = ecc
+    CFLAGS += -w2# -Wall
+# This doesn't seem to do anything
+#     ifeq ($(ABI),64)
+#       CF_FLGS += -size_lp64
+#     endif
+  else
+    # gcc
+    CPPFLAGS += -Dbool=char -DHAS_BOOL
+  endif
   OPTCF_FLGS = -O2
   SHARED_LINK_LIBRARIES += -lcrypt -ldl
+endif
+ifeq ($(SYSNAME),win32)
+  CC = gcc -fnative-struct
 endif
 ifeq ($(SYSNAME),SunOS)
   # need -xarch=native after -fast
@@ -370,23 +380,25 @@ ifeq ($(SYSNAME),SunOS)
     CFE_FLGS += -xarch=native64
   endif
 endif
-ifeq ($(SYSNAME),win32)
-  CC = gcc -fnative-struct
-endif
 ifeq ($(SYSNAME),AIX)
   CC = xlc
-  # 1506-743 (I) 64-bit portability: possible change of result through conversion ...
-  # FD_SET in sys/time.h does this
   # no -qinfo=gen because perl redefines many symbols
-  CFLAGS += -qinfo=ini:por:pro:trd:tru:use -qsuppress=1506-743
+  CFLAGS += -qinfo=ini:por:pro:trd:tru:use
   ARFLAGS += -X$(ABI)
   # may want -qsrcmsg
   CF_FLGS += -qfullpath
-  CFE_FLGS += -q$(ABI) -qarch=auto
+  CFE_FLGS += -q$(ABI) -qarch=auto -qhalt=e
   L_FLGS += -b$(ABI)
   ifeq ($(ABI),64)
-    CF_FLGS += -qwarn64
+    # 1506-743 (I) 64-bit portability: possible change of result through conversion ...
+    # These don't seem to serious.  Truncations are reported separately.
+    # FD_SET in sys/time.h does this
+    CF_FLGS += -qwarn64 -qsuppress=1506-743
   endif
+  # lapack's dlamch performs an underflow so we don't check that.
+  DBGCF_FLGS += -qfullpath -C -qflttrap=inv:en
+  # -qinitauto for C is bytewise: 7F gives large integers.
+  DBGC_FLGS += -qinitauto=7F
   OPTCF_FLGS = -O3 -qmaxmem=12000 -qtune=auto
   OPTC_FLGS += -qnoignerrno
 endif
@@ -464,7 +476,7 @@ ifeq ($(USE_DYNAMIC_LOADER),true)
    endif
    SHARED_INTERPRETER_BUILDS = $(foreach perl_executable, $(SHARED_PERL_EXECUTABLES), $(SHARED_BUILD_RULE))
    SHARED_VERSION_STRINGS = $(foreach perl_executable, $(SHARED_PERL_EXECUTABLES), $(shell ${perl_executable} -MConfig -e 'print "$$Config{version}/$$Config{archname}"'))
-   SHARED_LIBRARIES = $(foreach version_string, $(SHARED_VERSION_STRINGS), $(LIBRARY_ROOT_DIR)/$(version_string)/libperlinterpreter$(OPT_SUFFIX).so)
+   SHARED_LIBRARIES = $(foreach version_string, $(SHARED_VERSION_STRINGS), $(LIBRARY_ROOT_DIR)/$(version_string)/libperlinterpreter$(DEBUG_SUFFIX).so)
    ifneq ($(STATIC_PERL_LIB),)
       define SUB_WRITE_BUILD_MESSAGE
          @echo 'The static fallback perl built into the interpreter is:'
