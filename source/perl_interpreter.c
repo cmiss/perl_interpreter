@@ -43,6 +43,7 @@ and then executes the returned strings
   char perl_start_code[] = 
 	 "local $SIG{__WARN__} = sub { die $_[0] };\n"
 	 "use strict \"subs\";\n"
+	 "use Text::Balanced;\n"
 	 "my $filedescriptor = shift;\n"
 	 /* Redirect all STDOUT and STDERR to a pipe */
 /*  	 "open (STDOUT, \">&=4\") || die \"can't open fd 4: $!\";\n" */
@@ -128,15 +129,136 @@ and then executes the returned strings
 	 "	 my $match_string = join (\"|\", keys %keywords);\n"
 #if defined (OLD_CODE)
 	 "	 my @tokens = &parse_line('\\s*[\\{\\}\\(\\)]\\s*', \"delimiters\", $command);\n"
-#endif /* defined (OLD_CODE) */
 	 "	 my @tokens; push (@tokens, $command);\n"
+#endif /* defined (OLD_CODE) */
+	 "  my @tokens = ();\n"
+	 "  my $part_token = \"\";\n"
+	 "  my $extracted;\n"
+	 "  my $lc_command;\n"
+	 "  my $continue;\n"
+	 "  while ($command)\n"
+	 "  {\n"
+#if defined (CMISS_DEBUG_EXTRACT)
+	 "    print \"$command   \";\n"
+#endif /* defined (CMISS_DEBUG_EXTRACT) */
+	 "    if ($command =~ s%^(\\s+)%%)\n"
+	 "    {\n"
+#if defined (CMISS_DEBUG_EXTRACT)
+	 "       print \"space: $1\\n\";\n"
+#endif /* defined (CMISS_DEBUG_EXTRACT) */
+	 "       $part_token = $part_token . $1;\n"
+	 "    }\n"
+	 "    elsif ($command =~ s%^({)%%)\n"
+	 "    {\n"
+#if defined (CMISS_DEBUG_EXTRACT)
+	 "       print \"open bracket: $1\\n\";\n"
+#endif /* defined (CMISS_DEBUG_EXTRACT) */
+	 "       if ($part_token)\n"
+	 "       {\n"
+	 "          push(@tokens, $part_token);\n"
+	 "       }\n"
+	 "       $part_token = \"\";\n"
+	 "       push(@tokens, $1);\n"
+	 "    }\n"
+	 "    elsif ($command =~ s%^(#.*)%%)\n"
+	 "    {\n"
+#if defined (CMISS_DEBUG_EXTRACT)
+	 "       print \"comment: $1\\n\";\n"
+#endif /* defined (CMISS_DEBUG_EXTRACT) */
+	 "       if ($part_token)\n"
+	 "       {\n"
+	 "          push(@tokens, $part_token);\n"
+	 "       }\n"
+	 "       $part_token = \"\";\n"
+	 "    }\n"
+	 "    elsif ($command =~ s%^(})%%)\n"
+	 "    {\n"
+#if defined (CMISS_DEBUG_EXTRACT)
+	 "       print \"close bracket: $1\\n\";\n"
+#endif /* defined (CMISS_DEBUG_EXTRACT) */
+	 "       if ($part_token)\n"
+	 "       {\n"
+	 "          push(@tokens, $part_token);\n"
+	 "       }\n"
+	 "       $part_token = \"\";\n"
+	 "       push(@tokens, $1);\n"
+	 "    }\n"
+	 "    else\n"
+    "    {\n"
+	 "       $continue = 1;\n"
+    "       if (!$part_token)\n"
+	 "       {"
+	 "          $lc_command = lc ($command);\n"
+    "          if (($lc_command =~ m/^(?:$match_string)/) "
+    "          || ($lc_command =~ m/^\\?$/))\n"
+	 "          {\n"
+	 "             $command =~ s/([^}#]*)//;\n"
+#if defined (CMISS_DEBUG_EXTRACT)
+	 "             print \"cmiss: $1\\n\";\n"
+#endif /* defined (CMISS_DEBUG_EXTRACT) */
+	 "             push(@tokens, $1);\n"
+	 "             $continue = 0;\n"
+	 "          }\n"
+    "          if ($lc_command =~ m/^(?:assert)/)\n"
+	 "          {\n"
+	 "             $command =~ s/([^}#]*)//;\n"
+#if defined (CMISS_DEBUG_EXTRACT)
+	 "             print \"assert: $1\\n\";\n"
+#endif /* defined (CMISS_DEBUG_EXTRACT) */
+	 "             push(@tokens, $1);\n"
+	 "             $continue = 0;\n"
+	 "          }\n"
+	 "       }\n"
+	 "       if ($continue)\n"
+	 "       {\n"
+
+	 "       ($extracted, $command) = "
+	 "          Text::Balanced::extract_variable($command);\n"
+    "       if ($extracted)\n"
+	 "       {\n"
+#if defined (CMISS_DEBUG_EXTRACT)
+	 "          print \"variable: $extracted\\n\";\n"
+#endif /* defined (CMISS_DEBUG_EXTRACT) */
+	 "          $part_token = $part_token . $extracted;\n"
+	 "       }\n"
+	 "       else\n"
+	 "       {\n"
+	 "          ($extracted, $command) = "
+	 "             Text::Balanced::extract_quotelike($command);\n"
+	 "          if ($extracted)\n"
+	 "          {\n"
+#if defined (CMISS_DEBUG_EXTRACT)
+	 "             print \"quotelike: $extracted\\n\";\n"
+#endif /* defined (CMISS_DEBUG_EXTRACT) */
+	 "             $part_token = $part_token . $extracted;\n"
+	 "          }\n"
+	 "          else\n"
+	 "          {\n"
+#if defined (CMISS_DEBUG_EXTRACT)
+	 "             print \"character:\\n\";\n"
+#endif /* defined (CMISS_DEBUG_EXTRACT) */
+	 "             $part_token = $part_token . substr($command, 0, 1);\n"
+	 "             $command = substr($command, 1);\n"
+	 "          }\n"
+	 "       }\n"
+	 "       }\n"
+	 "    }\n"
+	 "  }\n"
+	 "  if ($part_token)\n"
+	 "  {\n"
+	 "     push(@tokens, $part_token);\n"
+	 "  }\n"
+
+
 	 "  my $print_command_after = 0;\n"
 
 	 "	 for ($j = 0 ; $j <= $#tokens ; $j++)\n"
 	 "		{\n"
 	 "      $token = $tokens[$j];"
 	 "		  $lc_token = lc ($token);\n"
-	 "#		  print \">  $token\\n\";\n"
+#if defined (CMISS_DEBUG)
+	 "		  print \">  $token\\n\";\n"
+#endif /* defined (CMISS_DEBUG) */
 	 "		  if ($lc_token =~ m/^ass\\w+\\sblo\\w+\\sclos\\w+/)\n"
 	 "			 {\n"
 	 "           if ($block_required || $block_count)\n"
@@ -148,7 +270,7 @@ and then executes the returned strings
 	 "              }\n"
 	 "           $token = \"\";\n"
 	 "        }\n"
-	 "		  elsif ($lc_token =~ m/^\\s*(?:$match_string)/ || $lc_token =~ m/^\\?$/)\n"
+	 "		  elsif ($lc_token =~ m/^\\s*(?:$match_string)/ || $lc_token =~ m/^\\s*\\?$/)\n"
 	 "			 {\n"
 	 "          $token =~ s/\\\"/\\\\\"/g;\n"
 	 "          $token =~ s/\\#.*$//;\n"
