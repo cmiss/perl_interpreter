@@ -22,6 +22,7 @@ my @command_list = ();
 my $block_count = 0;
 my $block_required = 0;
 my $echo_commands = 0;
+my $echo_prompt = "";
 my $cmiss_debug = 0;
 
 sub register_keyword
@@ -37,12 +38,86 @@ sub call_command
   {
 	 local $command = shift;
 	 {
-		package main;
-		*{main::cmiss} = \&{Perl_cmiss::cmiss};
+		package cmiss;
+		*{cmiss::cmiss} = \&{Perl_cmiss::cmiss};
 		# Catch all warnings as errors */
 		local $SIG{__WARN__} = sub { die $_[0] };
 		eval ($Perl_cmiss::command);
 	 }
+  }
+
+sub cmiss_array
+  {
+	 my $command = "";
+	 my $token2;
+	 my $ref_type;
+	 my $token;
+	 my $subtoken;
+	 my $first;
+
+	 for $token (@_)
+		{
+		  $ref_type = ref $token;
+		  if ($token =~ /^[\s;]+$/)
+			 {
+				#This is just a delimiter
+				$command = $command . $token;
+			 }
+		  elsif ("ARRAY" eq $ref_type)
+			 {
+				$first = 1;
+				for $subtoken (@{$token})
+				  {
+					 if ($first)
+						{
+						  $first = 0;
+						}
+					 else
+						{
+						  $command = $command . ",";
+						}
+					 if ($subtoken =~ /[\s;]+/)
+						{
+						  $token2 = $subtoken;
+						  #These delimiters need to be quoted and therefore the quotes and 
+						  #escape characters contained within must be escaped.
+						  $token2 =~ s/\\/\\\\/g;
+						  $token2 =~ s/\"/\\\"/g;
+						  $command = $command . "\"$token2\"";
+						}
+					 else
+						{
+						  $command = $command . $subtoken;
+						}
+				  }
+			 }
+		  elsif ($token =~ /[\s;]+/)
+			 {
+				$token2 = $token;
+				#These delimiters need to be quoted and therefore the quotes and 
+				#escape characters contained within must be escaped.
+				$token2 =~ s/\\/\\\\/g;
+				$token2 =~ s/\"/\\\"/g;
+				$command = $command . "\"$token2\"";
+			 }
+		  else
+			 {
+				#This is just a plain word
+				$command = $command . $token;
+			 }
+		}
+
+	 if ($cmiss_debug)
+		{
+		  print "Perl_cmiss::cmiss_array final: $command\n";
+		}
+
+	 $return_code = cmiss($command);
+	 if ($cmiss_debug)
+		{
+		  print "Perl_cmiss::cmiss return_code $return_code\n";
+		}
+	 return ($return_code);
   }
 
 sub execute_command
@@ -50,7 +125,7 @@ sub execute_command
 	 my $command = shift;
 	 my $command2 = $command;
 	 $command2 =~ s%'%\\'%g;
-	 $command2 = "print '>  $command2' . \"\\n\";";
+	 $command2 = "print '$echo_prompt$command2' . \"\\n\";";
 	 my $token = "";
 	 my $part_token;
 	 my $token2;
@@ -157,15 +232,21 @@ sub execute_command
 								die ("itp assert blocks closed failed");
 							 }
 						}
-					 elsif ($lc_command =~ m/^itp\s+set\s+echo\s*(\w*)/)
+					 elsif ($lc_command =~ m/^itp\s+set\s+echo\s*(\w*)\s*(?:[\"\']([^\"\']*)[\"\']|([^\"\']+\S*)|)/)
 						{
-						  if ($1 =~ m/on/)
+						  my $first_word = $1;
+						  my $second_word = $2 ? $2 : $3;
+						  if ($first_word =~ m/on/)
 							 {
 								$echo_commands = 1;
 							 }
-						  elsif ($1 =~ m/off/)
+						  elsif ($first_word =~ m/off/)
 							 {
 								$echo_commands = 0;
+							 }
+						  elsif ($first_word =~ m/pro/)
+							 {
+								$echo_prompt = $second_word;
 							 }
 						  else
 							 {
@@ -202,18 +283,11 @@ sub execute_command
 					 $continue = 1;
 					 if ($token =~ m/^\s*$/)
 						{
-						  if (($lc_command =~ m/^(?:$match_string)/)
+						  if (($lc_command =~ m/^(?:$match_string)\b/)
 								|| ($lc_command =~ m/^q$/)
 								|| ($lc_command =~ m/^\?+$/))
 							 {
-								if ($cmiss_debug)
-								  {
-									 $token = $token . "(\$return_code = Perl_cmiss::cmiss(\"";
-								  }
-								else
-								  {
-									 $token = $token . "(Perl_cmiss::cmiss(\"";
-								  }
+								$token = $token . "(Perl_cmiss::cmiss_array(";
 								$part_token = "";
 								$token2 = "";
 								$is_perl_token = 1;
@@ -232,16 +306,16 @@ sub execute_command
 											 }
 										  if (!$is_simple_token && $is_perl_token)
 											 {
-												# Let Perl parse this into a string
-												$token = $token . "\\\"\"." . "join(\",\",$part_token).\"\\\"$1";
+												# Let Perl parse this into a string array
+												$token = $token . "[$part_token],\"$1\",";
 											 }
 										  else
 											 {
-												# Just add it in normally 
+												# Add it as a string 
 												# Escape \\ and " characters
 												$part_token =~ s/\\/\\\\/g;
 												$part_token =~ s/\"/\\\"/g;
-												$token = $token . $part_token . $1;
+												$token = $token . "\"$part_token\",\"$1\",";
 											 }
 										  $token2 = $token2 . $part_token . $1;
 										  $is_perl_token = 1;
@@ -304,8 +378,8 @@ sub execute_command
 												  {
 													 $command = $reduced_command;
 													 #Escape " and \ characters except for the start and end ones
-													 $extracted =~ s/(?<=.)\\(?=.)/\\\\/g;
-													 $extracted =~ s/(?<=.)\"(?=.)/\\\"/g;
+													 #$extracted =~ s/(?<=.)\\(?=.)/\\\\/g;
+													 #$extracted =~ s/(?<=.)\"(?=.)/\\\"/g;
 													 $part_token = $part_token . $extracted;
 													 if ($cmiss_debug)
 														{
@@ -328,22 +402,22 @@ sub execute_command
 							  $token2 = $token2 . $part_token;
 							  $token2 =~ s/\\/\\\\/g;
 							  $token2 =~ s/\"/\\\"/g;
-							  if ($cmiss_debug)
-							    {
-									print "token2 $token2\n";
-								 }
+#							  if ($cmiss_debug)
+#							    {
+#									print "token2 $token2\n";
+#								 }
 							  if (!$is_simple_token && $is_perl_token)
 								 {
-									# Let Perl parse this into a string
-									$token = $token . "\\\"\".join(\",\",$part_token).\"\\\"\")) || die(\"Error in cmiss command \\\"$token2\\\".\\n\");";
+									# Let Perl parse this into a string array
+									$token = $token . "[$part_token])) || die(\"Error in cmiss command \\\"$token2\\\".\\n\");";
 								 }
 							  else
 								 {
-									# Just add it in normally 
+									# Add it as a string 
 									# Escape \\ and " characters
 									$part_token =~ s/\\/\\\\/g;
 									$part_token =~ s/\"/\\\"/g;
-									$token = $token . $part_token . "\")) || die(\"Error in cmiss command \\\"$token2\\\".\\n\");";
+									$token = $token . "\"$part_token\")) || die(\"Error in cmiss command \\\"$token2\\\".\\n\");";
 								 }
 							  if ($cmiss_debug)
 								 {
@@ -425,7 +499,6 @@ sub execute_command
 	if ($cmiss_debug)
 	  {
 		 print "Perl_cmiss::execute_command parsed $command\n";
-		 print "Perl_cmiss::execute_command parsed $command2\n";
 	  }
 	if ($echo_commands && (! $print_command_after))
      {
