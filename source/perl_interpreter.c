@@ -1,3 +1,12 @@
+/*******************************************************************************
+FILE : perl_interpreter.c
+
+LAST MODIFIED : 22 August 2000
+
+DESCRIPTION :
+Provides an interface between cmiss and a Perl interpreter.
+==============================================================================*/
+
 #include <EXTERN.h>               /* from the Perl distribution     */
 #include <perl.h>                 /* from the Perl distribution     */
 #include <unistd.h>
@@ -30,13 +39,15 @@ void xs_init()
 	newXS("DynaLoader::boot_DynaLoader", boot_DynaLoader, file);
 }
 
-void create_interpreter_(int *status)
+void create_interpreter_(int *redirect_output, int *status)
 /*******************************************************************************
-LAST MODIFIED : 9 June 2000
+LAST MODIFIED : 22 August 2000
 
 DESCRIPTION:
-Takes a <command_string>, processes this through the F90 interpreter
-and then executes the returned strings
+Takes a <command_string>, processes this through the Perl interpreter
+and then executes the returned strings.  If <*redirect_output> is true then
+the output from the perl_interpreter will be redirected from the shell to
+the display_message routine.
 ==============================================================================*/
 {
   char *embedding[] = { "", "-e", "0" };
@@ -48,316 +59,9 @@ and then executes the returned strings
 	 "import strict \"subs\";\n"
 	 "}\n"
 #include "Balanced.pmh"
-	 "my $filedescriptor = shift;\n"
-	 /* Redirect all STDOUT and STDERR to a pipe */
-/*  	 "open (STDOUT, \">&=4\") || die \"can't open fd 4: $!\";\n" */
-	 "$| = 1;\n"
-	 "package Perl_cmiss;\n"
+#include "Perl_cmiss.pmh"
+    ;
 
-	 "$VERSION = '0.01';\n"
-	 "bootstrap Perl_cmiss $VERSION;\n"
-
-	 "# Preloaded methods go here.\n"
-
-	 "#Using a hash so that the strategy for action could be placed with\n"
-	 "#the word.  For now only one action.\n"
-	 "my %keywords;\n"
-	 "my @command_list = ();\n"
-	 "my $block_count = 0;\n"
-	 "my $block_required = 0;\n"
-
- 	 "sub register_keyword\n"
-	 "  {\n"
-	 "	 my $word = shift;\n"
-
-	 "#	 print \"register $word\\n\";\n"
-
-	 "	 $keywords{$word} = 1;\n"
-	 "  }\n"
-
-	 "sub execute_command\n"
-	 "  {\n"
-	 "	 my $command = shift;\n"
-	 "  my $command2 = $command;\n"
-	 "  $command2 =~ s%'%\\\\'%g;\n"
-	 "  $command2 = \"print '>  $command2' . \\\"\\\\n\\\";\";\n"
-	 "	 my $token;\n"
-	 "	 my $lc_token;\n"
-	 "	 my $match_string = join (\"|\", keys %keywords);\n"
-#if defined (OLD_CODE)
-	 "	 my @tokens = &parse_line('\\s*[\\{\\}\\(\\)]\\s*', \"delimiters\", $command);\n"
-	 "	 my @tokens; push (@tokens, $command);\n"
-#endif /* defined (OLD_CODE) */
-	 "  my @tokens = ();\n"
-	 "  my $part_token = \"\";\n"
-	 "  my $extracted;\n"
-	 "  my $lc_command;\n"
-	 "  my $continue;\n"
-	 "  my $reduced_command;\n"
-	 /* #define CMISS_DEBUG_EXTRACT */
-	 "  while ($command ne \"\")\n"
-	 "  {\n"
-#if defined (CMISS_DEBUG_EXTRACT)
-	 "    print \"$command   \";\n"
-#endif /* defined (CMISS_DEBUG_EXTRACT) */
-	 "    if ($command =~ s%^(\\s+)%%)\n"
-	 "    {\n"
-#if defined (CMISS_DEBUG_EXTRACT)
-	 "       print \"space: $1\\n\";\n"
-#endif /* defined (CMISS_DEBUG_EXTRACT) */
-	 "       $part_token = $part_token . $1;\n"
-	 "    }\n"
-	 "    elsif ($command =~ s%^({)%%)\n"
-	 "    {\n"
-#if defined (CMISS_DEBUG_EXTRACT)
-	 "       print \"open bracket: $1\\n\";\n"
-#endif /* defined (CMISS_DEBUG_EXTRACT) */
-	 "       if ($part_token ne \"\")\n"
-	 "       {\n"
-	 "          push(@tokens, $part_token);\n"
-	 "       }\n"
-	 "       $part_token = \"\";\n"
-	 "       push(@tokens, $1);\n"
-	 "    }\n"
-	 "    elsif ($command =~ s%^(#.*)%%)\n"
-	 "    {\n"
-#if defined (CMISS_DEBUG_EXTRACT)
-	 "       print \"comment: $1\\n\";\n"
-#endif /* defined (CMISS_DEBUG_EXTRACT) */
-	 "       if ($part_token ne \"\")\n"
-	 "       {\n"
-	 "          push(@tokens, $part_token);\n"
-	 "       }\n"
-	 "       $part_token = \"\";\n"
-	 "    }\n"
-	 "    elsif ($command =~ s%^(})%%)\n"
-	 "    {\n"
-#if defined (CMISS_DEBUG_EXTRACT)
-	 "       print \"close bracket: $1\\n\";\n"
-#endif /* defined (CMISS_DEBUG_EXTRACT) */
-	 "       if ($part_token ne \"\")\n"
-	 "       {\n"
-	 "          push(@tokens, $part_token);\n"
-	 "       }\n"
-	 "       $part_token = \"\";\n"
-	 "       push(@tokens, $1);\n"
-	 "    }\n"
-	 "    else\n"
-    "    {\n"
-	 "       $continue = 1;\n"
-    "       if ($part_token eq \"\")\n"
-	 "       {"
-	 "          $lc_command = lc ($command);\n"
-    "          if (($lc_command =~ m/^(?:$match_string)/) "
-    "          || ($lc_command =~ m/^\\?$/))\n"
-	 "          {\n"
-	 "             while (($command ne \"\") && !($command =~ m/(^[}#])/))\n"
-	 "             {\n"
-	 "                ($extracted, $reduced_command) = "
-	 "                   Text::Balanced::extract_variable($command);\n"
-	 "                if ($extracted)\n" 
-	 "                {\n"
-	 "                   $command = $reduced_command;\n"
-	 "                   $part_token = $part_token . $extracted;\n"
-	 "                }\n"
-	 "                else\n"
-	 "                {\n"
-	 "                   ($extracted, $reduced_command) = "
-	 "                      Text::Balanced::extract_delimited($command, q{'\"`});\n"
-	 "                   if ($extracted)\n" 
-	 "                   {\n"
-	 "                      $command = $reduced_command;\n"
-	 "                      $part_token = $part_token . $extracted;\n"
-	 "                   }\n"
-	 "                   else\n"
-	 "                   {\n"
-	 "                      $part_token = $part_token . substr($command, 0, 1);\n"
-	 "                      $command = substr($command, 1);\n"
-	 "                   }\n"
-	 "                }\n"
-	 "             }\n"
-#if defined (CMISS_DEBUG_EXTRACT)
-	 "             print \"cmiss: $part_token\\n\";\n"
-#endif /* defined (CMISS_DEBUG_EXTRACT) */
-	 "             push(@tokens, $part_token);\n"
-	 "             $part_token = \"\";\n"
-	 "             $continue = 0;\n"
-	 "          }\n"
-    "          if ($lc_command =~ m/^(?:assert)/)\n"
-	 "          {\n"
-	 "             $command =~ s/^([^}#]*)//;\n"
-#if defined (CMISS_DEBUG_EXTRACT)
-	 "             print \"assert: $1\\n\";\n"
-#endif /* defined (CMISS_DEBUG_EXTRACT) */
-	 "             push(@tokens, $1);\n"
-	 "             $continue = 0;\n"
-	 "          }\n"
-	 "       }\n"
-	 "       if ($continue)\n"
-	 "       {\n"
-
-	 "       ($extracted, $reduced_command) = "
-	 "          Text::Balanced::extract_variable($command);\n"
-    "       if ($extracted)\n"
-	 "       {\n"
-	 "          $command = $reduced_command;\n"
-#if defined (CMISS_DEBUG_EXTRACT)
-	 "          print \"variable: $extracted\\n\";\n"
-#endif /* defined (CMISS_DEBUG_EXTRACT) */
-	 "          $part_token = $part_token . $extracted;\n"
-	 "       }\n"
-	 "       else\n"
-	 "       {\n"
-	 "          ($extracted, $reduced_command) = "
-	 "             Text::Balanced::extract_quotelike($command);\n"
-	 "          if ($extracted)\n"
-	 "          {\n"
-	 "             $command = $reduced_command;\n"
-#if defined (CMISS_DEBUG_EXTRACT)
-	 "             print \"quotelike: $extracted\\n\";\n"
-#endif /* defined (CMISS_DEBUG_EXTRACT) */
-	 "             $part_token = $part_token . $extracted;\n"
-	 "          }\n"
-	 "          else\n"
-	 "          {\n"
-#if defined (CMISS_DEBUG_EXTRACT)
-	 "             print \"character: \" . substr($command, 0, 1) . \"\\n\";\n"
-#endif /* defined (CMISS_DEBUG_EXTRACT) */
-	 "             $part_token = $part_token . substr($command, 0, 1);\n"
-	 "             $command = substr($command, 1);\n"
-	 "          }\n"
-	 "       }\n"
-	 "       }\n"
-	 "    }\n"
-	 "  }\n"
-	 "  if ($part_token ne \"\")\n"
-	 "  {\n"
-	 "     push(@tokens, $part_token);\n"
-	 "  }\n"
-
-
-	 "  my $print_command_after = 0;\n"
-
-	 "	 for ($j = 0 ; $j <= $#tokens ; $j++)\n"
-	 "		{\n"
-	 "      $token = $tokens[$j];"
-	 "		  $lc_token = lc ($token);\n"
-#if defined (CMISS_DEBUG)
-	 "		  print \">  $token\\n\";\n"
-#endif /* defined (CMISS_DEBUG) */
-	 "		  if ($lc_token =~ m/^ass\\w+\\sblo\\w+\\sclos\\w+/)\n"
-	 "			 {\n"
-	 "           if ($block_required || $block_count)\n"
-	 "              {\n"
-	 "                 $block_required = 0;\n"
-	 "                 $block_count = 0;\n"
-	 "                 @command_list = ();\n"
-	 "                 die (\"assert blocks closed failed\");\n\n"
-	 "              }\n"
-	 "           $token = \"\";\n"
-	 "        }\n"
-	 "		  elsif ($lc_token =~ m/^\\s*(?:$match_string)/ || $lc_token =~ m/^\\s*\\?$/)\n"
-	 "			 {\n"
-	 "          $token =~ s/\\\"/\\\\\"/g;\n"
-	 "          my $token2 = $token;\n"
-	 "          my @subtokens = split(\" \", $token);\n"
-	 "          my $subtoken;\n"
-	 "          for $subtoken (@subtokens)\n"
-	 "             {\n"
-	 "                if (!(($subtoken =~ m%^\\w+$%) || ($subtoken =~ m%^[\\d.]+$%)))\n"
-	 "                  {\n"
-#if defined (OLD_CODE)
-	 "                     print \"subtoken ^$subtoken^\n\";\n"
-#endif /* defined (OLD_CODE) */
-	 "                     $subtoken =~ s`^((?:(?:\\w*\\()|(?:\\$\\w*)|(?:\\{[^\\}]*\\})|(?:@\\w*)|(?:%\\w*)|[/\\d<>\\+\\-\\*\\%!\\\\~\\|\\(\\)\\{\\}\\{\\}\\$\\^\\&\\.=%])+)$`\\\".(\\1).\\\"`;\n"
-	 "                  }\n"
-#if defined (OLD_CODE)
-	 "                  {\n"
-	 "                     print \"subtoken ^$subtoken^\n\";\n"
-	 "                     $subtoken =~ s`^([/\\d<>\\+\\-\\*\\%!\\\\~\\|\\(\\)\\{\\}\\{\\}\\$\\^\\&\\.=%]+)$`\\\".(\\1).\\\"`;\n"
-	 "                  }\n"
-#endif /* defined (OLD_CODE) */
-	 "             }\n"
-	 "          $token = join (\" \", @subtokens)\n;"
-#if defined (CMISS_DEBUG)
-	 "				$token = \"(\\$return_code = Perl_cmiss::cmiss(\\\"$token\\\")) || die(\\\"Error in cmiss command \\$return_code\\\");\";\n"
-#else /* defined (CMISS_DEBUG) */
-	 "				$token = \"Perl_cmiss::cmiss(\\\"$token\\\") || die(\\\"Error in cmiss command $token2\\\");\";\n"
-#endif /* defined (CMISS_DEBUG) */
-	 "			 }\n"
-	 "		  else\n"
-	 "        {\n"
-	 "           while ($token =~ m/(\\d+)\\s*\\.\\.\\s*(\\d+)\\s*:\\s*(\\d+)/g)\n"
-	 "	        	   {\n"
-	 "                my $remainder_start = $1 % $3;\n"
-	 "                my $remainder_finish = ($2 - $remainder_start) % $3;\n"
-	 "                my $list_start = ($1 - $remainder_start) / $3;\n"
-	 "                my $list_finish = ($2 - $remainder_start - $remainder_finish)/ $3;\n"
-	 "                my $new_list_operator = \"(map {\\$_ * $3 + $remainder_start} $list_start..$list_finish)\";\n"
-	 "                $token =~ s/\\d+\\s*\\.\\.\\s*\\d+\\s*:\\s*\\d+/$new_list_operator/;\n"
-	 "             }\n"
-	 "           if ($token =~ m/^\\s*(?:if|while|unless|until|for|foreach|elsif|else|continue|sub)/)\n"
-	 "			      {\n"
-	 "			     	   $block_required = 1;\n"
-	 "			      }\n"
-	 "		       elsif ($token =~ m/^\\s*\\{/)\n"
-	 "			      {\n"
-	 "				     $block_required = 0;\n"
-	 "				     $block_count++;\n"
-	 "               $print_command_after = 1;\n"
-	 "			      }\n"
-	 "		       elsif ($token =~ m/^\\s*\\}/)\n"
-	 "			      {\n"
-	 "				     if ($block_count > 0)\n"
-	 "				       {\n"
-	 "					      $block_count--;\n"
-	 "				       }\n"
-	 "               $print_command_after = 0;\n"
-	 "			      }\n"
-	 "		       elsif (($j == $#tokens) && ($token) && (! ($token =~ m/;\\s*$/)))\n"
-	 "            {\n"
-	 "              $token = $token . \";\";\n"
-	 "			     }\n"
-	 "			 }\n"
-	 "      $tokens[$j] = $token;\n"
-	 "		}\n"
-	 "	 $command = join (\"\", @tokens);\n"
-#if defined (CMISS_DEBUG)
-	 "	 print \"Perl_cmiss::execute_command parsed $command\\n\";\n"
-	 "	 print \"Perl_cmiss::execute_command parsed $command2\\n\";\n"
-#endif /* defined (CMISS_DEBUG) */
-#if defined (NEW_CODE)
-	 "  if (! $print_command_after)\n"
-	 "    {\n"
-	 "      push (@command_list, $command2);\n"
-	 "    }\n"
-#endif /* defined (NEW_CODE) */
-	 "	 push (@command_list, $command);\n"
-#if defined (NEW_CODE)
-	 "  if ($print_command_after)\n"
-	 "    {\n"
-	 "      push (@command_list, $command2);\n"
-	 "    }\n"
-#endif /* defined (NEW_CODE) */
-
-	 "#	 print \"$block_count $block_required\\n\";\n"
-
-	 "	 if ((!($block_count))&&(!($block_required)))\n"
-	 "		{\n"
-	 "		  $command = join (\"\\n\", @command_list);\n"
-	 "		  #Must reset this before the eval as it may call this function\n"
-	 "		  #recursively before returning from this function\n"
-	 "		  @command_list = ();\n"
-	 /* Catch all warnings as errors */
-	 "      local $SIG{__WARN__} = sub { die $_[0] };\n"
-	 "		  eval ($command);\n"
-	 "      if ($@)\n"
-    "        {\n"
-    "          die;\n"
-    "        }\n"
-	 "		  print \"\";\n"
-	 "		}\n"
-	 "  }\n";
   char *load_commands[] =
   { "import cmiss",
 	 "Perl_cmiss::register_keyword assign",
@@ -403,9 +107,6 @@ and then executes the returned strings
 		  SAVETMPS;
 
 		  PUSHMARK(sp) ;
-		  perl_filehandle = filehandles[1];
-		  XPUSHs(sv_2mortal(newSViv(perl_filehandle)));
-		  PUTBACK;
 		  perl_eval_pv(perl_start_code, FALSE);
 		  if (SvTRUE(GvSV(errgv)))
 		  {
@@ -414,6 +115,15 @@ and then executes the returned strings
 			  POPs ;
 			  return_code = 0;
 		  }
+
+		  if (*redirect_output)
+			 {
+				PUSHMARK(sp) ;
+				perl_filehandle = filehandles[1];
+				XPUSHs(sv_2mortal(newSViv(perl_filehandle)));
+				PUTBACK;
+				perl_call_pv("Perl_cmiss::remap_descriptor", G_DISCARD);
+			 }
 
 		  number_of_load_commands = sizeof (load_commands) / sizeof (char *);
 		  for (i = 0 ; i < number_of_load_commands && return_code ; i++)
