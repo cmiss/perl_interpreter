@@ -591,10 +591,14 @@ debug opt debug64 opt64:
 
   debug debug64: DEBUG=true
   opt opt64: DEBUG=false
+  ifeq ($(MACHNAME),ia64)
+    debug opt: ABI=64
+  else
   ifeq ($(filter-out IRIX%,$(SYSNAME)),) #SGI
     debug opt: ABI=n32
   else
     debug opt: ABI=32
+  endif
   endif
   debug64 opt64: ABI=64
 
