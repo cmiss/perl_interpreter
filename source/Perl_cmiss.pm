@@ -66,6 +66,7 @@ sub execute_command
 	 my $print_command_after = 0;
 	 my $is_perl_token;
 	 my $simple_perl;
+	 my $cmiss_expand;
 
 	 $simple_perl = 0;
 	 while ($command ne "")
@@ -214,6 +215,7 @@ sub execute_command
 								$token2 = "";
 								$is_perl_token = 1;
 								$is_simple_token = 1;
+								$cmiss_expand = 0;
 								while (($command ne "") && !($command =~ m/(^[}	#])/))
 								  {
 									 if ($cmiss_debug)
@@ -226,7 +228,12 @@ sub execute_command
 											 {
 												print "cmiss space: $1\n";
 											 }
-										  if (!$is_simple_token && $is_perl_token)
+										  if ($cmiss_expand)
+											 {
+												# Let Perl parse this into a string without quoting
+												$token = $token . "\"." . "join(\" \",$part_token).\"$1";
+											 }
+										  elsif (!$is_simple_token && $is_perl_token)
 											 {
 												# Let Perl parse this into a string
 												$token = $token . "\\\"\"." . "join(\",\",$part_token).\"\\\"$1";
@@ -242,7 +249,17 @@ sub execute_command
 										  $token2 = $token2 . $part_token . $1;
 										  $is_perl_token = 1;
 										  $is_simple_token = 1;
+										  $cmiss_expand = 0;
 										  $part_token = "";
+										}
+									 elsif ($command =~ s%^(cmiss_expand\()%%)
+										{
+										  if ($cmiss_debug)
+											 {
+												print "cmiss expand: $1\n";
+											 }
+										  $part_token = $part_token . "(";
+										  $cmiss_expand = 1;
 										}
 									 elsif ($command =~ s%^([.,0-9:])%%)
 										{
@@ -317,7 +334,19 @@ sub execute_command
 							    {
 									print "token2 $token2\n";
 								 }
-						     if (!$is_simple_token && $is_perl_token)
+						     if ($cmiss_expand)
+								 {
+									# Let Perl parse this into a string
+									if ($cmiss_debug)
+									  {
+										 $token = $token . "\".join(\" \",$part_token).\"\")) || die(\"Error in cmiss command \$return_code\");";
+									  }
+									else
+									  {
+										 $token = $token . "\".join(\" \",$part_token).\"\")) || die(\"Error in cmiss command $token2\");";
+									  }
+								 }
+						     elsif (!$is_simple_token && $is_perl_token)
 								 {
 									# Let Perl parse this into a string
 									if ($cmiss_debug)
