@@ -231,13 +231,6 @@ else
           PERL = ${CMISS_ROOT}/bin/$(ABI)/perl
         endif
     endif
-    ifeq ($(SYSNAME),AIX)
-        ifeq ($(ABI),32)
-          PERL = ${CMISS_ROOT}/bin/perl
-        else
-          PERL = ${CMISS_ROOT}/bin/perl64
-        endif
-    endif
     ifeq ($(filter-out esp56%,$(NODENAME)),)
       PERL = ${CMISS_ROOT}/bin/i686-linux/perl
     endif
@@ -489,7 +482,9 @@ ifeq ($(SYSNAME),SunOS)
   endif
 endif
 ifeq ($(SYSNAME),AIX)
-  CC = xlc
+  # _r for reentrant - without this:
+  # "...lib/5.8.6/aix-thread-multi-64all/CORE/reentr.h", line 775.16: 1506-007 (S) "struct random_data" is undefined.
+  CC = xlc_r
   # no -qinfo=gen because perl redefines many symbols
   CFLAGS += -qinfo=ini:por:pro:trd:tru:use
   ARFLAGS += -X$(ABI)
