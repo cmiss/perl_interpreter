@@ -312,7 +312,8 @@ sub extract_variable (;$$)
 	unless ($text =~ s/\A\s*(?:::)?(?:[_a-z]\w*::)*[_a-z]\w*//i  or extract_codeblock($text,'{}'))
 		{ $@ = "Bad identifier after dereferencer";
 		  return _fail @fail; }
-	1 while (  extract_codeblock($text,'{}[]()','\s*(?:->(?:\s*\w+\s*)?)?\s*')
+#SAB I took out the round bracket pair as it was causing me trouble.
+	1 while (  extract_codeblock($text,'{}[]','\s*(?:->(?:\s*\w+\s*)?)?\s*')
 	        || extract_variable($text,'\s*->\s*')
 	        );
 
