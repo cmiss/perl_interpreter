@@ -91,6 +91,7 @@ static Interpreter_display_message_function *display_message_function =
 #define interpreter_set_double_ __interpreter_set_double_
 #define interpreter_evaluate_string_ __interpreter_evaluate_string_
 #define interpreter_set_string_ __interpreter_set_string_
+#define interpreter_set_pointer_ __interpreter_set_pointer_
 #endif /* defined (USE_DYNAMIC_LOADER) || defined (SHARED_OBJECT) */
 
 #if ! defined (NO_STATIC_FALLBACK)
@@ -536,7 +537,7 @@ Takes a <command_string>, processes this through the Perl interpreter.
 {
 	char *escaped_command, *new_pointer, *old_pointer, *quote_pointer,
 		*slash_pointer, *wrapped_command;
-	int return_code;
+	int escape_symbols, return_code;
 	STRLEN n_a;
 	dSP ;
  
@@ -555,13 +556,33 @@ Takes a <command_string>, processes this through the Perl interpreter.
 
 				return_code = 1;
 
-				if (wrapped_command = (char *)malloc(strlen(command_string) + 100))
+				escape_symbols = 0;
+				if ((quote_pointer = strchr (command_string, '\'')) ||
+					 (slash_pointer = strchr (command_string, '\\')))
+				{
+					 /* Count how many things we are going to escape */
+					 quote_pointer = command_string;
+					 while (quote_pointer = strchr (quote_pointer, '\\'))
+					 {
+							quote_pointer++;
+							escape_symbols++;
+					 }
+					 quote_pointer = command_string;
+					 while (quote_pointer = strchr (quote_pointer, '\''))
+					 {
+							quote_pointer++;
+							escape_symbols++;
+					 }
+				}
+
+				if (wrapped_command = (char *)malloc(strlen(command_string) + 
+					 escape_symbols + 100))
 				{
 					 /* Escape any 's in the string */
-					 if ((quote_pointer = strchr (command_string, '\'')) ||
-							(slash_pointer = strchr (command_string, '\\')))
+					 if (escape_symbols)
 					 {
-							if (escaped_command = (char *)malloc(strlen(command_string) + 100))
+							if (escaped_command = (char *)malloc(strlen(command_string) + 
+								 escape_symbols + 10))
 							{
 								 slash_pointer = strchr (command_string, '\\');
 								 new_pointer = escaped_command;
@@ -782,6 +803,7 @@ LAST MODIFIED : 6 September 2000
 
 DESCRIPTION:
 Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
+To override the cmiss:: package specify the full name in the string.
 ==============================================================================*/
 {
 	int return_code;
@@ -918,6 +940,7 @@ LAST MODIFIED : 6 September 2000
 
 DESCRIPTION:
 Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
+To override the cmiss:: package specify the full name in the string.
 ==============================================================================*/
 {
 	int return_code;
@@ -1065,6 +1088,7 @@ LAST MODIFIED : 7 September 2000
 
 DESCRIPTION:
 Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
+To override the cmiss:: package specify the full name in the string.
 ==============================================================================*/
 {
 	int return_code;
@@ -1082,6 +1106,54 @@ Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
 		 {
 				sv_variable = perl_get_sv(variable_name, TRUE);
 				sv_setpv(sv_variable, value);
+		 }
+		 else
+		 {
+				(*display_message_function)(ERROR_MESSAGE,"interpreter_set_string.  "
+					 "Invalid arguments.") ;
+				return_code = 0;
+		 }
+
+		 FREETMPS ;
+		 LEAVE ;
+ 	}
+	else
+	{
+		 (*display_message_function)(ERROR_MESSAGE,"interpreter_set_string.  Missing interpreter");
+		 return_code=0;
+	}
+
+	*status = return_code;
+} /* interpreter_set_string_ */
+#endif /* ! defined (NO_STATIC_FALLBACK) */
+
+#if ! defined (NO_STATIC_FALLBACK)
+void interpreter_set_pointer_(char *variable_name, char *class, void *value,
+	 int *status)
+/*******************************************************************************
+LAST MODIFIED : 30 May 2003
+
+DESCRIPTION:
+Sets the value of the scalar variable cmiss::<variable_name> to be <value> and 
+sets the class of that variable to be <class>.
+To override the cmiss:: package specify the full name in the string.
+==============================================================================*/
+{
+	int return_code;
+
+	SV *sv_variable;
+
+	return_code = 1;
+
+	if (my_perl)
+	{
+		 ENTER ;
+		 SAVETMPS;
+
+		 if (variable_name && value && status)
+		 {
+				sv_variable = perl_get_sv(variable_name, TRUE);
+				sv_setref_pv(sv_variable, class, value);
 		 }
 		 else
 		 {

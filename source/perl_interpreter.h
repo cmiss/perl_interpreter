@@ -1,7 +1,7 @@
 /*******************************************************************************
 FILE : perl_interpreter.h
 
-LAST MODIFIED : 22 August 2000
+LAST MODIFIED : 30 May 2003
 
 DESCRIPTION :
 Provides an interface between cmiss and a Perl interpreter.
@@ -79,6 +79,7 @@ LAST MODIFIED : 6 September 2000
 
 DESCRIPTION:
 Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
+To override the cmiss:: package specify the full name in the string.
 ==============================================================================*/
 
 void interpreter_evaluate_double_(char *expression, double *result, int *status);
@@ -103,6 +104,7 @@ LAST MODIFIED : 7 September 2000
 
 DESCRIPTION:
 Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
+To override the cmiss:: package specify the full name in the string.
 ==============================================================================*/
 
 void interpreter_evaluate_string_(char *expression, char **result, int *status);
@@ -138,6 +140,21 @@ LAST MODIFIED : 7 September 2000
 
 DESCRIPTION:
 Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
+To override the cmiss:: package specify the full name in the string.
+==============================================================================*/
+
+void interpreter_set_pointer_(char *variable_name, char *class, void *value,
+	int *status);
+#if ! defined (FORTRAN_INTERPRETER_INTERFACE)
+#define interpreter_set_pointer interpreter_set_pointer_
+#endif /* ! defined (FORTRAN_INTERPRETER_INTERFACE) */
+/*******************************************************************************
+LAST MODIFIED : 30 May 2003
+
+DESCRIPTION:
+Sets the value of the scalar variable cmiss::<variable_name> to be <value> and 
+sets the class of that variable to be <class>.
+To override the cmiss:: package specify the full name in the string.
 ==============================================================================*/
 
 void create_interpreter_(int argc, char **argv, const char *initial_comfile, int *status);

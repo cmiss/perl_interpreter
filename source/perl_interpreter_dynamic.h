@@ -101,6 +101,15 @@ void __interpreter_set_string_(char *variable_name, char *value, int *status);
 #define __interpreter_set_string_(variable_name, value, status);
 #endif /* ! defined (NO_STATIC_FALLBACK) */
 
+void (*interpreter_set_pointer_handle)(char *variable_name, char *class,
+	void *value, int *status);
+#if ! defined (NO_STATIC_FALLBACK)
+void __interpreter_set_pointer_(char *variable_name, char *class, void *value,
+	int *status);
+#else /* ! defined (NO_STATIC_FALLBACK) */
+#define __interpreter_set_pointer_(variable_name, class, value, status);
+#endif /* ! defined (NO_STATIC_FALLBACK) */
+
 void interpret_command_(char *command_string, void *user_data, int *quit,
   execute_command_function_type execute_command_function, int *status)
 /*******************************************************************************
@@ -263,7 +272,8 @@ void create_interpreter_ (int argc, char **argv, const char *initial_comfile,
 LAST MODIFIED : 28 March 2003
 
 DESCRIPTION:
-Creates the interpreter for processing commands.
+Dynamic loader wrapper which loads an appropriate interpreter, initialises all
+the function pointers and then calls create_interpreter_ for that instance.
 ==============================================================================*/
 {
 	char command[300], *library, perl_archname[200], *perl_executable,
@@ -375,6 +385,7 @@ Creates the interpreter for processing commands.
 		LOAD_FUNCTION(interpreter_set_double_);
 		LOAD_FUNCTION(interpreter_evaluate_string_);
 		LOAD_FUNCTION(interpreter_set_string_);
+		LOAD_FUNCTION(interpreter_set_pointer_);
 	}
 	if (return_code)
 	{
@@ -402,7 +413,7 @@ void destroy_interpreter_(int *status)
 LAST MODIFIED : 24 March 2003
 
 DESCRIPTION :
-Frees the memory associated with a string allocated by the interpreter.
+Dynamic loader wrapper
 ==============================================================================*/
 {
 	if (use_dynamic_interpreter)
@@ -421,7 +432,7 @@ void interpreter_set_display_message_function_(Interpreter_display_message_funct
 LAST MODIFIED : 26 March 2003
 
 DESCRIPTION :
-Frees the memory associated with a string allocated by the interpreter.
+Dynamic loader wrapper
 ==============================================================================*/
 {
 	if (use_dynamic_interpreter)
@@ -439,7 +450,7 @@ void redirect_interpreter_output_(int *status)
 LAST MODIFIED : 24 March 2003
 
 DESCRIPTION :
-Frees the memory associated with a string allocated by the interpreter.
+Dynamic loader wrapper
 ==============================================================================*/
 {
 	if (use_dynamic_interpreter)
@@ -457,7 +468,7 @@ void interpreter_evaluate_integer_(char *expression, int *result, int *status)
 LAST MODIFIED : 24 March 2003
 
 DESCRIPTION :
-Frees the memory associated with a string allocated by the interpreter.
+Dynamic loader wrapper
 ==============================================================================*/
 {
 	if (use_dynamic_interpreter)
@@ -475,7 +486,7 @@ void interpreter_set_integer_(char *variable_name, int *value, int *status)
 LAST MODIFIED : 24 March 2003
 
 DESCRIPTION :
-Frees the memory associated with a string allocated by the interpreter.
+Dynamic loader wrapper
 ==============================================================================*/
 {
 	if (use_dynamic_interpreter)
@@ -493,7 +504,7 @@ void interpreter_evaluate_double_(char *expression, double *result, int *status)
 LAST MODIFIED : 24 March 2003
 
 DESCRIPTION :
-Frees the memory associated with a string allocated by the interpreter.
+Dynamic loader wrapper
 ==============================================================================*/
 {
 	if (use_dynamic_interpreter)
@@ -511,7 +522,7 @@ void interpreter_set_double_(char *variable_name, double *value, int *status)
 LAST MODIFIED : 24 March 2003
 
 DESCRIPTION :
-Frees the memory associated with a string allocated by the interpreter.
+Dynamic loader wrapper
 ==============================================================================*/
 {
 	if (use_dynamic_interpreter)
@@ -529,7 +540,7 @@ void interpreter_evaluate_string_(char *expression, char **result, int *status)
 LAST MODIFIED : 24 March 2003
 
 DESCRIPTION :
-Frees the memory associated with a string allocated by the interpreter.
+Dynamic loader wrapper
 ==============================================================================*/
 {
 	if (use_dynamic_interpreter)
@@ -547,7 +558,7 @@ void interpreter_destroy_string_(char *string)
 LAST MODIFIED : 24 March 2003
 
 DESCRIPTION :
-Frees the memory associated with a string allocated by the interpreter.
+Dynamic loader wrapper
 ==============================================================================*/
 {
 	if (use_dynamic_interpreter)
@@ -565,7 +576,7 @@ void interpreter_set_string_(char *variable_name, char *value, int *status)
 LAST MODIFIED : 24 March 2003
 
 DESCRIPTION :
-Frees the memory associated with a string allocated by the interpreter.
+Dynamic loader wrapper
 ==============================================================================*/
 {
 	if (use_dynamic_interpreter)
@@ -577,3 +588,22 @@ Frees the memory associated with a string allocated by the interpreter.
 		__interpreter_set_string_(variable_name, value, status);
 	}
 } /* interpreter_set_string */
+
+void interpreter_set_pointer_(char *variable_name, char *class, void *value, 
+	int *status)
+/*******************************************************************************
+LAST MODIFIED : 30 May 2003
+
+DESCRIPTION :
+Dynamic loader wrapper
+==============================================================================*/
+{
+	if (use_dynamic_interpreter)
+	{
+		(*interpreter_set_pointer_handle)(variable_name, class, value, status);
+	}
+	else
+	{
+		__interpreter_set_pointer_(variable_name, class, value, status);
+	}
+} /* interpreter_set_pointer */
