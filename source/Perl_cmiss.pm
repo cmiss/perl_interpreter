@@ -256,7 +256,15 @@ sub execute_command
 										  $is_simple_token = 1;
 										  $part_token = "";
 										}
-									 elsif ($command =~ s%^([.,0-9:])%%)
+									 elsif (($part_token eq "") && ($command =~ s%^(\-?[.,0-9:]+)%%))
+										{
+										  if ($cmiss_debug)
+											 {
+												print "cmiss number/operator: $1\n";
+											 }
+										  $part_token = $part_token . $1;
+										}
+									 elsif ($command =~ s%^([.,0-9:]+)%%)
 										{
 										  if ($cmiss_debug)
 											 {
