@@ -34,8 +34,8 @@ ARCH_DIR = $(SYSNAME)-$(ABI)# default
 ifeq ($(filter-out IRIX%,$(SYSNAME)),)# SGI
   # Specify what application binary interface (ABI) to use i.e. 32, n32 or 64
   ifndef ABI
-    ifeq ($(SGI_ABI),-64)
-      ABI = 64
+    ifdef SGI_ABI
+      ABI := $(patsubst -%,%,$(SGI_ABI))
     else
       ABI = n32
     endif
