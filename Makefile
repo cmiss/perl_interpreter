@@ -78,11 +78,14 @@ ifeq ($(filter-out IRIX%,$(SYSNAME)),)# SGI
 endif
 ifeq ($(SYSNAME),Linux)
   OPERATING_SYSTEM := linux
-  LIB_ARCH_DIR = $(INSTRUCTION)-$(OPERATING_SYSTEM)# no ABI
   ifeq ($(filter-out i%86,$(MACHNAME)),)
     INSTRUCTION := i686
   endif
+  ifneq ($(filter $(INSTRUCTION),i686 ia64 x86_64),)# i686, ia64, x86_64 
+    LIB_ARCH_DIR = $(INSTRUCTION)-$(OPERATING_SYSTEM)# no ABI required
+  endif
   ifndef ABI
+    ABI=32
     ifeq ($(filter-out i%86,$(MACHNAME)),)
       ABI=32
     endif
@@ -425,9 +428,16 @@ ifeq ($(filter-out IRIX%,$(SYSNAME)),)# SGI
   endif
 endif
 ifeq ($(SYSNAME),Linux)
-  ifeq ($(MACHNAME),ia64)
+#  ifneq ($(filter $(MACHNAME),ia64 x86_64),)# ia64 or x86_64
+  ifneq ($(filter $(MACHNAME),ia64),)# ia64 only
+    # Use Intel compilers if available
+    # (icc -V sends output to STDERR and exits with error).
+    ifneq (,$(shell icc -V 2>&1 | grep -i intel))
+      CC = icc
+    endif
+  endif
+  ifeq ($(CC),icc)
     # Intel compilers
-    CC = ecc
     CFLAGS += -w2# -Wall
 # This doesn't seem to do anything
 #     ifeq ($(ABI),64)
@@ -436,20 +446,28 @@ ifeq ($(SYSNAME),Linux)
   else
     # gcc
     CPPFLAGS += -Dbool=char -DHAS_BOOL
-#    CFE_FLGS += -m$(ABI)
-    # Position independent code is only required for shared objects.
-    ifeq ($(SHARED_OBJECT),true)
-      CFE_FLGS += -fPIC
-      # gcc 3.3.3 documentation recommends using the same code generation
-      # flags when linking shared libraries as when compiling.
-      # Linker option -Bsymbolic binds references to global symbols to those
-      # within the shared library, if any.  This avoids picking up the symbols
-      # like boot_Perl_cmiss from the static interpreter.
-      LD_SHARED = $(CC) -shared -Wl,-Bsymbolic $(CFE_FLGS)
+    ifeq ($(filter $(INSTRUCTION),i686 ia64),)# not i686 nor ia64
+      CFE_FLGS += -m$(ABI)
+    endif
+#   DBGCF_FLGS = -g3
+  endif
+  # Position independent code is only required for shared objects.
+  ifeq ($(SHARED_OBJECT),true)
+    CFE_FLGS += -fPIC
+    # gcc 3.3.3 documentation recommends using the same code generation
+    # flags when linking shared libraries as when compiling.
+    # Linker option -Bsymbolic binds references to global symbols to those
+    # within the shared library, if any.  This avoids picking up the symbols
+    # like boot_Perl_cmiss from the static interpreter.
+    LD_SHARED = $(CC) -shared -Wl,-Bsymbolic $(CFE_FLGS)
+  endif
+  OPTCF_FLGS = -O3
+  ifeq ($(MACHNAME),ppc64)
+    ifeq ($(ABI),64)
+      L_FLGS += -m elf64ppc
+    # note for ABI=32 -m elf32ppclinux is probably appropriate (but default)
     endif
   endif
-#   DBGCF_FLGS = -g3
-  OPTCF_FLGS = -O2
   # Don't include a dependency on libperl.so in the shared link libraries as
   # the perl_interpreter does not say where to find libperl.so when loading the
   # shared link libraries.
