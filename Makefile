@@ -303,7 +303,7 @@ ifeq ($(TASK),)
          SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-irix-${ABI}*/perl)
       endif
     endif
-    ifeq ($(filter-out ${PERL},${SHARED_PERL_EXECUTABLES}),)
+    ifneq ($(filter-out ${SHARED_PERL_EXECUTABLES},${PERL}),)
       ifneq ($(wildcard $(PERL_ARCHLIB)/CORE/libperl.so),)
         SHARED_PERL_EXECUTABLES += ${PERL}
       endif
