@@ -17,8 +17,7 @@ bootstrap Perl_cmiss $VERSION;
 
 #Using a hash so that the strategy for action could be placed with
 #the word.  For now only one action.
-# GBS 9-March-2001 : Made this accessible to other package
-our %keywords;
+my %keywords;
 
 my @command_list = ();
 my $block_count = 0;
@@ -105,6 +104,11 @@ sub register_keyword
 	 #print \"register $word\\n\";
 	 
 	 $keywords{$word} = 1;
+  }
+
+sub get_keywords_hash_reference
+  {
+	return \%keywords;
   }
 
 sub call_command
