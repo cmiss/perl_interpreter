@@ -132,27 +132,28 @@ the display_message routine.
     ;
 
   char *load_commands[] =
-  { "Perl_cmiss::register_keyword assign",
-	 "Perl_cmiss::register_keyword cell",
-	 "Perl_cmiss::register_keyword command_window",
-	 "Perl_cmiss::register_keyword create",
-	 "Perl_cmiss::register_keyword define",
-	 "Perl_cmiss::register_keyword fem",
-	 "Perl_cmiss::register_keyword gen",
-	 "Perl_cmiss::register_keyword gfx",
-	 "Perl_cmiss::register_keyword help",
-	 "Perl_cmiss::register_keyword imp",
-	 "Perl_cmiss::register_keyword iterate",
-	 "Perl_cmiss::register_keyword 'open'",
-	 "Perl_cmiss::register_keyword 'quit'",
-	 "Perl_cmiss::register_keyword list",
-	 "Perl_cmiss::register_keyword list_memory",
-	 "Perl_cmiss::register_keyword optimise",
-	 "Perl_cmiss::register_keyword 'read'",
-	 "Perl_cmiss::register_keyword refresh",
-	 "Perl_cmiss::register_keyword set",
-	 "Perl_cmiss::register_keyword unemap",
-	 "Perl_cmiss::register_keyword var"};
+  { "Perl_cmiss::set_INC_for_platform('" ABI_ENV "')",
+		"Perl_cmiss::register_keyword assign",
+		"Perl_cmiss::register_keyword cell",
+		"Perl_cmiss::register_keyword command_window",
+		"Perl_cmiss::register_keyword create",
+		"Perl_cmiss::register_keyword define",
+		"Perl_cmiss::register_keyword fem",
+		"Perl_cmiss::register_keyword gen",
+		"Perl_cmiss::register_keyword gfx",
+		"Perl_cmiss::register_keyword help",
+		"Perl_cmiss::register_keyword imp",
+		"Perl_cmiss::register_keyword iterate",
+		"Perl_cmiss::register_keyword 'open'",
+		"Perl_cmiss::register_keyword 'quit'",
+		"Perl_cmiss::register_keyword list",
+		"Perl_cmiss::register_keyword list_memory",
+		"Perl_cmiss::register_keyword optimise",
+		"Perl_cmiss::register_keyword 'read'",
+		"Perl_cmiss::register_keyword refresh",
+		"Perl_cmiss::register_keyword set",
+		"Perl_cmiss::register_keyword unemap",
+		"Perl_cmiss::register_keyword var"};
   int i, number_of_load_commands, return_code;
 
   return_code = 1;
@@ -870,3 +871,8 @@ Sets the value of the scalar variable cmiss::<variable_name> to be <value>.
 	*status = return_code;
 } /* interpreter_set_string_ */
 
+/*
+	Local Variables: 
+	tab-width: 2
+	End: 
+*/

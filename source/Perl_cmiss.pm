@@ -25,6 +25,74 @@ my $echo_commands = 0;
 my $echo_prompt = "";
 my $cmiss_debug = 0;
 
+sub set_INC_for_platform
+  {
+    my ($abi_env) = @_;
+
+    my $perlinc;
+
+# see if an environment variable is set to override @INC.
+    foreach my $varname ("CMISS${abi_env}_PERLINC","CMISS_PERLINC")
+	  {
+		if( exists $ENV{$varname} )
+		  {
+			$perlinc = $ENV{$varname};
+			last;
+		  }
+      } 
+    unless( $perlinc )
+	  {
+		# no environment variable is set for @INC.
+		# run the local perl to get its @INC so we can use its modules
+		my $perl = 'perl';
+		# see if an environment variable specifies which local perl.
+		foreach my $varname ("CMISS${abi_ext}_PERL","CMISS_PERL")
+		  {
+			if( exists $ENV{$varname} )
+			  {
+				$perl = $ENV{$varname};
+				last;
+			  }
+		  }
+		# fork and catch STDOUT from the child.
+		local *PERLOUT;
+		unless( defined( my $pid = open PERLOUT, '-|' ) )
+		  {
+			print STDERR "$0: fork failed: $!\n";
+		  }
+		elsif( ! $pid ) #child
+		  {
+			exec $perl, '-e', 'print join ":", @INC' or exit $!;
+		  }
+		else # parent
+		  { 
+			my $perlout = <PERLOUT>;
+			# check child completed successfully
+			unless( close PERLOUT )
+			  {
+				$! = $? >> 8;
+				print STDERR "$0: exec $perl failed: $!\n";
+			  }
+			else
+			  {
+				# perl has given us its include list.
+				$perlinc = $perlout;
+				# include $ENV{CMISS_ROOT}/perl_lib if exists
+				if( exists $ENV{CMISS_ROOT} )
+				  {
+					my $cmiss_perl_lib = $ENV{CMISS_ROOT}.'/perl_lib';
+					if( -d $cmiss_perl_lib )
+					  {
+						$perlinc = $cmiss_perl_lib.':'.$perlinc;
+					  }
+				  }
+			  }
+		  }
+      }
+
+    if( defined $perlinc ) { @INC = split /:/, $perlinc }
+  }
+
 sub register_keyword
   {
 	 my $word = shift;
@@ -572,3 +640,7 @@ sub execute_command
 		  print "";
 		}
   }
+
+### Local Variables: 
+### tab-width: 4
+### End: 

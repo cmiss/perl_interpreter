@@ -1,15 +1,16 @@
 #!/usr/local/bin/gmake -f
 # no builtin implicit rules
-MAKEFLAGS = --no-builtin-rules -I
+MAKEFLAGS = --no-builtin-rules --warn-undefined-variables
 
 #-----------------------------------------------------------------------------
 
-# files and directories
+# not implemented yet
+# ifndef OPT
+#   OPT = false
+# endif
 
 ifndef HOSTTYPE
-.PHONY: error
-error:
-	@echo HOSTTYPE not defined
+  $(error HOSTTYPE not defined)
 endif
 
 SOURCE_DIR = source
@@ -17,7 +18,7 @@ SOURCE_DIR = source
 # set architecture dependent directory
 ifeq (${HOSTTYPE},iris4d)
   # Specify what application binary interface (ABI) to use i.e. 32, n32 or 64
-  ABI = n32
+  ABI = n32#
   # Specify what sort of instruction set to use i.e. -mips#
   MIPS = 4
   INSTRUCTION := mips$(MIPS)
@@ -37,6 +38,19 @@ C_OBJ = $(WORKING_DIR)/libperlinterpreter.o
 F_OBJ = $(WORKING_DIR)/libperlinterpreter_f.o
 LIBRARY = $(LIBRARY_DIR)/libperlinterpreter.a
 
+# ABI string for environment variables
+# (for location of perl librarys in execuatable)
+ifdef ABI
+  ifeq ($(ABI),n32)
+    ABI_ENV=N32#
+  else
+    ABI_ENV=ABI#
+  endif
+else
+  ABI_ENV=#
+endif
+
+# location of perl
 ifeq (${HOSTTYPE},iris4d)
   ifeq ($(INSTRUCTION),mips4)
     ifeq (${CMISS_LOCALE},OXFORD)
@@ -75,20 +89,21 @@ CINCLUDE_DIRS = $(PERL_ARCHLIB)/CORE
 
 CC = cc -c
 CFLAGS = -g
-CPPFLAGS = $(addprefix -I, $(CINCLUDE_DIRS) $(WORKING_DIR) )
+CPPFLAGS = $(addprefix -I, $(CINCLUDE_DIRS) $(WORKING_DIR) ) \
+	'-DABI_ENV="$(ABI_ENV)"'
 ifeq (${HOSTTYPE},i386-linux)
-F90C = pgf90 -c
+  F90C = pgf90 -c
 else
-F90C = f90 -c
+  F90C = f90 -c
 endif
 F90FLAGS = -g
 LDFLAGS = -r
 ifeq (${HOSTTYPE},iris4d)
-CFLAGS += -$(ABI) -$(INSTRUCTION)
-F90FLAGS += -$(ABI) -$(INSTRUCTION)
-LDFLAGS += -$(ABI) -$(INSTRUCTION)
+  CFLAGS += -$(ABI) -$(INSTRUCTION)
+  F90FLAGS += -$(ABI) -$(INSTRUCTION)
+  LDFLAGS += -$(ABI) -$(INSTRUCTION)
 else
-CPPFLAGS += -Dbool=char -DHAS_BOOL
+  CPPFLAGS += -Dbool=char -DHAS_BOOL
 endif
 AR = ar
 ARFLAGS = -cr
