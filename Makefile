@@ -101,7 +101,12 @@ endif
 #need to override this to false and you must have the corresponding
 #static libperl.a
 ifndef USE_DYNAMIC_LOADER
-  USE_DYNAMIC_LOADER = false
+  ifeq ($(SYSNAME),Linux)
+     #SAB Gradually adding OS's as I get it working.
+     USE_DYNAMIC_LOADER = true
+  else
+     USE_DYNAMIC_LOADER = false
+  endif
 endif
 
 #This routine is recursivly called for each possible dynamic version
