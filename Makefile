@@ -140,7 +140,7 @@ ifndef USE_DYNAMIC_LOADER
       #I have not even been including a dynaloader at all so far.
       USE_DYNAMIC_LOADER = false
     else
-      USE_DYNAMIC_LOADER = true
+      USE_DYNAMIC_LOADER = maybe # if shared libraries are found
     endif
   endif
 endif
@@ -250,6 +250,35 @@ DYNALOADER_LIB = $(PERL_ARCHLIB)/auto/DynaLoader/DynaLoader.a
 PERL_WORKING_DIR = Perl_cmiss/generated/$(PERL_VERSION)/$(PERL_ARCHNAME)
 PERL_CMISS_MAKEFILE = $(PERL_WORKING_DIR)/Makefile
 PERL_CMISS_LIB = $(PERL_WORKING_DIR)/auto/Perl_cmiss/Perl_cmiss.a
+ifeq ($(TASK),)
+  ifneq ($(USE_DYNAMIC_LOADER),false) #true or maybe
+    SHARED_PERL_EXECUTABLES =
+    ifneq ($(wildcard ${CMISS_ROOT}/perl),)
+      ifeq ($(SYSNAME),Linux)
+         SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-i386-linux*/perl)
+         SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-i686-linux*/perl)
+      endif
+      ifeq ($(SYSNAME),AIX)
+         SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-rs6000-${ABI}*/perl)
+      endif
+      ifeq ($(filter-out IRIX%,$(SYSNAME)),)# SGI
+         SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-irix-${ABI}*/perl)
+      endif
+    endif
+    ifeq ($(filter-out ${PERL},${SHARED_PERL_EXECUTABLES}),)
+      ifneq ($(wildcard $(PERL_ARCHLIB)/CORE/libperl.so),)
+        SHARED_PERL_EXECUTABLES += ${PERL}
+      endif
+    endif
+    ifeq ($(USE_DYNAMIC_LOADER),maybe)
+      ifeq ($(SHARED_PERL_EXECUTABLES),)
+        USE_DYNAMIC_LOADER=false
+      else
+        USE_DYNAMIC_LOADER=true
+      endif
+    endif
+  endif
+endif
 ifneq ($(SHARED_OBJECT), true)
    STATIC_PERL_LIB = $(firstword $(wildcard $(PERL_ARCHLIB)/CORE/libperl.a) $(wildcard $(PERL_ARCHLIB)/CORE/libperl56.a))
    ifneq ($(USE_DYNAMIC_LOADER), true)
@@ -443,33 +472,17 @@ endif
   .PHONY : tidy clean allclean \
 	all debug opt debug64 opt64
 
-SHARED_PERL_EXECUTABLES =
-define VERSION_MESSAGE
-   @echo '     Version $(shell ${perl_executable} -MConfig -e 'print "$$Config{version} $$Config{archname}"') ${perl_executable}'
+  define VERSION_MESSAGE
+    @echo '     Version $(shell ${perl_executable} -MConfig -e 'print "$$Config{version} $$Config{archname}"') ${perl_executable}'
 
-endef
-ifeq ($(USE_DYNAMIC_LOADER),true)
+  endef
+  ifeq ($(USE_DYNAMIC_LOADER),true)
    #Dynamic loading perl interpreter
    #Note that the blank line in the define is useful.
    define SHARED_BUILD_RULE
       $(MAKE) --no-print-directory USE_DYNAMIC_LOADER=false SHARED_OBJECT=true CMISS$(subst n,N,${ABI})_PERL=$(perl_executable)
 
    endef
-   ifneq ($(wildcard ${CMISS_ROOT}/perl),)
-      ifeq ($(SYSNAME),Linux)
-         SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-i386-linux*/perl)
-         SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-i686-linux*/perl)
-      endif
-      ifeq ($(SYSNAME),AIX)
-         SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-rs6000-${ABI}*/perl)
-      endif
-      ifeq ($(filter-out IRIX%,$(SYSNAME)),)# SGI
-         SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-irix-${ABI}*/perl)
-      endif
-   endif
-   ifeq ($(filter-out ${PERL},${SHARED_PERL_EXECUTABLES}),)
-      SHARED_PERL_EXECUTABLES += ${PERL}
-   endif
    SHARED_INTERPRETER_BUILDS = $(foreach perl_executable, $(SHARED_PERL_EXECUTABLES), $(SHARED_BUILD_RULE))
    SHARED_VERSION_STRINGS = $(foreach perl_executable, $(SHARED_PERL_EXECUTABLES), $(shell ${perl_executable} -MConfig -e 'print "$$Config{version}/$$Config{archname}"'))
    SHARED_LIBRARIES = $(foreach version_string, $(SHARED_VERSION_STRINGS), $(LIBRARY_ROOT_DIR)/$(version_string)/libperlinterpreter$(DEBUG_SUFFIX).so)
@@ -496,8 +509,9 @@ ifeq ($(USE_DYNAMIC_LOADER),true)
       $(foreach perl_executable, $(SHARED_PERL_EXECUTABLES), $(VERSION_MESSAGE))
       ${SUB_WRITE_BUILD_MESSAGE}
    endef
-else
+  else
    SHARED_INTERPRETER_BUILDS =
+   SHARED_LIBRARIES =
    ifeq ($(SHARED_OBJECT),true)
       #This is an intermediate step and so doesn't write a message
       WRITE_BUILD_MESSAGE =
@@ -514,7 +528,7 @@ else
          $(foreach perl_executable, $(PERL), $(VERSION_MESSAGE))
       endef
    endif
-endif
+  endif
 
   main : $(PERL_CMISS_MAKEFILE) $(PERL_WORKING_DIR) $(WORKING_DIR) $(LIBRARY_DIR)
 ifeq ($(USE_DYNAMIC_LOADER),true)
@@ -529,12 +543,10 @@ else
    #Use dmake as it supports back slashes for paths
 	( cd $(PERL_WORKING_DIR) ; dmake static )
 endif
-ifeq ($(USE_DYNAMIC_LOADER),true)
-	$(MAKE) --no-print-directory TASK=source SHARED_LIBRARIES='$(SHARED_LIBRARIES)'
-else
-	$(MAKE) --no-print-directory TASK=source
-endif
-	$(MAKE) --no-print-directory TASK=library
+	$(MAKE) --no-print-directory USE_DYNAMIC_LOADER=$(USE_DYNAMIC_LOADER) \
+	  SHARED_LIBRARIES='$(SHARED_LIBRARIES)' TASK=source
+	$(MAKE) --no-print-directory USE_DYNAMIC_LOADER=$(USE_DYNAMIC_LOADER) \
+	  TASK=library
 	$(WRITE_BUILD_MESSAGE)
 
   tidy :
