@@ -7,9 +7,12 @@ DESCRIPTION :
 Provides an interface between cmiss and a Perl interpreter.
 ==============================================================================*/
 
+#if defined (USE_DYNAMIC_LOADER)
+#include "static_version.h"       /* for NO_STATIC_FALLBACK */
+#endif
 #if ! defined (NO_STATIC_FALLBACK)
-#include <EXTERN.h>               /* from the Perl distribution     */
-#include <perl.h>                 /* from the Perl distribution     */
+#include "EXTERN.h"               /* from the Perl distribution     */
+#include "perl.h"                 /* from the Perl distribution     */
 #endif /* ! defined (NO_STATIC_FALLBACK) */
 #include <stdio.h>
 #include <unistd.h>

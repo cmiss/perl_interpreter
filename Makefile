@@ -425,6 +425,7 @@ ifeq ($(SYSNAME),Linux)
   # the perl_interpreter does not say where to find libperl.so when loading the
   # shared link libraries.
   SHARED_LINK_LIBRARIES += -lcrypt -ldl
+#  LD_SHARED = $(CC) -shared $(CFE_FLGS)
 endif
 ifeq ($(SYSNAME),win32)
   CC = gcc -fnative-struct
@@ -463,11 +464,6 @@ ifeq ($(SHARED_OBJECT), true)
 endif
 ifeq ($(USE_DYNAMIC_LOADER), true)
   CPPFLAGS += -DUSE_DYNAMIC_LOADER
-endif
-ifneq ($(SHARED_OBJECT), true)
-  ifeq ($(STATIC_PERL_LIB),)
-    CPPFLAGS += -DNO_STATIC_FALLBACK
-  endif
 endif
 SHARED_LINK_LIBRARIES += -lc
 CFLAGS += $(PERL_CFLAGS)
@@ -671,27 +667,50 @@ ifeq ($(USE_DYNAMIC_LOADER),true)
   %.soh : %.so
 	$(UID2UIDH) $< $@
 
-  #Always regenerate the dynamic_versions file as it has recorded for
+  #Always regenerate the versions files as they have recorded for
   #us the versions that are built into this executable
-  $(WORKING_DIR)/dynamic_versions.h.new : $(SHARED_LIBRARY_HEADERS)
-	echo > $@;
+  STATIC_HEADER := $(WORKING_DIR)/static_version.h
+  DYNAMIC_VERSIONS_HEADER := $(WORKING_DIR)/dynamic_versions.h
+  VERSION_HEADERS := $(DYNAMIC_VERSIONS_HEADER) $(STATIC_HEADER)
+  $(DYNAMIC_VERSIONS_HEADER) : $(SHARED_LIBRARY_HEADERS)
+	{ \
 	$(foreach header, $(SHARED_LIBRARY_HEADERS), \
-      echo 'static char libperlinterpreter$(word 3, $(subst /,' ',$(subst .,_,$(header))))$(word 4, $(subst /,' ',$(subst -,_,$(header))))[] = ' >> $@; \
-      echo '#include "../../../$(header)"' >> $@; \
-      echo ';' >> $@; )
-	echo 'static struct Interpreter_library_strings interpreter_strings[] = {' >> $@;
+      echo 'static char libperlinterpreter$(word 3, $(subst /,' ',$(subst .,_,$(header))))$(word 4, $(subst /,' ',$(subst -,_,$(header))))[] = ' && \
+      echo '#include "../../../$(header)"' && \
+      echo ';' && ) \
+	echo 'static struct Interpreter_library_strings interpreter_strings[] = {' && \
 	$(foreach header, $(SHARED_LIBRARY_HEADERS), \
-      echo '{"$(word 3, $(subst /,' ',$(header)))","$(word 4, $(subst /,' ',$(header)))", libperlinterpreter$(word 3, $(subst /,' ',$(subst .,_,$(header))))$(word 4, $(subst /,' ',$(subst -,_,$(header)))) },' >> $@; )
-	echo '};' >> $@;
-	if [ ! -f $(WORKING_DIR)/dynamic_versions.h ] || ! diff $(WORKING_DIR)/dynamic_versions.h $(WORKING_DIR)/dynamic_versions.h.new > /dev/null ; then \
-		mv $(WORKING_DIR)/dynamic_versions.h.new $(WORKING_DIR)/dynamic_versions.h ; \
+      echo '{"$(word 3, $(subst /,' ',$(header)))","$(word 4, $(subst /,' ',$(header)))", libperlinterpreter$(word 3, $(subst /,' ',$(subst .,_,$(header))))$(word 4, $(subst /,' ',$(subst -,_,$(header)))) },' && ) \
+	echo '};'; \
+	} > $@.new;
+	@set -xe && \
+	if [ ! -f $@ ] || ! diff $@ $@.new > /dev/null ; then \
+		mv $@.new $@ ; \
 	else \
-		rm $(WORKING_DIR)/dynamic_versions.h.new; \
+		rm $@.new; \
 	fi
 
-#Always build the .new and see if it should be updated.
-   .PHONY: $(WORKING_DIR)/dynamic_versions.h.new
-   main: $(WORKING_DIR)/dynamic_versions.h.new
+  $(STATIC_HEADER):
+  ifeq ($(STATIC_PERL_LIB),)
+	echo '#define NO_STATIC_FALLBACK' > $@.new;
+  else
+	echo '/* undef NO_STATIC_FALLBACK */' > $@.new;
+  endif
+	@set -xe && \
+	if [ ! -f $@ ] || ! diff $@ $@.new > /dev/null; then \
+		mv $@.new $@; \
+	else \
+		rm $@.new; \
+	fi
+
+#Always build the .new and see if they should be updated.
+#    .PHONY: version_headers
+    $(VERSION_HEADERS): force
+    .PHONY: force
+    force: ;
+
+    # version headers must exist for makedepend
+    $(DEPEND_FILES): $(DYNAMIC_VERSIONS_HEADER) $(STATIC_HEADER)
 endif
 #-----------------------------------------------------------------------------
 endif
@@ -717,7 +736,7 @@ endif
   # Is there a better way?
 
   ifneq ($(SHARED_OBJECT), true)
-    $(LIBRARY) : $(C_OBJ)
+    $(LIBRARY) : $(WORKING_DIR)/perl_interpreter_dynamic.o $(C_OBJ)
 		$(AR) $(ARFLAGS) $@ $^
 
     # If there is an export file for libperl.a then use it for this library.
@@ -731,16 +750,16 @@ endif
     # don't retain these relocatable objects
     .INTERMEDIATE : $(C_OBJ)
 
-    ifneq ($(SYSNAME),win32)
-       LIBRARY_LIBS = $(DYNALOADER_LIB) $(PERL_CMISS_LIB) $(STATIC_PERL_LIB)
-    else
-       #I have not got Win32 to work with building the libararies into the
-       #perl_interpreter lib, instead I link them all together at the final link
-       LIBRARY_LIBS = 
+    LIBRARY_LIBS = 
+    ifneq (,$(STATIC_PERL_LIB)) # have a static perl
+      #I have not got Win32 to work with building the libararies into the
+      #perl_interpreter lib, instead I link them all together at the final link
+      ifneq ($(SYSNAME),win32)
+        LIBRARY_LIBS = $(DYNALOADER_LIB) $(PERL_CMISS_LIB) $(STATIC_PERL_LIB)
+      endif
     endif
 
-    $(C_OBJ) : $(foreach unit, $(C_UNITS), $(WORKING_DIR)/$(unit).o ) \
-         $(LIBRARY_LIBS)
+    $(C_OBJ) : $(WORKING_DIR)/perl_interpreter.o $(LIBRARY_LIBS)
 		$(LD_RELOCATABLE) -o $@ $^
   else
     $(LIBRARY) : $(foreach unit, $(C_UNITS), $(WORKING_DIR)/$(unit).o ) \
@@ -756,13 +775,6 @@ endif
   # implicit rules for making the objects
   $(WORKING_DIR)/%.o : $(SOURCE_DIR)/%.c
 	$(CC) -o $@ $(CPPFLAGS) $(CFLAGS) $<
-
-#Dynamic loader code for putting shared objects into the interpreter
-ifeq ($(USE_DYNAMIC_LOADER),true)
-
-  $(WORKING_DIR)/perl_interpreter.o : $(WORKING_DIR)/dynamic_versions.h
-endif
-
 
 #-----------------------------------------------------------------------------
 endif
