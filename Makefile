@@ -180,14 +180,10 @@ else
     # Specify the perl on some platforms so that everyone builds with the same.
     ifeq ($(filter-out IRIX%,$(SYSNAME)),)# SGI
       ifeq ($(filter-out esu%,$(NODENAME)),)
-        ifeq ($(MIPS),3)
-          PERL = ${CMISS_ROOT}/bin/perl 
+        ifeq ($(ABI),n32)
+          PERL = ${CMISS_ROOT}/bin/mips-irix/perl
         else
-          ifeq ($(ABI),n32)
-            PERL = ${CMISS_ROOT}/bin/perl
-          else
-            PERL = ${CMISS_ROOT}/bin/mips-irix/perl64
-          endif
+          PERL = ${CMISS_ROOT}/bin/mips-irix/perl64
         endif
       endif
       ifeq ($(NODENAME),hpc2)
