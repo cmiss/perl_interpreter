@@ -136,7 +136,7 @@ ifndef USE_DYNAMIC_LOADER
     #a shared "libperl.a" I cannot seem to dlopen it.
     USE_DYNAMIC_LOADER = false
   else
-    ifeq ($(SYSNAME,win32)
+    ifeq ($(SYSNAME),win32)
       #I have not tried to make a dynamic perl interpreter in win32,
       #I have not even been including a dynaloader at all so far.
       USE_DYNAMIC_LOADER = false
