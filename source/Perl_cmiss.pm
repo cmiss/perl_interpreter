@@ -32,7 +32,7 @@ sub set_INC_for_platform
 
     my $perlinc;
 
-# see if an environment variable is set to override @INC.
+	# See if an environment variable is set to override @INC.
     foreach my $varname ("CMISS${abi_env}_PERLINC","CMISS_PERLINC")
 	  {
 		if( exists $ENV{$varname} )
@@ -40,11 +40,12 @@ sub set_INC_for_platform
 			$perlinc = $ENV{$varname};
 			last;
 		  }
-      } 
+      }
     unless( $perlinc )
 	  {
-		# no environment variable is set for @INC.
-		# run the local perl to get its @INC so we can use its modules
+		# No environment variable is set for @INC.
+		# Run the local perl to get its @INC so we can use its modules.
+		# Default is first perl in path:
 		my $perl = 'perl';
 		# see if an environment variable specifies which local perl.
 		foreach my $varname ("CMISS${abi_env}_PERL","CMISS_PERL")
@@ -59,7 +60,7 @@ sub set_INC_for_platform
 		local *PERLOUT;
 		unless( defined( my $pid = open PERLOUT, '-|' ) )
 		  {
-			print STDERR "$0: fork failed: $!\n";
+			print STDERR "$^X: fork failed: $!\n";
 		  }
 		elsif( ! $pid ) #child
 		  {
@@ -72,7 +73,7 @@ sub set_INC_for_platform
 			unless( close PERLOUT )
 			  {
 				$! = $? >> 8;
-				print STDERR "$0: exec $perl failed: $!\n";
+				print STDERR "$^X: exec $perl failed: $!\n";
 			  }
 			else
 			  {
@@ -301,47 +302,46 @@ sub execute_command
 					 $token = $token . $1;
 					 $block_required = 1;
 				  }
-				elsif (($token =~ m/^\s*$/) && ($lc_command =~ m/^(itp)?\s*(ass\w*|set)?\s*(ech\w*|deb\w*)?\s*(\?+)/))
-				  {
-					 my $first_word = $1;
-					 my $second_word = $2;
-					 my $third_word = $3;
-					 my $fourth_word = $4;
-					 print "itp\n";
-					 if ((! $second_word) || ($second_word =~ m/ass\w*/))
-						{
-						  print "  assert blocks closed\n";
+				elsif( $token =~ m/^\s*$/ &&
+					   $lc_command =~ m/^(itp(\s+(ass\w*)(?:\s+blo\w*(?:\s+clo\w*)?)?|\s+(set)(\s+(ech\w*)|\s+(deb\w*))?)?\s+)?\?+/ )
+			    {
+				    my $itp = defined $1;
+					my $second_word = defined $2;
+					my $assert = defined $3;
+					my $set = defined $4;
+					my $third_word = defined $5;
+					my $echo = defined $6;
+					my $debug = defined $7;
+
+					print "itp\n";
+					if ( ! $second_word || $assert ) {
+						print "  assert blocks closed\n";
+					}
+					if ( ! $second_word || $set ) {
+						print "  set\n";
+						if ( ! $third_word || $echo ) {
+							print "    echo\n";
+							print "      <on>\n";
+							print "      <off>\n";
+							print "      <prompt PROMPT_STRING>\n";
 						}
-					 if ((! $second_word) || ($second_word =~ m/set/))
-						{
-						  print "  set\n";
-						  if ((! $third_word) || ($third_word =~ m/ech\w*/))
-							 {
-								print "    echo\n";
-								print "      <on>\n";
-								print "      <off>\n";
-								print "      <prompt PROMPT_STRING>\n";
-							 }
-						  if ((! $third_word) || ($third_word =~ m/deb\w*/))
-							 {						  
-								print "    debug\n";
-								print "      <on>\n";
-								print "      <off>\n";
-							 }
+						if ( ! $third_word || $debug ) {
+							print "    debug\n";
+							print "      <on>\n";
+							print "      <off>\n";
 						}
-					 if (! $first_word)
-						{
-						  #Call Cmiss with the help command
-						  $token .= "Perl_cmiss::cmiss_array(\"$fourth_word\")";
-						  push(@tokens, $token);
-						  $token = "";						  
-						}
-					 $command =~ s/^([^}#]*)//;
-					 if ($cmiss_debug)
-						{
-						  print "itp?: $1\n";
-						}
-				  }
+					}
+					if ( ! $itp ) {
+						#Call Cmiss with the help command
+						$token .= "Perl_cmiss::cmiss_array(\"$lc_command\")";
+						push(@tokens, $token);
+						$token = "";
+					}
+					$command =~ s/^([^}#]*)//;
+					if ( $cmiss_debug ) {
+						print "itp?: $1\n";
+					}
+				}
 				elsif ($lc_command =~ m/^itp/)
 				  {
 					 if ($lc_command =~ m/^itp\s+ass\w*\s+blo\w*\s+clo\w*/)
@@ -650,6 +650,6 @@ sub execute_command
 		}
   }
 
-### Local Variables: 
+### Local Variables:
 ### tab-width: 4
-### End: 
+### End:
