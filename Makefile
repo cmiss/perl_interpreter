@@ -237,10 +237,10 @@ ifeq ($(TASK),)
 	$(MAKE) ABI=64 OPT=
   endif
 
-  tidy :
-  ifneq ($(OLD_FILES),)
-	rm $(foreach file,$(OLD_FILES), $(WORKING_DIR)/$(file) )
-  endif
+#   tidy :
+#   ifneq ($(OLD_FILES),)
+# 	rm $(foreach file,$(OLD_FILES), $(WORKING_DIR)/$(file) )
+#   endif
 
   Perl_cmiss/$(PERL_CMISS_MAKEFILE) : $(PERL) Perl_cmiss/Makefile.PL
 	cd Perl_cmiss ; $(PERL) Makefile.PL \
