@@ -30,8 +30,8 @@ ifndef DEBUG
 endif
 
 # set architecture dependent directories and default options
-ARCH_DIR = $(SYSNAME)-$(ABI) #default
-ifeq ($(SYSNAME:IRIX%=),) #SGI
+ARCH_DIR = $(SYSNAME)-$(ABI)# default
+ifeq ($(SYSNAME:IRIX%=),)# SGI
   # Specify what application binary interface (ABI) to use i.e. 32, n32 or 64
   ifndef ABI
     ifeq ($(SGI_ABI),-64)
@@ -65,8 +65,11 @@ endif
 ifeq ($(SYSNAME),AIX)
   ifndef ABI
     ifdef OBJECT_MODE
+      ifneq ($(OBJECT_MODE),32_64)
       ABI = $(OBJECT_MODE)
-    else
+      endif
+    endif
+    ifndef ABI
       ABI = 64
     endif
   endif
@@ -182,63 +185,64 @@ C_INCLUDE_DIRS = $(PERL_ARCHLIB)/CORE $(WORKING_DIR)
 # compiling commands
 
 CC = cc
-LD_RELOCATABLE = ld -r $(LD_FLGS)
+LD_RELOCATABLE = ld -r $(CFL_FLGS) $(L_FLGS)
 AR = ar
-# option lists
-CCFLAGS = $(C_FLGS)
+# Option lists
+# (suboption lists become more specific so that later ones overrule previous)
+CFLAGS = $(strip $(CFL_FLGS) $(CFE_FLGS) $(CF_FLGS))
 CPPFLAGS := $(addprefix -I, $(C_INCLUDE_DIRS) ) '-DABI_ENV="$(ABI_ENV)"'
 ARFLAGS = -cr
 ifneq ($(DEBUG),false)
-  CCFLAGS += $(DBGCC_FLGS)
+  CFLAGS += $(strip $(DBGCF_FLGS) $(DBGC_FLGS))
 else
-  CCFLAGS += $(OPTCC_FLGS)
+  CFLAGS += $(strip $(OPTCFE_FLGS) $(OPTCF_FLGS) $(OPTC_FLGS))
 endif
 # suboption lists
-C_FLGS = -c $(CLD_FLGS) $(CE_FLGS)
-CE_FLGS =
-LD_FLGS = $(CLD_FLGS)
-CLD_FLGS =
-DBGCC_FLGS = $(DBGC_FLGS)
-DBGC_FLGS = -g
-OPTCC_FLGS = $(OPTC_FLGS)
-OPTC_FLGS = -O $(OPT_FLGS)
-OPT_FLGS =
+CFL_FLGS =#	flags for C fortran and linking
+L_FLGS =#	flags for linking only
+CFE_FLGS =#	flags for C fortran and linking executables only
+CF_FLGS = -c#	flags for C and fortran only
+DBGCF_FLGS = -g#OPT=false flags for C and fortran
+DBGC_FLGS =#	OPT=false flags for C only
+OPTCFE_FLGS =#	OPT=true flags for C and fortran and linking executables
+OPTCF_FLGS = -O#OPT=true flags for C and fortran only
+OPTC_FLGS =#	OPT=true flags for C only
 
 ifeq ($(SYSNAME:IRIX%=),)
-  C_FLGS += -use_readonly_const
-  DBGC_FLGS += -DEBUG:trap_uninitialized:subscript_check:verbose_runtime
+  CF_FLGS += -use_readonly_const
+  DBGCF_FLGS += -DEBUG:trap_uninitialized:subscript_check:verbose_runtime
   # warning 158 : Expecting MIPS3 objects: ... MIPS4.
-  LD_FLGS += -rdata_shared -DEBUG:error=158 -woff 47
-  CLD_FLGS := -$(ABI) -$(INSTRUCTION)
-  OPTC_FLGS = -O3 -OPT:Olimit=8000
+  L_FLGS += -rdata_shared -DEBUG:error=158 -woff 47
+  CFL_FLGS = -$(ABI) -$(INSTRUCTION)
+  OPTCF_FLGS = -O3 -OPT:Olimit=8000
 endif
 ifeq ($(SYSNAME),Linux)
   CPPFLAGS += -Dbool=char -DHAS_BOOL
-  OPTC_FLGS = -O2
+  OPTCF_FLGS = -O2
 endif
 ifeq ($(SYSNAME),SunOS)
-  # need arch_flags after -fast
-  OPT_FLGS = -fast $(CLD_FLGS)
+  # need -xarch=native after -fast
+  OPTCFE_FLGS += -fast $(CFE_FLGS)
   ifeq ($(ABI),64)
-    CE_FLGS := -xarch=native64
+    CFE_FLGS += -xarch=native64
   endif
 endif
 ifeq ($(SYSNAME),AIX)
   CC = xlc
   # 1506-743 (I) 64-bit portability: possible change of result through conversion ...
   # FD_SET in sys/time.h does this
-  CCFLAGS += -qinfo=ini:por:pro:trd:tru:use -qsuppress=1506-743
-  ifeq ($(ABI),64)
-    ARFLAGS += -X64
-  endif
+  # no -qinfo=gen because perl redefines many symbols
+  CFLAGS += -qinfo=ini:por:pro:trd:tru:use -qsuppress=1506-743
+  ARFLAGS += -X$(ABI)
   # may want -qsrcmsg
-  C_FLGS += -qfullpath
-  CE_FLGS += -q$(ABI) -qarch=auto
-  LD_FLGS += -b$(ABI)
+  CF_FLGS += -qfullpath
+  CFE_FLGS += -q$(ABI) -qarch=auto
+  L_FLGS += -b$(ABI)
   ifeq ($(ABI),64)
-    C_FLGS += -qwarn64
+    CF_FLGS += -qwarn64
   endif
-  OPTC_FLGS = -O3 -qtune=auto -qstrict -qmaxmem=-1
+  OPTCF_FLGS = -O3 -qmaxmem=12000 -qtune=auto
+  OPTC_FLGS += -qnoignerrno
 endif
 
 #-----------------------------------------------------------------------------
@@ -319,7 +323,7 @@ ifeq ($(TASK),source)
 
   $(WORKING_DIR)/%.d : $(SOURCE_DIR)/%.c
 	makedepend $(CPPFLAGS) -f- -Y $< 2> $@.tmp | sed -e 's%^source\([^ ]*\).o%$$(WORKING_DIR)\1.o $$(WORKING_DIR)\1.d%' > $@
-	(grep pmh $@.tmp | grep makedepend | nawk -F "[ ,]" '{printf("%s.%s:",substr($$4, 1, length($$4) - 2),"o"); for(i = 1 ; i <= NF ; i++)  { if (match($$i,"pmh")) printf(" source/%s", substr($$i, 2, length($$i) -2)) } printf("\n");}' | sed -e 's%^source\([^ ]*\).o%$$(WORKING_DIR)\1.o $$(WORKING_DIR)\1.d%' | sed -e 's%source\([^ ]*\).pmh%$$(WORKING_DIR)\1.pmh%' >> $@)
+	(grep pmh $@.tmp | grep makedepend | nawk -F "[ ,]" '{printf("%s.%s:",substr($$4, 1, length($$4) - 2),"o"); for(i = 1 ; i <= NF ; i++)  { if (match($$i,"pmh")) printf(" source/%s", substr($$i, 2, length($$i) -2)) } printf("\n");}' | sed -e 's%^$(SOURCE_DIR)\([^ ]*\).o%$$(WORKING_DIR)\1.o $$(WORKING_DIR)\1.d%' | sed -e 's%$(SOURCE_DIR)\([^ ]*\).pmh%$$(WORKING_DIR)\1.pmh%' >> $@)
 
 $(WORKING_DIR)/%.pmh : $(SOURCE_DIR)/%.pm
 	utilities/pm2pmh $< > $@
@@ -355,7 +359,7 @@ ifeq ($(TASK),library)
 
   # implicit rules for making the objects
   $(WORKING_DIR)/%.o : $(SOURCE_DIR)/%.c
-	$(CC) -o $@ $(CPPFLAGS) $(CCFLAGS) $<
+	$(CC) -o $@ $(CPPFLAGS) $(CFLAGS) $<
 
 #-----------------------------------------------------------------------------
 endif
