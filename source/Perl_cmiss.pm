@@ -114,7 +114,8 @@ sub add_cmiss_perl_to_INC
 	# If a CMISS_PERLLIB has been found prepend it to the path.
 	if (defined $cmiss_perllib)
 	{
-	  unshift @INC, $cmiss_perllib;
+	  my @path_list = split (':', $cmiss_perllib);
+	  unshift @INC, @path_list;
 	}
  }
 
