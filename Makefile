@@ -137,6 +137,13 @@ else
       endif
     endif
   endif
+  ifeq ($(SYSNAME),AIX)
+      ifeq ($(ABI),32)
+        PERL = /usr/opt/perl-5.6.1/bin/perl
+      else
+        PERL = /usr/opt/perl-5.6.1/bin-$(ABI)/perl
+      endif
+  endif
   ifeq ($(SYSNAME),Linux)
     ifeq ($(NODENAME:esp56%=),)
       PERL = /usr/local/cmiss/bin/perl
@@ -193,7 +200,16 @@ else
       OPT_CFLAGS = -O
       LD_RELOCATABLE = ld -r
     else
-      OPT_CFLAGS = -O2
+      ifeq ($(SYSNAME),AIX)
+        OPT_CFLAGS = -O2
+        ifeq ($(ABI),64)
+          OPT_CFLAGS = -O2 -q64
+          LD_RELOCATABLE = ld -r -b64 
+          ARFLAGS = -cr -X64
+        endif
+      else
+        OPT_CFLAGS = -O2
+      endif
     endif
   endif
 endif
