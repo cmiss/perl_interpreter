@@ -630,14 +630,25 @@ sub execute_command
 										$token = $token . $extracted;
 									 }
 								  else
-									 {
-										if ($cmiss_debug)
-										  {
-											 print "character: " . substr($command, 0, 1) . "\n";
-										  }
-										$token = $token . substr($command, 0, 1);
-										$command = substr($command, 1);
-									 }
+									{
+									  if ($command =~ s/^(\w+)//)
+										{
+										  if ($cmiss_debug)
+											{
+											  print "characters: " . $1 . "\n";
+											}
+										  $token = $token . $1;
+										}
+									  else
+										{
+										  if ($cmiss_debug)
+											{
+											  print "punctuation: " . substr($command, 0, 1) . "\n";
+											}
+										  $token = $token . substr($command, 0, 1);
+										  $command = substr($command, 1);
+										}
+									}
 								}
 						  }
 					 }
