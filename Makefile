@@ -31,7 +31,7 @@ endif
 
 # set architecture dependent directories and default options
 ARCH_DIR = $(SYSNAME)-$(ABI)# default
-ifeq ($(SYSNAME:IRIX%=),)# SGI
+ifeq ($(filter-out IRIX%,$(SYSNAME)),)# SGI
   # Specify what application binary interface (ABI) to use i.e. 32, n32 or 64
   ifndef ABI
     ifeq ($(SGI_ABI),-64)
@@ -45,7 +45,7 @@ ifeq ($(SYSNAME:IRIX%=),)# SGI
     # Using mips3 for most basic version on esu* machines
     # as there are still some Indys around.
     MIPS = 4
-    ifeq ($(NODENAME:esu%=),)
+    ifeq ($(filter-out esu%,$(NODENAME)),)
       ifeq ($(ABI),n32)
         ifneq ($(DEBUG),false)
           MIPS=3
@@ -112,25 +112,24 @@ endif
 ifneq ($(origin CMISS$(ABI_ENV)_PERL),undefined)
   PERL := $(CMISS$(ABI_ENV)_PERL)
 else
-  # need a perl of the same architecture (and ABI) type
-  # so don't just find the first perl in PATH
-  ifneq ($(findstring IRIX,$(SYSNAME)),)
-    ifeq ($(NODENAME:esu%=),)
+  # Specify the perl on some platforms so that everyone builds with the same.
+  ifeq ($(filter-out IRIX%,$(SYSNAME)),)# SGI
+    ifeq ($(filter-out esu%,$(NODENAME)),)
       ifeq ($(INSTRUCTION),mips3)
         PERL = /usr/local/perl5.6/bin-$(INSTRUCTION)/perl
       else
         ifeq ($(ABI),n32)
           PERL = /usr/local/perl5.6/bin/perl
         else
-          PERL = /usr/local/perl5.6/bin-$(ABI)/perl
+          PERL = ${CMISS_ROOT}/bin/mips-irix/perl64
         endif
       endif
     endif
     ifeq ($(NODENAME),hpc2)
       ifeq ($(ABI),n32)
-        PERL = /usr/local/perl5.6/bin/perl
+        PERL = ${CMISS_ROOT}/bin/perl
       else
-        PERL = /usr/local/perl5.6/bin-$(ABI)/perl
+        PERL = ${CMISS_ROOT}/bin/perl64
       endif
     endif
     # What to oxford NODENAMEs look like?
@@ -147,19 +146,20 @@ else
       ifeq ($(ABI),32)
         PERL = ${CMISS_ROOT}/bin/perl
       else
-        PERL = ${CMISS_ROOT}/bin/$(ABI)/perl
+        PERL = ${CMISS_ROOT}/bin/perl64
       endif
   endif
-  ifeq ($(SYSNAME),Linux)
-    ifeq ($(NODENAME:esp56%=),)
-      PERL = /usr/local/cmiss/bin/perl
-    else
-      #only 32-bit, assume first perl in path is suitable for this architecture
-      PERL = $(firstword $(wildcard $(subst :,/perl ,$(PATH))))
-    endif
+  ifeq ($(filter-out esp56%,$(NODENAME)),)
+    PERL = ${CMISS_ROOT}/bin/i686-linux/perl
   endif
   ifndef PERL
-    $(error PERL not defined)
+    ifeq ($(ABI),64)
+      # Need a perl of the same ABI
+      PERL = perl64
+    else
+      # Assume 32-bit and first perl in path is suitable for this architecture
+      PERL = perl
+    endif
   endif
 endif
 
@@ -207,7 +207,7 @@ OPTCFE_FLGS =#	OPT=true flags for C and fortran and linking executables
 OPTCF_FLGS = -O#OPT=true flags for C and fortran only
 OPTC_FLGS =#	OPT=true flags for C only
 
-ifeq ($(SYSNAME:IRIX%=),)
+ifeq ($(filter-out IRIX%,$(SYSNAME)),)# SGI
   CF_FLGS += -use_readonly_const
   DBGCF_FLGS += -DEBUG:trap_uninitialized:subscript_check:verbose_runtime
   # warning 158 : Expecting MIPS3 objects: ... MIPS4.
@@ -297,7 +297,7 @@ debug opt debug64 opt64:
 
   debug debug64: DEBUG=true
   opt opt64: DEBUG=false
-  ifeq ($(SYSNAME:IRIX%=),) #SGI
+  ifeq ($(filter-out IRIX%,$(SYSNAME)),) #SGI
     debug opt: ABI=n32
   else
     debug opt: ABI=32
