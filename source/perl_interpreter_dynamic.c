@@ -8,11 +8,6 @@ Puts a layer between cmiss and the perl interpreter which allows many different
 perl interpreters to be included in the executable and the appropriate one
 selected at runtime according to the perl found in the users path.
 ==============================================================================*/
-#include "static_version.h"       /* for NO_STATIC_FALLBACK */
-#if ! defined (NO_STATIC_FALLBACK)
-#include "EXTERN.h"               /* from the Perl distribution     */
-#include "perl.h"                 /* from the Perl distribution     */
-#endif /* ! defined (NO_STATIC_FALLBACK) */
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
@@ -22,6 +17,7 @@ selected at runtime according to the perl found in the users path.
 #include <fcntl.h>
 #include <dlfcn.h>
 #include <stdarg.h>
+#include "static_version.h"       /* for NO_STATIC_FALLBACK */
 #include "perl_interpreter.h"
 
 static int interpreter_display_message(enum Message_type message_type,
