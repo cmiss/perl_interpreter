@@ -216,11 +216,12 @@ ifeq ($(TASK),)
 
   .NOTPARALLEL:
 
-  TMP_FILES := $(notdir $(wildcard $(WORKING_DIR)/*.* ) )
-  OLD_FILES := $(filter-out $(PMH_FILES) $(foreach unit,$(UNITS),$(unit).%), \
-    $(TMP_FILES))
+# needs some thought
+#   TMP_FILES := $(notdir $(wildcard $(WORKING_DIR)/*.* ) )
+#   OLD_FILES := $(filter-out $(PMH_FILES) $(foreach unit,$(UNITS),$(unit).%), \
+#     $(TMP_FILES))
 
-  .PHONY : main tidy clean all
+  .PHONY : main clean all# tidy
 
   main : Perl_cmiss/$(PERL_CMISS_MAKEFILE) $(WORKING_DIR) $(LIBRARY_DIR)
 	$(MAKE) --directory=Perl_cmiss --file=$(PERL_CMISS_MAKEFILE) \
