@@ -148,6 +148,27 @@ and then executes the returned strings
 	perl_destruct(perl_interpreter);
 	perl_free(perl_interpreter);
 
+	if(perl_interpreter_filehandle_in)
+	{
+		close(perl_interpreter_filehandle_in);
+		perl_interpreter_filehandle_in = 0;
+	}
+	if(perl_interpreter_filehandle_out)
+	{
+		close(perl_interpreter_filehandle_out);
+		perl_interpreter_filehandle_out = 0;
+	}
+	if (keep_stdout)
+	{
+		close(keep_stdout);
+		keep_stdout = 0;
+	}
+	if (keep_stderr)
+	{
+		close(keep_stderr);
+		keep_stderr = 0;
+	}
+
 	*status = 1;
 }
 
