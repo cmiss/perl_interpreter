@@ -699,7 +699,7 @@ ifeq ($(TASK),source)
 	(grep pmh $@.tmp | grep makedepend | awk -F "[ ,]" '{printf("%s.%s:",substr($$4, 1, length($$4) - 2),"o"); for(i = 1 ; i <= NF ; i++)  { if (match($$i,"pmh")) printf(" source/%s", substr($$i, 2, length($$i) -2)) } printf("\n");}' | sed -e 's%^$(SOURCE_DIR)\([^ ]*\).o%$$(WORKING_DIR)\1.o $$(WORKING_DIR)\1.d%' | sed -e 's%$(SOURCE_DIR)\([^ ]*\).pmh%$$(WORKING_DIR)\1.pmh%' >> $@)
 
 $(WORKING_DIR)/%.pmh : $(SOURCE_DIR)/%.pm
-	utilities/pm2pmh $< > $@
+	$(PERL) utilities/pm2pmh $< > $@
 
 #Dynamic loader code for putting shared objects into the interpreter
 ifeq ($(USE_DYNAMIC_LOADER),true)
@@ -779,7 +779,7 @@ ifneq ($(SHARED_OBJECT), true)
 	if [ -L $(LIBRARY_LINK) ] || [ -e $(LIBRARY_LINK) ] ; then \
 		rm $(LIBRARY_LINK) ; \
 	fi
-	ln -s $(LIBRARY_VERSION)/$(LIBRARY_NAME) $(LIBRARY_LINK)
+	cd $(LIBRARY_ROOT_DIR); ln -s $(LIBRARY_VERSION)/$(LIBRARY_NAME) $(LIBRARY_NAME); cd ../..
 endif
 
   # explicit rule for making the library
