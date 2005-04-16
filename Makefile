@@ -12,7 +12,7 @@ ifndef SYSNAME
   ifeq ($(SYSNAME),)
     $(error error with shell command uname)
   endif
-  ifeq ($(SYSNAME),MINGW32_NT-5.1)
+  ifneq ($(filter MINGW32%,$(SYSNAME)),)
     SYSNAME=win32
   endif
 endif
