@@ -231,13 +231,11 @@ else
           PERL = ${CMISS_ROOT}/bin/$(ABI)/perl
         endif
     endif
+    ifeq ($(SYSNAME),win32)
+	PERL = ${CMISS_ROOT}/perl/bin/perl
+    endif
     ifeq ($(filter-out esp56%,$(NODENAME)),)
       PERL = ${CMISS_ROOT}/bin/i686-linux/perl
-    endif
-    ifeq ($(SYSNAME),win32)
-      PERL = c:/perl/5.6.1/bin/MSWin32-x86/perl.exe
-# eg for a MinGW system
-#      PERL = /usr/lib/perl5/5.9.1/bin/MSWin32-x86-multi-thread/perl.exe
     endif
   endif
 endif
