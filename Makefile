@@ -790,10 +790,10 @@ endif
       $(LIBRARY):
 	mkdir archive_members
 	cd archive_members; \
-	$(AR) x $(PERL_CMISS_LIB); \
+	$(AR) x ../$(PERL_CMISS_LIB); \
 	$(AR) x $(STATIC_PERL_LIB); \
 	cd ..; \
-	$(AR) q $(LIBRARY) archive_members/*; \
+	$(AR) q $(LIBRARY) $(WORKING_DIR)/perl_interpreter.o archive_members/*; \
 	rm -fr archive_members; \
 	ranlib $(LIBRARY)
     else
