@@ -786,9 +786,21 @@ endif
       $(LIBRARY) : $(WORKING_DIR)/perl_interpreter_dynamic.o
     endif
 
-    $(LIBRARY):
+    ifeq ($(SYSNAME),win32)
+      $(LIBRARY):
+	mkdir archive_members
+	cd archive_members; \
+	$(AR) x $(PERL_CMISS_LIB); \
+	$(AR) x $(STATIC_PERL_LIB); \
+	cd ..; \
+	$(AR) q $(LIBRARY) archive_members/*; \
+	rm -fr archive_members; \
+	ranlib $(LIBRARY)
+    else
+      $(LIBRARY):
 	[ ! -f $@ ] || rm $@
 	$(AR) $(ARFLAGS) $@ $^
+    endif
 
     ifneq (,$(STATIC_PERL_LIB)) # have a static perl
       # Including all necessary objects from archives into output archive.
