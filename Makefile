@@ -611,7 +611,7 @@ ifneq ($(OPERATING_SYSTEM),win32)
 	$(MAKE) --directory=$(PERL_WORKING_DIR) static
 else
    #Use dmake as it supports back slashes for paths
-	cd $(PERL_WORKING_DIR) ; unset SHELL ; dmake static
+	cd $(PERL_WORKING_DIR) ; unset SHELL ; $(CMISS_ROOT)/perl/build/dmake-4.1pl1-win32/dmake static
 endif
 	$(MAKE) --no-print-directory USE_DYNAMIC_LOADER=$(USE_DYNAMIC_LOADER) \
 	  SHARED_LIBRARIES='$(SHARED_LIBRARIES)' TASK=source
