@@ -7,6 +7,11 @@ DESCRIPTION :
 Provides an interface between cmiss and a Perl interpreter.
 ==============================================================================*/
 
+#ifdef WIN32
+/* Need this to make static linking work... */
+#define PERLDLL
+#endif
+
 #include "EXTERN.h"               /* from the Perl distribution     */
 #include "perl.h"                 /* from the Perl distribution     */
 #include <stdio.h>
@@ -14,6 +19,12 @@ Provides an interface between cmiss and a Perl interpreter.
 #include <fcntl.h>
 #include <stdarg.h>
 #include "perl_interpreter.h"
+
+#if defined(WIN32) && !defined(perl_get_av)
+#define perl_get_av(a,b) Perl_get_av(aTHX_ a, b)
+#define perl_get_sv(a,b) Perl_get_sv(aTHX_ a, b)
+#define perl_eval_pv(a,b) Perl_eval_pv(aTHX_ a, b)
+#endif
 
 struct Interpreter 
 /*******************************************************************************
@@ -214,6 +225,10 @@ Creates the interpreter for processing commands.
   int i, number_of_load_commands, return_code;
 
   return_code = 1;
+
+#ifdef WIN32
+	PERL_SYS_INIT(&argc, &argv);
+#endif
 
 	if (*interpreter = (struct Interpreter *)malloc(sizeof (struct Interpreter)))
 	{
