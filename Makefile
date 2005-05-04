@@ -366,12 +366,21 @@ LIB_EXP := $(patsubst %$(LIBRARY_SUFFIX), %.exp, $(LIBRARY_LINK))
 
 SOURCE_FILES := $(notdir $(wildcard $(SOURCE_DIR)/*.*) )
 PMH_FILES := $(patsubst %.pm, %.pmh, $(filter %.pm, $(SOURCE_FILES)))
-C_SOURCES := perl_interpreter.c
+ifneq ($(STATIC_PERL_LIB),)# have static perl
+  C_SOURCES := perl_interpreter.c
+else
+  ifeq ($(SHARED_OBJECT),true)
+    C_SOURCES := perl_interpreter.c
+  else
+    C_SOURCES :=
+  endif
+endif
 ifeq ($(USE_DYNAMIC_LOADER), true)
    C_SOURCES += perl_interpreter_dynamic.c
 endif
 C_UNITS := $(basename $(C_SOURCES) )
 DEPEND_FILES := $(foreach unit, $(C_UNITS), $(WORKING_DIR)/$(unit).d )
+OBJECTS := $(foreach unit, $(C_UNITS), $(WORKING_DIR)/$(unit).o )
 
 C_OBJ := $(WORKING_DIR)/libperlinterpreter.o
 
@@ -380,7 +389,6 @@ C_OBJ := $(WORKING_DIR)/libperlinterpreter.o
 # compiling commands
 
 CC = cc
-LD_RELOCATABLE = ld -r $(CFL_FLGS) $(L_FLGS)
 LD_SHARED = ld -shared $(CFL_FLGS) $(L_FLGS)
 SHARED_LINK_LIBRARIES = 
 AR = ar
@@ -782,57 +790,51 @@ endif
 
   # explicit rule for making the library
   ifneq ($(SHARED_OBJECT), true)
-    ifeq ($(USE_DYNAMIC_LOADER),true)
-      $(LIBRARY) : $(WORKING_DIR)/perl_interpreter_dynamic.o
-    endif
 
-    ifeq ($(SYSNAME),win32)
-      $(LIBRARY):
-	mkdir archive_members
-	cd archive_members; \
-	$(AR) x ../$(PERL_CMISS_LIB); \
-	$(AR) x $(STATIC_PERL_LIB); \
-	cd ..; \
-	$(AR) q $(LIBRARY) $(WORKING_DIR)/perl_interpreter.o archive_members/*; \
-	rm -fr archive_members; \
-	ranlib $(LIBRARY)
-    else
-      $(LIBRARY):
-	[ ! -f $@ ] || rm $@
-	$(AR) $(ARFLAGS) $@ $^
-    endif
+    $(LIBRARY) : $(OBJECTS)
 
-    ifneq (,$(STATIC_PERL_LIB)) # have a static perl
-      # Including all necessary objects from archives into output archive.
-      # This is done by producing a relocatable object first.
-      # Is there a better way?
+    ARCHIVE_MEMBERS := $(OBJECTS)
 
-      $(LIBRARY) : $(C_OBJ)
-      # don't retain these relocatable objects
-      .INTERMEDIATE : $(C_OBJ)
+    ifneq ($(STATIC_PERL_LIB),) # have a static perl
 
-      #I have not got Win32 to work with building the libararies into the
-      #perl_interpreter lib, instead I link them all together at the final link
-      ifneq ($(OPERATING_SYSTEM),win32)
-        LIBRARY_LIBS = $(DYNALOADER_LIB) $(PERL_CMISS_LIB) $(STATIC_PERL_LIB)
+      ifeq ($(SYSNAME),win32)
+        LIBRARY_LIBS :=
       else
-        LIBRARY_LIBS = 
+        LIBRARY_LIBS := $(DYNALOADER_LIB)
       endif
-      $(C_OBJ) : $(WORKING_DIR)/perl_interpreter.o $(LIBRARY_LIBS)
-		$(LD_RELOCATABLE) -o $@ $^
+      LIBRARY_LIBS += $(STATIC_PERL_LIB) $(CURDIR)/$(PERL_CMISS_LIB)
+
+      $(LIBRARY) : $(LIBRARY_LIBS)
+
+      MEMBERS_DIR := $(WORKING_DIR)/archive_members
+      # Hopefully there are not too many objects for the command line
+      ARCHIVE_MEMBERS += $(MEMBERS_DIR)/*
 
       # If there is an export file for libperl.a then use it for this library.
       ifneq ($(PERL_EXP),)
         main : $(LIB_EXP)
 
         $(LIB_EXP) : $(PERL_EXP)
-			cp -f $^ $@
+		cp -f $^ $@
       endif
 
     endif
 
-  else
-    $(LIBRARY) : $(foreach unit, $(C_UNITS), $(WORKING_DIR)/$(unit).o ) \
+    $(LIBRARY):
+    ifneq ($(STATIC_PERL_LIB),) # have a static perl
+	mkdir -p $(MEMBERS_DIR)
+    # Hopefully none of the libraries have objects of the same name
+	cd $(MEMBERS_DIR) && \
+          for lib in $(LIBRARY_LIBS); do $(AR) x $$lib; done
+    endif
+	[ ! -f $@ ] || rm $@
+	$(AR) $(ARFLAGS) $@ $(ARCHIVE_MEMBERS)
+    ifneq ($(STATIC_PERL_LIB),) # have a static perl
+	rm -r $(MEMBERS_DIR)
+    endif
+
+  else# shared object
+    $(LIBRARY) : $(OBJECTS) \
          $(DYNALOADER_LIB) $(PERL_CMISS_LIB) $(STATIC_PERL_LIB)
 		$(LD_SHARED) -o $@ $^ $(SHARED_LINK_LIBRARIES)
   endif
