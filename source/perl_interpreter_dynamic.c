@@ -81,7 +81,7 @@ The default interpreter_display_message_function.
 } /* interpreter_display_message */
 
 /* Used by dynamic_versions.h */
-struct Interpreter_library_strings {   char *version; char *archname; char *base64_string; };
+struct Interpreter_library_strings { char *api_string; char *base64_string; };
 #include "dynamic_versions.h"
 
 #define LOAD_FUNCTION(symbol) \
@@ -420,9 +420,9 @@ Dynamic loader wrapper which loads an appropriate interpreter, initialises all
 the function pointers and then calls create_interpreter_ for that instance.
 ==============================================================================*/
 {
-	char command[300], *library, perl_archname[200], *perl_executable,
-		*perl_executable_default = "perl", *perl_interpreter_string, perl_version[200],
-		perl_archlib[200], perl_result_buffer[500], perl_shared_library[200];
+	char *library, perl_api_string[200], *perl_executable,
+		*perl_executable_default = "perl", *perl_interpreter_string,
+		perl_archlib[300];
 	fd_set readfds;
 	int i, number_of_perl_interpreters, return_code,
 		stdout_pipe[2], old_stdout;
@@ -440,8 +440,7 @@ the function pointers and then calls create_interpreter_ for that instance.
 		perl_interpreter_string = (char *)NULL;
 		library = (char *)NULL;
 
-		*perl_archname = 0;
-		*perl_version = 0;
+		*perl_api_string = 0;
 		*perl_archlib = 0;
 
 		interpreter_handle = NULL;
@@ -453,6 +452,9 @@ the function pointers and then calls create_interpreter_ for that instance.
 		{
 			if (0 == pipe(stdout_pipe))
 			{
+				char command[500];
+
+			  /* !!! We should fork here so that the writing doesn't block because the reading process is waiting */
 				/* Redirect stdout */
 				old_stdout = dup(STDOUT_FILENO);
 				dup2(stdout_pipe[1], STDOUT_FILENO);
@@ -467,7 +469,14 @@ the function pointers and then calls create_interpreter_ for that instance.
 					}
 				}
 
-				sprintf(command, "%s -MConfig -e 'print \"$Config{archname} $Config{version} $Config{archlibexp}\\n\"'", perl_executable);
+				/* api_versionstring specifies the binary interface version.
+				   usethreads use64bitall use64bitint uselongdouble useperlio
+				   usemultiplicity specify compile-time options affecting binary
+				   compatibility.
+					 version is filesystem dependent so use $^V ? sprintf("%vd",$^V) : $]
+				*/
+				/* !!! length of perl_executable is not checked !!! */
+				sprintf(command, "%s -MConfig -e 'print $Config{api_versionstring},(map{$Config{\"use$_\"}?\"-$_\":()}qw(threads multiplicity 64bitall longdouble perlio)),\" $Config{installarchlib}\"'", perl_executable);
 				system(command);
 
 				/* Set stdout back */
@@ -480,16 +489,16 @@ the function pointers and then calls create_interpreter_ for that instance.
 				timeout_struct.tv_usec = 0;
 				if (select(FD_SETSIZE, &readfds, NULL, NULL, &timeout_struct))
 				{
+					char perl_result_buffer[500];
 					if (number_read = read(stdout_pipe[0], perl_result_buffer, 499))
 					{
 						perl_result_buffer[number_read] = 0;
-						if (3 == sscanf(perl_result_buffer, "%190s %190s %190s", perl_archname, 
-								perl_version, perl_archlib))
+						if (2 == sscanf(perl_result_buffer, "%190s %290s",
+														perl_api_string, perl_archlib))
 						{
 							for (i = 0 ; i < number_of_perl_interpreters ; i++)
 							{
-								if ((!strcmp(perl_archname, interpreter_strings[i].archname))
-									&& (!strcmp(perl_version, interpreter_strings[i].version)))
+								if (0 == strcmp(perl_api_string, interpreter_strings[i].api_string))
 								{
 									perl_interpreter_string = interpreter_strings[i].base64_string;
 								}
@@ -520,6 +529,7 @@ the function pointers and then calls create_interpreter_ for that instance.
 			if (library = write_base64_string_to_binary_file(*interpreter,
 					perl_interpreter_string))
 			{
+				char perl_shared_library[350];
 				sprintf(perl_shared_library, "%s/CORE/libperl.so", perl_archlib);
 				if (perl_handle = dlopen(perl_shared_library, RTLD_LAZY | RTLD_GLOBAL))
 				{
@@ -543,19 +553,19 @@ the function pointers and then calls create_interpreter_ for that instance.
 			}
 			else
 			{
-				if (*perl_version && *perl_archname)
+				if (*perl_api_string)
 				{
 					/* We didn't get a match so lets list all the versions strings */
 					((*interpreter)->display_message_function)(ERROR_MESSAGE,
-						"Your perl reported version \"%s\" and archname \"%s\".",
-						perl_version, perl_archname);
+						"Your perl reported API version and options \"%s\".",
+						perl_api_string);
 					((*interpreter)->display_message_function)(ERROR_MESSAGE,
-						"The version and archname interpreters included in this executable are:");
+						"The APIs supported by interpreters included in this executable are:");
 					for (i = 0 ; i < number_of_perl_interpreters ; i++)
 					{
 						((*interpreter)->display_message_function)(ERROR_MESSAGE,
-							"                         %s             %s",
-							interpreter_strings[i].version, interpreter_strings[i].archname);
+							"                         %s",
+							interpreter_strings[i].api_string);
 					}
 				}
 			}
@@ -856,3 +866,9 @@ Dynamic loader wrapper
 			class_name, value, status);
 	}
 } /* interpreter_set_pointer */
+
+/*
+	Local Variables: 
+	tab-width: 2
+	End: 
+*/
