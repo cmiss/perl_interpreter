@@ -2,16 +2,12 @@ use strict;
 use ExtUtils::MakeMaker;
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
 # the contents of the Makefile that is written.
-use Config;
 
 my $name = 'Perl_cmiss';
 my $xs = "$name.xs";
 
-my $working_dir = "generated/$Config{version}/$Config{archname}";
-if (defined $ENV{CMISS_PERL_CALLBACK_SUFFIX})
-  {
-	 $working_dir .= "-" . $ENV{CMISS_PERL_CALLBACK_SUFFIX};
-  }
+my $working_dir = $ENV{WORKING_DIR} or
+  die "required environment variable WORKING_DIR not set";
 unless( -d $working_dir ) {
     use File::Path;
     # make and print subdirectories
@@ -38,6 +34,8 @@ my $define_list;
 if (defined $ENV{CMISS_PERL_CALLBACK})
   {
 	 $define_list .= " -DCMISS_PERL_CALLBACK=\"$ENV{CMISS_PERL_CALLBACK}\"";
+# I don't think this is necessary because XS_Perl_cmiss_cmiss is a static
+# function that is handled by function pointers.
 	 $define_list .= " -DXS_Perl_cmiss_cmiss=\"XS_Perl_cmiss_$ENV{CMISS_PERL_CALLBACK}\"";
   }
 else
@@ -48,11 +46,12 @@ else
 #my $object = "$name.o";
 WriteMakefile(
     'NAME'	=> $name,
+    # ??? Shouldn't this be "$source_dir/../source/$name.pm" or should that be moved here.
     'VERSION_FROM' => "$source_dir/$name.pm", # finds $VERSION
 #    'EXTRALIBS' => '',# to prevent undefined warnings in Makefile
     'MYEXTLIB'  => '',# to prevent undefined warnings in Makefile
     'INC'	=> "-I$source_dir",     # e.g., '-I/usr/include/other'
-    'DEFINE'	=> $define_list,# to prevent undefined warnings in Makefile
+    'DEFINE'	=> $define_list,
     'LINKTYPE'  => 'static',
     'INST_ARCHLIB' => '.'
 );
