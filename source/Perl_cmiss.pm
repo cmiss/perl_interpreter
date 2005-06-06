@@ -25,71 +25,118 @@ my $block_required = 0;
 my $echo_commands = 0;
 my $echo_prompt = "";
 my $cmiss_debug = 0;
+# Try to use Config.pm but only print a failure message once
+my $use_config = 1;
 
-sub set_INC_for_platform
+sub set_INC_for_platform ($)
   {
+	# Call this if the perl interpreter does not match the modules on the
+	# local system (i.e. it is a built-in interpreter.
     my ($abi_env) = @_;
 
     my $perlinc;
+	my $module_perl_version;
+
+	# Run the local perl to get its version and @INC so we can use its
+	# modules.
+
+	# Default is first perl in path:
+	my $perl = 'perl';
+	# see if an environment variable specifies which local perl.
+	foreach my $varname ("CMISS${abi_env}_PERL","CMISS_PERL")
+	  {
+		if( exists $ENV{$varname} )
+		  {
+			$perl = $ENV{$varname};
+			last;
+		  }
+	  }
+	# fork and catch STDOUT from the child.
+	local *PERLOUT;
+	unless( defined( my $pid = open PERLOUT, '-|' ) )
+	  {
+		print STDERR "$^X: fork failed: $!\n";
+	  }
+	elsif( ! $pid ) #child
+	  {
+		exec $perl, '-e', 'print join ":", $^V ? sprintf("%vd",$^V) : $], @INC'
+		  or exit $!;
+	  }
+	else # parent
+	  {
+		my $perlout = <PERLOUT>;
+		# check child completed successfully
+		unless( close PERLOUT )
+		  {
+			$! = $? >> 8;
+			print STDERR "$^X: exec $perl failed: $!\n";
+			$use_config = 0;
+		  }
+		else
+		  {
+			# perl has given us its version include list.
+			($module_perl_version,@INC) = split /:/,$perlout;
+		  }
+	  }
 
 	# See if an environment variable is set to override @INC.
     foreach my $varname ("CMISS${abi_env}_PERLINC","CMISS_PERLINC")
 	  {
 		if( exists $ENV{$varname} )
 		  {
-			$perlinc = $ENV{$varname};
+			@INC = split /:/,$ENV{$varname};
 			last;
 		  }
       }
-    unless( $perlinc )
-	  {
-		# No environment variable is set for @INC.
-		# Run the local perl to get its @INC so we can use its modules.
-		# Default is first perl in path:
-		my $perl = 'perl';
-		# see if an environment variable specifies which local perl.
-		foreach my $varname ("CMISS${abi_env}_PERL","CMISS_PERL")
-		  {
-			if( exists $ENV{$varname} )
-			  {
-				$perl = $ENV{$varname};
-				last;
-			  }
-		  }
-		# fork and catch STDOUT from the child.
-		local *PERLOUT;
-		unless( defined( my $pid = open PERLOUT, '-|' ) )
-		  {
-			print STDERR "$^X: fork failed: $!\n";
-		  }
-		elsif( ! $pid ) #child
-		  {
-			exec $perl, '-e', 'print join ":", @INC' or exit $!;
-		  }
-		else # parent
-		  { 
-			my $perlout = <PERLOUT>;
-			# check child completed successfully
-			unless( close PERLOUT )
-			  {
-				$! = $? >> 8;
-				print STDERR "$^X: exec $perl failed: $!\n";
-			  }
-			else
-			  {
-				# perl has given us its include list.
-				$perlinc = $perlout;
-			  }
-		  }
-      }
 
-    if( defined $perlinc ) { @INC = split /:/, $perlinc }
+	# Dynaloader.pm uses Config.pm.
+
+	# Config.pm checks with the version of the interpreter.  We can lie about
+	# our version so that this check passes.  Do this here so that require
+	# Config works seemlessly elsewhere.
+	# Should we check binary compatibility first?
+
+	if( defined $module_perl_version )
+	  {
+		# Convert version to a version literal for $^V
+		eval "local \$^V = v$module_perl_version; require Config";
+
+		if ( $@ )
+		  {
+			warn $@;
+			$use_config = 0;
+		  }
+# 		else
+# 		  {
+		    # Now that we have Config, it would be an easy and good time to
+			# check that we are binary compatible.  We could even pretend to
+			# unrequire Config if we are not.
+# 		  }
+	  }
+  }
+
+sub load_DynaLoader ()
+  {
+	# Dynaloader uses Config
+	if( $use_config )
+	  {
+		# Load the DynaLoader module
+		eval $DynaLoader_pm;
+		if ( $@ )
+		  {
+			warn $@;
+		  }
+		else
+		  {
+			# Record that this is loaded so nothing tries to load it again.
+			$INC{"DynaLoader.pm"} = 1;
+		  }
+		undef $DynaLoader_pm; # Free the symbol
+	  }
   }
 
 sub add_cmiss_perl_to_INC
   {
-	my $use_config = 0;
-
 	{
 	  #By not using "use" we can avoid the BEGIN and therefore the $use_config
 	  #variable will be in the correct scope.  Because of this the automatic imports
@@ -98,10 +145,7 @@ sub add_cmiss_perl_to_INC
 	  if ( $@ )
 	  {
 		warn $@;
-	  }
-	  else
-	  {
-		$use_config = 1;
+		$use_config = 0;
 	  }
 	}
 
@@ -118,6 +162,8 @@ sub add_cmiss_perl_to_INC
 		if ( $use_config )
 		{
 		  #Add in a version/archname specific derivative of any paths if they exist
+		  # !!! Should use inc_version_list here (or just use lib.pm)
+		  # or even choose our own old versions.
 		  @path_list = (@env_list,
 			 grep { -d $_ } map { "$_/$Config::Config{version}/$Config::Config{archname}" } @env_list);
 		}
@@ -151,7 +197,6 @@ sub add_cmiss_perl_to_INC
 	  unshift @INC, @path_list;
 	}
  }
-
 
 sub register_keyword
   {
