@@ -41,7 +41,7 @@ cmiss(name)
 	CODE:
 	{
 		SV *sv_variable;
-		long long internal_interpreter_pointer;
+		IV internal_interpreter_pointer;
 
 		sv_variable = perl_get_sv("Perl_cmiss::internal_interpreter_structure", TRUE);
 		internal_interpreter_pointer = SvIV(sv_variable);
