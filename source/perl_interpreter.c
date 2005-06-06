@@ -14,6 +14,11 @@ Provides an interface between cmiss and a Perl interpreter.
 
 #include "EXTERN.h"               /* from the Perl distribution     */
 #include "perl.h"                 /* from the Perl distribution     */
+#ifdef SHARED_OBJECT /* This condition should really be `shared libperl' */
+/* binary compatible accessor functions for perl variables
+	 (from the Perl distribution) */
+#  include "perlapi.h"
+#endif
 #include <stdio.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -188,15 +193,26 @@ Creates the interpreter for processing commands.
 	 "}\n"
 #include "Balanced.pmh"
 #include "Perl_cmiss.pmh"
+		/* Still in package Perl_cmiss: */
+#if ! defined (WIN32)
+    /* A separate perl_eval_pv would probably be better and remove the need to
+			 store this in a perl variable */
+		"$DynaLoader_pm = <<\\EOPM;\n"
+#include "DynaLoader.pmh"
+		"EOPM\n"
+#endif /* ! defined (WIN32) */
 	 "$| = 1;\n"
     ;
+
   char *load_commands[] =
   {
 #if ! defined (WIN32)
     /* This code is not working in Win32 at the moment */
 #if ! defined (SHARED_OBJECT)
+		/* Using a built-in perl */
 		"Perl_cmiss::set_INC_for_platform('" ABI_ENV "')",
 #endif /* defined (SHARED_OBJECT) */
+		"Perl_cmiss::load_DynaLoader",
 		"Perl_cmiss::add_cmiss_perl_to_INC('" ABI_ENV "')",
 #endif /* ! defined (WIN32) */
 		"Perl_cmiss::register_keyword assign",
@@ -325,7 +341,7 @@ Creates the interpreter for processing commands.
 							interpreter so it can be passed by the callback function,
 							preferable to having it global in this file. */
 					 sv_variable = perl_get_sv("Perl_cmiss::internal_interpreter_structure", TRUE);
-					 sv_setiv(sv_variable, (long long)(*interpreter));
+					 sv_setiv(sv_variable, (IV)(*interpreter));
 				}
 
 				FREETMPS ;
