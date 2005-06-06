@@ -182,6 +182,10 @@ endif
 
 # Location of perl.
 # Try to determine from environment.
+# !!! if this perl is built with gcc -fPIC and its static library is linked
+# into the executable its symbols will be exported and override those in any
+# shared library loaded.
+
 # gmake doesn't do what I want with this:
 # ifdef CMISS$(ABI_ENV)_PERL
 ifneq ($(origin CMISS$(ABI_ENV)_PERL),undefined)
@@ -240,67 +244,79 @@ else
   endif
 endif
 
-#Make architecture directory names and lib name
-PERL_ARCHNAME := $(shell $(PERL) -MConfig -e 'print "$$Config{archname}\n"')
-ifeq ($(PERL_ARCHNAME),)
+#Make api directory names and lib name
+
+# There may be an issue with the perl 5.8.1 threaded build if Perl_cmiss calls
+# "certain re-entrant system calls".  See perldoc perl582delta.
+get_perl_api_string = $(shell $1 -MConfig -e 'print $$Config{api_versionstring}, map { $$Config{"use$$_"} ? "-$$_" : () } qw(threads multiplicity 64bitall longdouble perlio)')
+PERL_API_STRING := $(call get_perl_api_string,$(PERL))
+ifeq ($(PERL_API_STRING),)
   $(error problem with $(PERL))
 endif
 ifeq ($(SYSNAME),win32)
-  PERL_ARCHLIB := $(subst \,/,$(shell $(PERL) -MConfig -e 'print "$$Config{archlibexp}\n"'))
+  PERL_ARCHLIB := $(subst \,/,$(shell $(PERL) -MConfig -e 'print "$$Config{installarchlib}\n"'))
 else
-  PERL_ARCHLIB := $(subst \,/,$(shell $(PERL) -MConfig -e 'print "$$Config{archlibexp}\n"'))
+  PERL_ARCHLIB := $(shell $(PERL) -MConfig -e 'print "$$Config{installarchlib}\n"')
 endif
 ifeq ($(PERL_ARCHLIB),)
   $(error problem with $(PERL))
 endif
-PERL_VERSION := $(shell $(PERL) -MConfig -e 'print "$$Config{version}\n"')
-ifeq ($(PERL_VERSION),)
-  $(error problem with $(PERL))
-endif
+# $Config{libperl,useshrplib} may be useful.  If an archname is required
+# $Config{targetarch} || $Config{myarchname} gives perl's Configure's
+# interpretation of the archname which could be less distribution specific
+# than $Config{archname}.
 PERL_CFLAGS := $(shell $(PERL) -MConfig -e 'print "$$Config{ccflags}\n"')
 ifeq ($(PERL_CFLAGS),)
   $(error problem with $(CFLAGS))
 endif
-DYNALOADER_LIB = $(PERL_ARCHLIB)/auto/DynaLoader/DynaLoader.a
+
+# I don't think there is any point in having a unique name here unless we also
+# have a unique name for boot_Perl_cmiss, and building the dso with -Bsymbolic
+# should make this unnecessary.
 #Mangle the callback name so that we don't pick up the wrong version even when it is accidently visible
 ifeq ($(SHARED_OBJECT), true)
-   CMISS_PERL_CALLBACK_SUFFIX_A := $(PERL_VERSION)/$(PERL_ARCHNAME)
-   CMISS_PERL_CALLBACK_SUFFIX_B := $(subst .,_,$(CMISS_PERL_CALLBACK_SUFFIX_A))
-   CMISS_PERL_CALLBACK_SUFFIX_C := $(subst /,_,$(CMISS_PERL_CALLBACK_SUFFIX_B))
-   CMISS_PERL_CALLBACK_SUFFIX := $(subst -,_,$(CMISS_PERL_CALLBACK_SUFFIX_C))
+   CMISS_PERL_CALLBACK_SUFFIX := $(subst .,_,$(PERL_API_STRING))
+   CMISS_PERL_CALLBACK_SUFFIX := $(subst -,_,$(CMISS_PERL_CALLBACK_SUFFIX))
+   PERL_CMISS_WORKING_DIR = Perl_cmiss/generated/$(BIN_ARCH_DIR)/$(PERL_API_STRING)
 else
    CMISS_PERL_CALLBACK_SUFFIX := static
+   PERL_CMISS_WORKING_DIR = Perl_cmiss/generated/$(BIN_ARCH_DIR)/$(PERL_API_STRING)-static
 endif
 CMISS_PERL_CALLBACK=cmiss_perl_callback_$(CMISS_PERL_CALLBACK_SUFFIX)
-PERL_WORKING_DIR = Perl_cmiss/generated/$(PERL_VERSION)/$(PERL_ARCHNAME)-$(CMISS_PERL_CALLBACK_SUFFIX)
-PERL_CMISS_MAKEFILE = $(PERL_WORKING_DIR)/Makefile
-PERL_CMISS_LIB = $(PERL_WORKING_DIR)/auto/Perl_cmiss/Perl_cmiss.a
+PERL_CMISS_MAKEFILE = $(PERL_CMISS_WORKING_DIR)/Makefile
+PERL_CMISS_LIB = $(PERL_CMISS_WORKING_DIR)/auto/Perl_cmiss/Perl_cmiss.a
 ifeq ($(TASK),)
-  ifneq ($(USE_DYNAMIC_LOADER),false) #true or maybe
+  ifeq ($(USE_DYNAMIC_LOADER),false)
+    SHARED_PERL_API_STRINGS=
+  else # USE_DYNAMIC_LOADER is true or maybe
     SHARED_PERL_EXECUTABLES =
     ifneq ($(wildcard ${CMISS_ROOT}/perl),)
       ifeq ($(SYSNAME),Linux)
         ifeq ($(filter-out i%86,$(MACHNAME)),)
-          SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-i386-linux*/perl)
-          SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-i686-linux*/perl)
+          SHARED_PERL_EXECUTABLES += $(wildcard $(foreach version,5.6.2 5.8.0,${CMISS_ROOT}/perl/lib/$(version)/i686-linux*/bin/perl))
         else
-          SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-$(MACHNAME)-linux*/perl)
+          SHARED_PERL_EXECUTABLES += $(wildcard $(foreach version,5.6.2 5.8.0,${CMISS_ROOT}/perl/lib/$(version)/$(MACHNAME)-linux*/bin/perl))
         endif
       endif
-      ifeq ($(SYSNAME),AIX)
-         SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-rs6000-${ABI}*/perl)
-      endif
+#       ifeq ($(SYSNAME),AIX)
+#          SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-rs6000-${ABI}*/perl)
+#       endif
       ifeq ($(filter-out IRIX%,$(SYSNAME)),)# SGI
-         SHARED_PERL_EXECUTABLES += $(wildcard ${CMISS_ROOT}/perl/bin-5.?.?-irix-${ABI}*/perl)
+        ifeq ($(ABI),64)
+          SHARED_PERL_EXECUTABLES += $(wildcard $(foreach version,5.6.0 5.8.2,${CMISS_ROOT}/perl/lib/$(version)/irix-$(ABI)*/bin/perl))
+        else
+          SHARED_PERL_EXECUTABLES += $(wildcard $(foreach version,5.6.0 5.8.0,${CMISS_ROOT}/perl/lib/$(version)/irix-$(ABI)*/bin/perl))
+        endif
       endif
     endif
     #Check the CMISS_PERL version isn't already included from CMISS_ROOT perls
     #Could additionally check between the versions listed above and also check that
     #the executable actually runs.
-    SHARED_PERL_VERSIONS = $(foreach perl_executable,$(SHARED_PERL_EXECUTABLES),$(shell $(perl_executable) -MConfig -e 'print "$$Config{version}-$$Config{archname}\n"'))
-    ifneq ($(filter-out ${SHARED_PERL_VERSIONS},${PERL_VERSION}-${PERL_ARCHNAME}),)
+    SHARED_PERL_API_STRINGS := $(foreach perl_executable,$(SHARED_PERL_EXECUTABLES),$(call get_perl_api_string,$(perl_executable)))
+    ifneq ($(filter-out $(SHARED_PERL_API_STRINGS),$(PERL_API_STRING)),)
       ifneq ($(wildcard $(PERL_ARCHLIB)/CORE/libperl.so),)
         SHARED_PERL_EXECUTABLES += ${PERL}
+        SHARED_PERL_API_STRINGS += $(PERL_API_STRING)
       endif
     endif
     ifeq ($(USE_DYNAMIC_LOADER),maybe)
@@ -335,6 +351,35 @@ else
 endif
 PERL_EXP = $(wildcard $(PERL_ARCHLIB)/CORE/perl.exp)
 
+# The DynaLoader lib built with perl is built with -DPERL_CORE because it is
+# only intended to be linked with the corresponding libperl.a, and therefore
+# does not include the perlapi.h adjustments for binary compatibility.
+# (Changes in thrdvar.h between 5.8.0 and 5.8.1 mean that perl libraries built
+# with threading have different offsets for the members of struct interpreter.)
+#
+# If we are building for a shared libperl then the version of the libperl may
+# differ from the perl version being used to build our perl_interpreter.  To
+# maintain binary compatibility for the DynaLoader, it is necessary to build
+# a DynaLoader without PERL_CORE defined.
+#
+# If DynaLoader is built here, then the version from 5.8.7 doesn't build with
+# perl 5.6 executables, so at least two different copies may be required.  But
+# changes in struct interpreter from 5.6.0 to 5.6.2 have been more consistent
+# so it is possible that it is not an issue for the 5.005 api.  For now build
+# perl with the one line change.  (see perl/build/Makefile.pl.)
+
+# DYNALOADER_MAKEFILE =
+# DYNALOADER_WORKING_DIR =
+# ifneq ($(SYSNAME),win32)
+#   ifeq ($(STATIC_PERL_LIB),)
+#     DYNALOADER_WORKING_DIR = DynaLoader/generated/$(BIN_ARCH_DIR)/$(PERL_API_STRING)
+#     DYNALOADER_MAKEFILE = $(DYNALOADER_WORKING_DIR)/Makefile
+#     DYNALOADER_LIB = $(DYNALOADER_WORKING_DIR)/auto/DynaLoader/DynaLoader.a
+#   else
+    DYNALOADER_LIB = $(PERL_ARCHLIB)/auto/DynaLoader/DynaLoader.a
+#   endif
+# endif
+
 SOURCE_DIR = source
 ifneq ($(USE_DYNAMIC_LOADER), true)
    ifneq ($(SHARED_OBJECT), true)
@@ -348,11 +393,11 @@ else
    SHARED_LIB_SUFFIX = -dynamic
 endif
 
-WORKING_DIR := generated/$(PERL_VERSION)/$(PERL_ARCHNAME)$(DEBUG_SUFFIX)$(SHARED_SUFFIX)
-C_INCLUDE_DIRS = $(PERL_ARCHLIB)/CORE $(WORKING_DIR)
+WORKING_DIR := generated/$(BIN_ARCH_DIR)/$(PERL_API_STRING)$(DEBUG_SUFFIX)$(SHARED_SUFFIX)
+C_INCLUDE_DIRS = $(PERL_ARCHLIB)/CORE $(WORKING_DIR) .
 
 LIBRARY_ROOT_DIR := lib/$(LIB_ARCH_DIR)
-LIBRARY_VERSION := $(PERL_VERSION)/$(PERL_ARCHNAME)$(SHARED_LIB_SUFFIX)
+LIBRARY_VERSION := $(PERL_API_STRING)$(SHARED_LIB_SUFFIX)
 LIBRARY_DIR := $(LIBRARY_ROOT_DIR)/$(LIBRARY_VERSION)
 ifneq ($(SHARED_OBJECT), true)
    LIBRARY_SUFFIX = .a
@@ -365,7 +410,14 @@ LIBRARY_LINK := $(LIBRARY_ROOT_DIR)/libperlinterpreter$(INCLUDE_PERL_SUFFIX)$(DE
 LIB_EXP := $(patsubst %$(LIBRARY_SUFFIX), %.exp, $(LIBRARY_LINK))
 
 SOURCE_FILES := $(notdir $(wildcard $(SOURCE_DIR)/*.*) )
+
+# DynaLoader module should be same version as library.
+# Is there a reason why the other modules are not just taken from the perl?
 PMH_FILES := $(patsubst %.pm, %.pmh, $(filter %.pm, $(SOURCE_FILES)))
+ifneq ($(SYSNAME),win32)
+  PMH_FILES += DynaLoader.pmh
+endif
+
 ifneq ($(STATIC_PERL_LIB),)# have static perl
   C_SOURCES := perl_interpreter.c
 else
@@ -395,7 +447,7 @@ AR = ar
 # Option lists
 # (suboption lists become more specific so that later ones overrule previous)
 CFLAGS = $(strip $(CFL_FLGS) $(CFE_FLGS) $(CF_FLGS)) '-DCMISS_PERL_CALLBACK=$(CMISS_PERL_CALLBACK)'
-CPPFLAGS := $(addprefix -I, $(C_INCLUDE_DIRS) ) '-DABI_ENV="$(ABI_ENV)"'
+CPPFLAGS := $(addprefix -I, $(C_INCLUDE_DIRS) ) '-DABI_ENV="$(ABI_ENV)"'# -DPERL_NO_SHORT_NAMES
 ARFLAGS = -cr
 ifneq ($(DEBUG),false)
   CFLAGS += $(strip $(DBGCF_FLGS) $(DBGC_FLGS))
@@ -448,7 +500,7 @@ ifeq ($(SYSNAME),Linux)
 #       CF_FLGS += -size_lp64
 #     endif
   else
-    # gcc
+    CC=gcc
     CPPFLAGS += -Dbool=char -DHAS_BOOL
     ifeq ($(filter $(INSTRUCTION),i686 ia64),)# not i686 nor ia64
       CFE_FLGS += -m$(ABI)
@@ -472,9 +524,15 @@ ifeq ($(SYSNAME),Linux)
     # note for ABI=32 -m elf32ppclinux is probably appropriate (but default)
     endif
   endif
-  # Don't include a dependency on libperl.so in the shared link libraries as
-  # the perl_interpreter does not say where to find libperl.so when loading the
-  # shared link libraries.
+  # A (-L $(PERL_ARCHLIB)/CORE) -lperl dependency might be useful here but
+  # perl_interpreter_dynamic.c needs to be modified so that (the right)
+  # libperl.so can be found when dlopening the perl_interpreter.
+  # And we might need to check that soname version numbers don't interfere
+  # with the ability to load the library as version numbers could depend on
+  # the distribution.
+  # But any dynamic symbols in the executable override any loaded from these
+  # dependencies so there seems no advantage over merely dlopening the right
+  # libperl before dlopening the perl_interpreter.
   SHARED_LINK_LIBRARIES += -lcrypt -ldl
 endif
 ifeq ($(SYSNAME),win32)
@@ -549,7 +607,7 @@ endif
 	all debug opt debug64 opt64
 
   define VERSION_MESSAGE
-    @echo '     Version $(shell ${perl_executable} -MConfig -e 'print "$$Config{version} $$Config{archname}"') ${perl_executable}'
+    @echo '     $(call get_perl_api_string,${perl_executable}) from ${perl_executable}'
 
   endef
   ifeq ($(USE_DYNAMIC_LOADER),true)
@@ -560,8 +618,6 @@ endif
 
    endef
    SHARED_INTERPRETER_BUILDS = $(foreach perl_executable, $(SHARED_PERL_EXECUTABLES), $(SHARED_BUILD_RULE))
-   SHARED_VERSION_STRINGS = $(foreach perl_executable, $(SHARED_PERL_EXECUTABLES), $(shell ${perl_executable} -MConfig -e 'print "$$Config{version}/$$Config{archname}"'))
-   SHARED_LIBRARIES = $(foreach version_string, $(SHARED_VERSION_STRINGS), $(LIBRARY_ROOT_DIR)/$(version_string)/libperlinterpreter$(DEBUG_SUFFIX).so)
    ifneq ($(STATIC_PERL_LIB),)
       define SUB_WRITE_BUILD_MESSAGE
          @echo 'The static fallback perl built into the interpreter is:'
@@ -581,15 +637,14 @@ endif
 	   @echo '======================================================'
 	   @echo 'Congratulations, you have built a dynamic perl interpreter.'
 	   @echo '     $(LIBRARY_LINK)'
-      @echo 'It will work dynamically with the following versions of perl:'
+      @echo 'It will work dynamically with the following perl APIs:'
       $(foreach perl_executable, $(SHARED_PERL_EXECUTABLES), $(VERSION_MESSAGE))
-      @echo 'and has compatibility defined for the following versions:'
-		@cat compatible_versions.txt
       ${SUB_WRITE_BUILD_MESSAGE}
    endef
+#       @echo 'and has compatibility defined for the following versions:'
+# 		@cat compatible_versions.txt
   else
    SHARED_INTERPRETER_BUILDS =
-   SHARED_LIBRARIES =
    ifeq ($(SHARED_OBJECT),true)
       #This is an intermediate step and so doesn't write a message
       WRITE_BUILD_MESSAGE =
@@ -608,7 +663,7 @@ endif
    endif
   endif
 
-  main : $(PERL_CMISS_MAKEFILE) $(PERL_WORKING_DIR) $(WORKING_DIR) $(LIBRARY_DIR)
+  main : $(PERL_CMISS_MAKEFILE) $(WORKING_DIR) $(LIBRARY_DIR)# $(DYNALOADER_MAKEFILE)
 ifeq ($(USE_DYNAMIC_LOADER),true)
 	$(SHARED_INTERPRETER_BUILDS)
 endif
@@ -616,13 +671,16 @@ endif
 	@echo 'Building library ${LIBRARY}'
 	@echo
 ifneq ($(OPERATING_SYSTEM),win32)
-	$(MAKE) --directory=$(PERL_WORKING_DIR) static
+	$(MAKE) --directory=$(PERL_CMISS_WORKING_DIR) static
+#   ifneq ($(DYNALOADER_WORKING_DIR),)
+# 	$(MAKE) --directory=$(DYNALOADER_WORKING_DIR) DynaLoader.pm static
+#   endif
 else
    #Use dmake as it supports back slashes for paths
-	cd $(PERL_WORKING_DIR) ; unset SHELL ; $(CMISS_ROOT)/perl/build/dmake-4.1pl1-win32/dmake static
+	cd $(PERL_CMISS_WORKING_DIR) ; unset SHELL ; $(CMISS_ROOT)/perl/build/dmake-4.1pl1-win32/dmake static
 endif
 	$(MAKE) --no-print-directory USE_DYNAMIC_LOADER=$(USE_DYNAMIC_LOADER) \
-	  SHARED_LIBRARIES='$(SHARED_LIBRARIES)' TASK=source
+	  SHARED_PERL_API_STRINGS='$(SHARED_PERL_API_STRINGS)' TASK=source
 	$(MAKE) --no-print-directory USE_DYNAMIC_LOADER=$(USE_DYNAMIC_LOADER) \
 	  TASK=library
 	$(WRITE_BUILD_MESSAGE)
@@ -633,10 +691,10 @@ endif
   endif
 
   $(PERL_CMISS_MAKEFILE) : $(PERL) Perl_cmiss/Makefile.PL
-	cd Perl_cmiss ; export CMISS_PERL_CALLBACK=$(CMISS_PERL_CALLBACK) CMISS_PERL_CALLBACK_SUFFIX=$(CMISS_PERL_CALLBACK_SUFFIX) ; $(PERL) Makefile.PL
+	cd Perl_cmiss && CMISS_PERL_CALLBACK=$(CMISS_PERL_CALLBACK) WORKING_DIR=$(subst Perl_cmiss/,,$(PERL_CMISS_WORKING_DIR)) $(PERL) Makefile.PL
 
-  $(PERL_WORKING_DIR) :
-	mkdir -p $@
+#   $(DYNALOADER_MAKEFILE) : $(PERL) DynaLoader/Makefile.PL
+# 	cd DynaLoader && WORKING_DIR=$(subst DynaLoader/,,$(DYNALOADER_WORKING_DIR)) $(PERL) Makefile.PL
 
   $(WORKING_DIR) :
 	mkdir -p $@
@@ -646,11 +704,13 @@ endif
 
 clean:
 	@echo "Cleaning some of house ..."
-	-rm -rf $(PERL_WORKING_DIR) $(WORKING_DIR) $(LIBRARY) $(LIB_EXP)
+	-rm -rf $(PERL_CMISS_WORKING_DIR) $(WORKING_DIR) $(LIBRARY) $(LIB_EXP)
+#$(DYNALOADER_WORKING_DIR)
 
 allclean:
 	@echo "Cleaning house ..."
 	-rm -rf Perl_cmiss/generated/* generated/* lib/*
+#DynaLoader/generated/* 
 
 debug opt debug64 opt64:
 	$(MAKE) --no-print-directory DEBUG=$(DEBUG) ABI=$(ABI)
@@ -704,15 +764,19 @@ ifeq ($(TASK),source)
 	@if grep /perl\\.h $@ > /dev/null; then set -x; echo '$$(WORKING_DIR)/perl_interpreter.o $$(WORKING_DIR)/perl_interpreter.d: $$(PERL)' >> $@; fi
 	(grep pmh $@.tmp | grep makedepend | awk -F "[ ,]" '{printf("%s.%s:",substr($$4, 1, length($$4) - 2),"o"); for(i = 1 ; i <= NF ; i++)  { if (match($$i,"pmh")) printf(" source/%s", substr($$i, 2, length($$i) -2)) } printf("\n");}' | sed -e 's%^$(SOURCE_DIR)\([^ ]*\).o%$$(WORKING_DIR)\1.o $$(WORKING_DIR)\1.d%' | sed -e 's%$(SOURCE_DIR)\([^ ]*\).pmh%$$(WORKING_DIR)\1.pmh%' >> $@)
 
-$(WORKING_DIR)/%.pmh : $(SOURCE_DIR)/%.pm
+  vpath %.pm $(SOURCE_DIR) $(PERL_ARCHLIB)# $(DYNALOADER_WORKING_DIR)
+
+$(WORKING_DIR)/%.pmh : %.pm
 	$(PERL) utilities/pm2pmh $< > $@
 
 #Dynamic loader code for putting shared objects into the interpreter
 ifeq ($(USE_DYNAMIC_LOADER),true)
-   ifeq ($(SHARED_LIBRARIES),)
-      $(error Missing list of SHARED_LIBRARIES in source stage)
+   ifeq ($(SHARED_PERL_API_STRINGS),)
+      $(error Missing list of SHARED_PERL_API_STRINGS in source stage)
    endif
-   SHARED_LIBRARY_HEADERS = $(patsubst %.so, %.soh, $(SHARED_LIBRARIES))
+   get_shared_lib_header = $(LIBRARY_ROOT_DIR)/$1/libperlinterpreter$(DEBUG_SUFFIX).soh
+   SHARED_LIBRARY_HEADERS = $(foreach api_string, $(SHARED_PERL_API_STRINGS),\
+	$(call get_shared_lib_header,$(api_string)))
 
    UID2UIDH = $(CMISS_ROOT)/utilities/bin/$(BIN_ARCH_DIR)/bin2base64h
 
@@ -729,16 +793,13 @@ ifeq ($(USE_DYNAMIC_LOADER),true)
   VERSION_HEADERS := $(DYNAMIC_VERSIONS_HEADER) $(STATIC_HEADER)
   $(DYNAMIC_VERSIONS_HEADER) : $(SHARED_LIBRARY_HEADERS)
 	{ \
-	$(foreach header, $(SHARED_LIBRARY_HEADERS), \
-      echo 'static char libperlinterpreter$(word 3, $(subst /,' ',$(subst .,_,$(header))))$(word 4, $(subst /,' ',$(subst -,_,$(header))))[] = ' && \
-      echo '#include "../../../$(header)"' && \
+	$(foreach api_string, $(SHARED_PERL_API_STRINGS), \
+      echo 'static char libperlinterpreter$(subst .,_,$(subst -,_,$(api_string)))[] = ' && \
+      echo '#include "$(call get_shared_lib_header,$(api_string))"' && \
       echo ';' && ) \
 	echo 'static struct Interpreter_library_strings interpreter_strings[] = {' && \
-	$(foreach header, $(SHARED_LIBRARY_HEADERS), \
-      echo '{"$(word 3, $(subst /,' ',$(header)))","$(word 4, $(subst /,' ',$(header)))", libperlinterpreter$(word 3, $(subst /,' ',$(subst .,_,$(header))))$(word 4, $(subst /,' ',$(subst -,_,$(header)))) },' && ) \
-	$(foreach compatible_versions,$(wildcard compatible_versions.txt), \
-		$(foreach header, $(SHARED_LIBRARY_HEADERS), \
-			cat $(compatible_versions) | $(PERL) -ne '{$$version="$(word 3, $(subst /,' ',$(header)))";$$arch="$(word 4, $(subst /,' ',$(header)))";@words = split;if ($$words[2] eq $$version) { $$words[2]=~s/[-.]/_/g;$$archsub=$$arch;$$archsub=~s/[-.]/_/g;printf("{\"%s\",\"%s\", libperlinterpreter%s%s},\n",$$words[0],$$arch,$$words[2],$$archsub)}}' && )) \
+	$(foreach api_string, $(SHARED_PERL_API_STRINGS), \
+      echo '{"$(api_string)", libperlinterpreter$(subst .,_,$(subst -,_,$(api_string))) },' && ) \
 	echo '};'; \
 	} > $@.new;
 	@set -xe && \
@@ -747,6 +808,9 @@ ifeq ($(USE_DYNAMIC_LOADER),true)
 	else \
 		rm $@.new; \
 	fi
+# 	$(foreach compatible_versions,$(wildcard compatible_versions.txt), \
+# 		$(foreach header, $(SHARED_LIBRARY_HEADERS), \
+# 			cat $(compatible_versions) | $(PERL) -ne '{$$version="$(word 3, $(subst /,' ',$(header)))";$$arch="$(word 4, $(subst /,' ',$(header)))";@words = split;if ($$words[2] eq $$version) { $$words[2]=~s/[-.]/_/g;$$archsub=$$arch;$$archsub=~s/[-.]/_/g;printf("{\"%s\",\"%s\", libperlinterpreter%s%s},\n",$$words[0],$$arch,$$words[2],$$archsub)}}' && )) \
 
   $(STATIC_HEADER):
   ifeq ($(STATIC_PERL_LIB),)
@@ -797,6 +861,8 @@ endif
 
     ifneq ($(STATIC_PERL_LIB),) # have a static perl
 
+      # there is probably no point in including the dynaloader_lib unless it
+      # is possible to load binary perl modules from the static perl lib.
       ifeq ($(SYSNAME),win32)
         LIBRARY_LIBS :=
       else
