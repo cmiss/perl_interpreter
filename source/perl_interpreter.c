@@ -62,8 +62,10 @@ static void xs_init(pTHX)
 {
 	char *file_name = __FILE__;
 	newXS("Perl_cmiss::bootstrap", boot_Perl_cmiss, file_name);
+#ifndef USE_DYNAMIC_LOADER
 	/* DynaLoader is a special case */
 	newXS("DynaLoader::boot_DynaLoader", boot_DynaLoader, file_name);
+#endif /* ndef USE_DYNAMIC_LOADER */
 }
 
 static int interpreter_display_message(enum Message_type message_type,
@@ -194,13 +196,15 @@ Creates the interpreter for processing commands.
 #include "Balanced.pmh"
 #include "Perl_cmiss.pmh"
 		/* Still in package Perl_cmiss: */
-#if ! defined (WIN32)
+		/* If there are shared perl interpreters, then there is no static
+			 dynaloader linked as it doesn't work with the shared perl. */ 
+#if ! defined (WIN32) && ! defined (USE_DYNAMIC_LOADER)
     /* A separate perl_eval_pv would probably be better and remove the need to
 			 store this in a perl variable */
 		"$DynaLoader_pm = <<\\EOPM;\n"
 #include "DynaLoader.pmh"
 		"EOPM\n"
-#endif /* ! defined (WIN32) */
+#endif /* ! defined (WIN32) && ! defined (USE_DYNAMIC_LOADER) */
 	 "$| = 1;\n"
     ;
 
@@ -212,7 +216,9 @@ Creates the interpreter for processing commands.
 		/* Using a built-in perl */
 		"Perl_cmiss::set_INC_for_platform('" ABI_ENV "')",
 #endif /* defined (SHARED_OBJECT) */
+#ifndef USE_DYNAMIC_LOADER
 		"Perl_cmiss::load_DynaLoader",
+#endif /* ndef USE_DYNAMIC_LOADER */
 		"Perl_cmiss::add_cmiss_perl_to_INC('" ABI_ENV "')",
 #endif /* ! defined (WIN32) */
 		"Perl_cmiss::register_keyword assign",
