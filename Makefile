@@ -351,6 +351,13 @@ else
 endif
 PERL_EXP = $(wildcard $(PERL_ARCHLIB)/CORE/perl.exp)
 
+# If we intend to load a shared libperl then we cannot export symbols from a
+# static perl (because they will mask those in libperl) so there is no point
+# in including DynaLoader.
+ifeq ($(USE_DYNAMIC_LOADER), true)
+  DYNALOADER_LIB =
+else
+
 # The DynaLoader lib built with perl is built with -DPERL_CORE because it is
 # only intended to be linked with the corresponding libperl.a, and therefore
 # does not include the perlapi.h adjustments for binary compatibility.
@@ -370,7 +377,11 @@ PERL_EXP = $(wildcard $(PERL_ARCHLIB)/CORE/perl.exp)
 
 # DYNALOADER_MAKEFILE =
 # DYNALOADER_WORKING_DIR =
-# ifneq ($(SYSNAME),win32)
+  ifeq ($(SYSNAME),win32)
+    # there is probably no point in including the dynaloader_lib unless it
+    # is possible to load binary perl modules from the static perl lib.
+    DYNALOADER_LIB =
+  else
 #   ifeq ($(STATIC_PERL_LIB),)
 #     DYNALOADER_WORKING_DIR = DynaLoader/generated/$(BIN_ARCH_DIR)/$(PERL_API_STRING)
 #     DYNALOADER_MAKEFILE = $(DYNALOADER_WORKING_DIR)/Makefile
@@ -378,7 +389,8 @@ PERL_EXP = $(wildcard $(PERL_ARCHLIB)/CORE/perl.exp)
 #   else
     DYNALOADER_LIB = $(PERL_ARCHLIB)/auto/DynaLoader/DynaLoader.a
 #   endif
-# endif
+  endif
+endif
 
 SOURCE_DIR = source
 ifneq ($(USE_DYNAMIC_LOADER), true)
@@ -414,7 +426,7 @@ SOURCE_FILES := $(notdir $(wildcard $(SOURCE_DIR)/*.*) )
 # DynaLoader module should be same version as library.
 # Is there a reason why the other modules are not just taken from the perl?
 PMH_FILES := $(patsubst %.pm, %.pmh, $(filter %.pm, $(SOURCE_FILES)))
-ifneq ($(SYSNAME),win32)
+ifneq ($(DYNALOADER_LIB),)
   PMH_FILES += DynaLoader.pmh
 endif
 
@@ -703,13 +715,13 @@ endif
 	mkdir -p $@
 
 clean:
-	@echo "Cleaning some of house ..."
-	-rm -rf $(PERL_CMISS_WORKING_DIR) $(WORKING_DIR) $(LIBRARY) $(LIB_EXP)
+	@echo "Cleaning house ..."
+	-rm -rf Perl_cmiss/generated/$(BIN_ARCH_DIR) generated/$(BIN_ARCH_DIR) $(LIBRARY_ROOT_DIR)
 #$(DYNALOADER_WORKING_DIR)
 
 allclean:
-	@echo "Cleaning house ..."
-	-rm -rf Perl_cmiss/generated/* generated/* lib/*
+	@echo "Cleaning all houses ..."
+	-rm -rf Perl_cmiss/generated generated lib
 #DynaLoader/generated/* 
 
 debug opt debug64 opt64:
@@ -861,14 +873,7 @@ endif
 
     ifneq ($(STATIC_PERL_LIB),) # have a static perl
 
-      # there is probably no point in including the dynaloader_lib unless it
-      # is possible to load binary perl modules from the static perl lib.
-      ifeq ($(SYSNAME),win32)
-        LIBRARY_LIBS :=
-      else
-        LIBRARY_LIBS := $(DYNALOADER_LIB)
-      endif
-      LIBRARY_LIBS += $(STATIC_PERL_LIB) $(CURDIR)/$(PERL_CMISS_LIB)
+      LIBRARY_LIBS := $(DYNALOADER_LIB) $(STATIC_PERL_LIB) $(CURDIR)/$(PERL_CMISS_LIB)
 
       $(LIBRARY) : $(LIBRARY_LIBS)
 
