@@ -551,7 +551,7 @@ ifeq ($(SYSNAME),AIX)
   CC = xlc_r
   # no -qinfo=gen because perl redefines many symbols
   CFLAGS += -qinfo=ini:por:pro:trd:tru:use
-  ARFLAGS += -X$(ABI)
+  AR += -X$(ABI)
   # may want -qsrcmsg
   CF_FLGS += -qfullpath
   CFE_FLGS += -q$(ABI) -qarch=auto -qhalt=e
@@ -891,10 +891,10 @@ endif
 	mkdir -p $(MEMBERS_DIR)
     # Hopefully none of the libraries have objects of the same name
 	cd $(MEMBERS_DIR) && \
-          for lib in $(LIBRARY_LIBS); do $(AR) x $$lib; done
+          for lib in $(LIBRARY_LIBS); do $(AR) x $$lib || exit 1; done
     endif
-	[ ! -f $@ ] || rm $@
-	$(AR) $(ARFLAGS) $@ $(ARCHIVE_MEMBERS)
+	$(AR) $(ARFLAGS) $@.build $(ARCHIVE_MEMBERS)
+	mv $@.build $@
     ifneq ($(STATIC_PERL_LIB),) # have a static perl
 	rm -r $(MEMBERS_DIR)
     endif
