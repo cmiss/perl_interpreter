@@ -26,7 +26,7 @@ my $echo_commands = 0;
 my $echo_prompt = "";
 my $cmiss_debug = 0;
 # Try to use Config.pm but only print a failure message once
-my $use_config = 1;
+$use_config = 1;
 
 sub set_INC_for_platform ($)
   {
@@ -112,26 +112,6 @@ sub set_INC_for_platform ($)
 			# check that we are binary compatible.  We could even pretend to
 			# unrequire Config if we are not.
 # 		  }
-	  }
-  }
-
-sub load_DynaLoader ()
-  {
-	# Dynaloader uses Config
-	if( $use_config )
-	  {
-		# Load the DynaLoader module
-		eval $DynaLoader_pm;
-		if ( $@ )
-		  {
-			warn $@;
-		  }
-		else
-		  {
-			# Record that this is loaded so nothing tries to load it again.
-			$INC{"DynaLoader.pm"} = 1;
-		  }
-		undef $DynaLoader_pm; # Free the symbol
 	  }
   }
 

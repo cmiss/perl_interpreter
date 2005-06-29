@@ -187,29 +187,20 @@ Creates the interpreter for processing commands.
 {
   char *embedding[3], e_string[] = "-e", zero_string[] = "0";
 	char *perl_invoke_command;
-  char perl_start_code[] = 
-	 "local $SIG{__WARN__} = sub { die $_[0] };\n"
-	 "BEGIN {\n"
-#include "strict.pmh"
-	 "import strict \"subs\";\n"
-	 "}\n"
-#include "Balanced.pmh"
-#include "Perl_cmiss.pmh"
-		/* Still in package Perl_cmiss: */
-		/* If there are shared perl interpreters, then there is no static
-			 dynaloader linked as it doesn't work with the shared perl. */ 
-#if ! defined (WIN32) && ! defined (USE_DYNAMIC_LOADER)
-    /* A separate perl_eval_pv would probably be better and remove the need to
-			 store this in a perl variable */
-		"$DynaLoader_pm = <<\\EOPM;\n"
-#include "DynaLoader.pmh"
-		"EOPM\n"
-#endif /* ! defined (WIN32) && ! defined (USE_DYNAMIC_LOADER) */
-	 "$| = 1;\n"
-    ;
 
-  char *load_commands[] =
+  const char *load_commands[] =
   {
+		"local $SIG{__WARN__} = sub { die $_[0] };\n"
+		"BEGIN {\n"
+#include "strict.pmh"
+		"import strict \"subs\";\n"
+		"}\n"
+		"$| = 1;\n"
+		,
+#include "Balanced.pmh"
+		,
+#include "Perl_cmiss.pmh"
+		,
 #if ! defined (WIN32)
     /* This code is not working in Win32 at the moment */
 #if ! defined (SHARED_OBJECT)
@@ -244,6 +235,15 @@ Creates the interpreter for processing commands.
 		"Perl_cmiss::register_keyword set",
 		"Perl_cmiss::register_keyword unemap",
 		"Perl_cmiss::register_keyword var"};
+	/* If there are shared perl interpreters, then there is no static
+		 dynaloader linked as it doesn't work with the shared perl.
+	*/ 
+#ifndef USE_DYNAMIC_LOADER
+	const char DynaLoader_pm[] =
+#  include "DynaLoader.pmh"
+		;
+#endif /* ! defined (USE_DYNAMIC_LOADER) */
+
   int i, number_of_load_commands, return_code;
 
   return_code = 1;
@@ -316,15 +316,6 @@ Creates the interpreter for processing commands.
 								 "Unable to get ARGV\n") ;
 					 }
 				}
-				perl_eval_pv(perl_start_code, FALSE);
-				if (SvTRUE(ERRSV))
-				{
-					 ((*interpreter)->display_message_function)(ERROR_MESSAGE,"initialise_interpreter.  "
-							"Uh oh - %s\n", SvPV(ERRSV, n_a)) ;
-					 POPs ;
-					 *interpreter = (struct Interpreter *)NULL;
-					 return_code = 0;
-				}
 
 				number_of_load_commands = sizeof (load_commands) / sizeof (char *);
 				for (i = 0 ; i < number_of_load_commands && return_code ; i++)
@@ -334,12 +325,47 @@ Creates the interpreter for processing commands.
 					 {
 							((*interpreter)->display_message_function)(ERROR_MESSAGE,"initialise_interpreter.  "
 								 "Uh oh - %s\n", SvPV(ERRSV, n_a)) ;
+							/* !!! What does this pop? */
 							POPs ;
 							*interpreter = (struct Interpreter *)NULL;
 							return_code = 0;
 					 }
 				}
 				
+#ifndef USE_DYNAMIC_LOADER
+				/* Load the DynaLoader module now so that the module is the same
+					 version as the library linked in.  (A hook early in @INC might work
+					 also.) */
+				/* Dynaloader requires Config so don't print the same error message
+					 again on failure. */
+				if( SvTRUE( get_sv( "Perl_cmiss::use_config",/* create = */FALSE ) ) )
+					{
+						/* Load the DynaLoader module. */
+						/* Should we check the return code as well as $@ */
+						perl_eval_pv( DynaLoader_pm,/* croak_on_error = */FALSE );
+						if (SvTRUE(ERRSV))
+							{
+								((*interpreter)->display_message_function)
+									( ERROR_MESSAGE,"initialise_interpreter.  "
+										"Failed to load DynaLoader: %s\n", SvPV( ERRSV, n_a ) ) ;
+							}
+						else
+							{
+								/* Record that this is loaded so nothing tries to load it
+									 again.  If this value doesn't contain "DynaLoader.pm",
+									 AutoLoader will look for a file with the name of this
+									 string (v5.8.7).
+								*/
+								const char name[] = "DynaLoader.pm";
+								size_t len = strlen(name);
+								(void)hv_store( get_hv( "INC", /* create = */FALSE ),
+														name, len,
+														newSVpv( name, len ),
+														0 );
+							}
+					}
+#endif /* ! defined (USE_DYNAMIC_LOADER) */
+
 				{
 					 SV *sv_variable;
 					 
@@ -349,6 +375,8 @@ Creates the interpreter for processing commands.
 					 sv_variable = perl_get_sv("Perl_cmiss::internal_interpreter_structure", TRUE);
 					 sv_setiv(sv_variable, (IV)(*interpreter));
 				}
+
+				/* !!! Destroy the interpreter if !return_code */
 
 				FREETMPS ;
 				LEAVE ;
