@@ -676,21 +676,21 @@ endif
   endif
 
   main : $(PERL_CMISS_MAKEFILE) $(WORKING_DIR) $(LIBRARY_DIR)# $(DYNALOADER_MAKEFILE)
-ifeq ($(USE_DYNAMIC_LOADER),true)
+  ifeq ($(USE_DYNAMIC_LOADER),true)
 	$(SHARED_INTERPRETER_BUILDS)
-endif
+  endif
 	@echo
 	@echo 'Building library ${LIBRARY}'
 	@echo
-ifneq ($(OPERATING_SYSTEM),win32)
+  ifneq ($(OPERATING_SYSTEM),win32)
 	$(MAKE) --directory=$(PERL_CMISS_WORKING_DIR) static
 #   ifneq ($(DYNALOADER_WORKING_DIR),)
 # 	$(MAKE) --directory=$(DYNALOADER_WORKING_DIR) DynaLoader.pm static
 #   endif
-else
+  else
    #Use dmake as it supports back slashes for paths
 	cd $(PERL_CMISS_WORKING_DIR) ; unset SHELL ; $(CMISS_ROOT)/perl/build/dmake-4.1pl1-win32/dmake static
-endif
+  endif
 	$(MAKE) --no-print-directory USE_DYNAMIC_LOADER=$(USE_DYNAMIC_LOADER) \
 	  SHARED_PERL_API_STRINGS='$(SHARED_PERL_API_STRINGS)' TASK=source
 	$(MAKE) --no-print-directory USE_DYNAMIC_LOADER=$(USE_DYNAMIC_LOADER) \
@@ -770,8 +770,13 @@ ifeq ($(TASK),source)
   # KAT I think Solaris needed nawk rather than awk, but nawk is not usually
   # avaiable on Mandrake.  I don't have a Sun to try this out so I'll get it
   # working with awk on the machines I have.
+
+  # wildcard in the .d file removes files that no longer exist
+  # (that may no longer be needed because they were included in .h files that
+  #  have changed).
   $(WORKING_DIR)/%.d : $(SOURCE_DIR)/%.c
-	makedepend $(CPPFLAGS) -f- -Y $< 2> $@.tmp | sed -e 's%^source\([^ ]*\).o%$$(WORKING_DIR)\1.o $$(WORKING_DIR)\1.d%' > $@
+	makedepend $(CPPFLAGS) -f- -Y $< 2> $@.tmp | \
+	  sed -e 's%^$(SOURCE_DIR)\([^ ]*\).o: \(.*\)%$$(WORKING_DIR)\1.o $$(WORKING_DIR)\1.d: $$(wildcard \2)%' > $@
 # See if there is a dependency on perl
 	@if grep /perl\\.h $@ > /dev/null; then set -x; echo '$$(WORKING_DIR)/perl_interpreter.o $$(WORKING_DIR)/perl_interpreter.d: $$(PERL)' >> $@; fi
 	(grep pmh $@.tmp | grep makedepend | awk -F "[ ,]" '{printf("%s.%s:",substr($$4, 1, length($$4) - 2),"o"); for(i = 1 ; i <= NF ; i++)  { if (match($$i,"pmh")) printf(" source/%s", substr($$i, 2, length($$i) -2)) } printf("\n");}' | sed -e 's%^$(SOURCE_DIR)\([^ ]*\).o%$$(WORKING_DIR)\1.o $$(WORKING_DIR)\1.d%' | sed -e 's%$(SOURCE_DIR)\([^ ]*\).pmh%$$(WORKING_DIR)\1.pmh%' >> $@)
