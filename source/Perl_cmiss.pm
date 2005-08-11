@@ -35,7 +35,7 @@ sub set_INC_for_platform ($)
     my ($abi_env) = @_;
 
     my $perlinc;
-	my $module_perl_version;
+	my ($module_perl_version,$module_numeric_version);# perl module versions
 
 	# Run the local perl to get its version and @INC so we can use its
 	# modules.
@@ -59,7 +59,8 @@ sub set_INC_for_platform ($)
 	  }
 	elsif( ! $pid ) #child
 	  {
-		exec $perl, '-e', 'print join ":", $^V ? sprintf("%vd",$^V) : $], @INC'
+		exec $perl, '-e',
+		  'print join ":", $^V ? sprintf("v%vd",$^V) : "undef", $], @INC'
 		  or exit $!;
 	  }
 	else # parent
@@ -75,7 +76,8 @@ sub set_INC_for_platform ($)
 		else
 		  {
 			# perl has given us its version include list.
-			($module_perl_version,@INC) = split /:/,$perlout;
+			($module_perl_version,$module_numeric_version,@INC) =
+			  split /:/,$perlout;
 		  }
 	  }
 
@@ -98,8 +100,12 @@ sub set_INC_for_platform ($)
 
 	if( defined $module_perl_version )
 	  {
-		# Convert version to a version literal for $^V
-		eval "local \$^V = v$module_perl_version; require Config";
+		{
+		  # Convert version to a version literal for $^V
+		  local $^V = eval $module_perl_version;
+		  local $] = $module_numeric_version;
+		  eval { require Config };
+		}
 
 		if ( $@ )
 		  {
@@ -151,7 +157,7 @@ sub add_cmiss_perl_to_INC
 	  }
     }
 	# If no CMISS*_PERLLIB variable is set then see if there is a CMISS_ROOT version
-	if (! defined @path_list)
+	if (! @path_list)
 	{
 	  if (exists $ENV{CMISS_ROOT})
 	  {
@@ -172,7 +178,7 @@ sub add_cmiss_perl_to_INC
 	  }
 	}
 	# If a CMISS_PERLLIB has been found prepend it to the path.
-	if (defined @path_list)
+	if (@path_list)
 	{
 	  unshift @INC, @path_list;
 	}
