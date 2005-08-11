@@ -470,13 +470,24 @@ the function pointers and then calls create_interpreter_ for that instance.
 				}
 
 				/* api_versionstring specifies the binary interface version.
+           5.005 series perls use apiversion.
+					 It seems that versions prior to 5.005 did not have an api version,
+					 but we don't support these anyway so just get the version for
+					 the mismatch message below.
 				   usethreads use64bitall use64bitint uselongdouble useperlio
 				   usemultiplicity specify compile-time options affecting binary
 				   compatibility.
-					 version is filesystem dependent so use $^V ? sprintf("%vd",$^V) : $]
+					 $Config{version} is filesystem dependent so use
+           $^V ? sprintf("%vd",$^V) : $] if the version is required, and
+					 $Config{api_revision}.$Config{api_version}.$Config{api_subversion}
+           may be better that $Config{api_version_string}.
 				*/
 				/* !!! length of perl_executable is not checked !!! */
-				sprintf(command, "%s -MConfig -e 'print $Config{api_versionstring},(map{$Config{\"use$_\"}?\"-$_\":()}qw(threads multiplicity 64bitall longdouble perlio)),\" $Config{installarchlib}\"'", perl_executable);
+				sprintf(command, "%s -MConfig -e "
+								"'print $Config{api_versionstring}||$Config{apiversion}||$],"
+								"(map{$Config{\"use$_\"}?\"-$_\":()}"
+								"qw(threads multiplicity 64bitall longdouble perlio)),"
+								"\" $Config{installarchlib}\"'", perl_executable);
 				system(command);
 
 				/* Set stdout back */
@@ -560,7 +571,7 @@ the function pointers and then calls create_interpreter_ for that instance.
 						"Your perl reported API version and options \"%s\".",
 						perl_api_string);
 					((*interpreter)->display_message_function)(ERROR_MESSAGE,
-						"The APIs supported by interpreters included in this executable are:");
+						"The APIs supported by this executable are:");
 					for (i = 0 ; i < number_of_perl_interpreters ; i++)
 					{
 						((*interpreter)->display_message_function)(ERROR_MESSAGE,
