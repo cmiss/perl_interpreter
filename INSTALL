@@ -1,0 +1,26 @@
+# **************************************************************************
+# FILE : INSTALL
+#
+# LAST MODIFIED : 23 September 2005
+# ==========================================================================
+
+This software is the perl_interpreter for CMISS.
+It is released under the Mozilla Public License v1.1
+
+Further information, help pages, a tracker and a wiki is available at 
+http://dev.cmiss.org/cmgui/
+
+Dependencies:
+Required:
+Perl: 
+bin2base64: Small script that encodes binary files as a base64 string.
+
+Build bin2base64.  It is expected that the resulting executable is located at $(CMISS_ROOT)/utilities/bin/$(BIN_ARCH_DIR)/bin2base64h.  make OPT=true
+
+Build perl_interpreter.
+With a standard distribution of perl this perl_interpreter will build against the shared_object library in your installation (libperl.so).  This will require a binarily compatible version to be found on any computer the executable is put onto at runtime.  You can also include a fully static "fallback" interpreter which means that the executable will run even on a computer without perl.  To do this you must have a static perl library (libperl.a), from your distribution or build.
+
+make OPT=true
+
+There is currently no install target as the programs that depend on this library expect to find the library inside the compilation tree.
+lib/$(LIB_ARCH_DIR)/$(PERL_API_STRING)$(SHARED_LIB_SUFFIX)/libperlinterpreter$(INCLUDE_PERL_SUFFIX)$(DEBUG_SUFFIX)$(LIBRARY_SUFFIX)

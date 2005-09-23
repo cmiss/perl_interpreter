@@ -1,0 +1,14 @@
+# **************************************************************************
+# FILE : CHANGELOG
+#
+# LAST MODIFIED : 23 September 2005
+# ==========================================================================
+
+This software is the perl_interpreter for CMISS.
+It is released under the Mozilla Public License v1.1
+
+Further information, help pages, a tracker and a wiki is available at 
+http://dev.cmiss.org/cmgui/
+
+First open source release.  License updated to Mozilla Public License.
+Added README, INSTALL, RELEASE_NOTES and CHANGELOG.
