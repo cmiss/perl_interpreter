@@ -10,5 +10,6 @@ It is released under the Mozilla Public License v1.1
 Further information, help pages, a tracker and a wiki is available at 
 http://dev.cmiss.org/cmgui/
 
+v2.0.0
 First open source release.  License updated to Mozilla Public License.
 Added README, INSTALL, RELEASE_NOTES and CHANGELOG.
