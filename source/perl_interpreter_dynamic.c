@@ -43,12 +43,15 @@ selected at runtime according to the perl found in the users path.
  * the terms of any one of the MPL, the GPL or the LGPL.
  *
  * ***** END LICENSE BLOCK ***** */
+#include <errno.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <signal.h>
+#include <sys/wait.h>
 #include <fcntl.h>
 #include <dlfcn.h>
 #include <stdarg.h>
@@ -459,8 +462,8 @@ the function pointers and then calls create_interpreter_ for that instance.
 		*perl_executable_default = "perl", *perl_interpreter_string,
 		perl_archlib[300];
 	fd_set readfds;
-	int i, number_of_perl_interpreters, return_code,
-		stdout_pipe[2], old_stdout;
+	int i, number_of_perl_interpreters, process_id, return_code,
+		stdout_pipe[2];
 	ssize_t number_read;
 	struct timeval timeout_struct;
 	void *interpreter_handle, *perl_handle;
@@ -485,15 +488,13 @@ the function pointers and then calls create_interpreter_ for that instance.
 			sizeof(struct Interpreter_library_strings);
 		if (number_of_perl_interpreters)
 		{
-			if (0 == pipe(stdout_pipe))
+			if (-1 == pipe(stdout_pipe))
 			{
-				char command[500];
-
-			  /* !!! We should fork here so that the writing doesn't block because the reading process is waiting */
-				/* Redirect stdout */
-				old_stdout = dup(STDOUT_FILENO);
-				dup2(stdout_pipe[1], STDOUT_FILENO);
-
+				((*interpreter)->display_message_function)
+					( ERROR_MESSAGE, "Unable to create pipe: %s", strerror(errno) );
+			}
+			else
+			{
 				/* We are only expecting a little bit of stuff so I am
 					hoping that the pipe can buffer it */
 				if (!(perl_executable = getenv("CMISS" ABI_ENV "_PERL")))
@@ -503,6 +504,26 @@ the function pointers and then calls create_interpreter_ for that instance.
 						perl_executable = perl_executable_default;
 					}
 				}
+
+				process_id = fork();
+
+				if (0 == process_id)
+				{ /* Child process comes here */
+					int stdin_fd;
+
+					close(stdout_pipe[0]); /* For the parent */
+				
+					/* The child shouldn't read anything */
+					/* Is this the best way to redirect stdin to /dev/null? */
+					stdin_fd = open ("/dev/null", O_RDONLY);
+					dup2 (stdin_fd,STDIN_FILENO);
+					close(stdin_fd);
+					/* Redirect stdout */
+					dup2 (stdout_pipe[1],STDOUT_FILENO);
+					close(stdout_pipe[1]);
+
+					/* Execute the perl */
+/* !!! Should first ensure that all non-system file descriptors are closed! */
 
 				/* api_versionstring specifies the binary interface version.
            5.005 series perls use apiversion.
@@ -517,55 +538,94 @@ the function pointers and then calls create_interpreter_ for that instance.
 					 $Config{api_revision}.$Config{api_version}.$Config{api_subversion}
            may be better that $Config{api_version_string}.
 				*/
-				/* !!! length of perl_executable is not checked !!! */
-				sprintf(command, "%s -MConfig -e "
-								"'print $Config{api_versionstring}||$Config{apiversion}||$],"
-								"(map{$Config{\"use$_\"}?\"-$_\":()}"
-								"qw(threads multiplicity 64bitall longdouble perlio)),"
-								"\" $Config{installarchlib}\"'", perl_executable);
-				system(command);
+					execlp( perl_executable, perl_executable, "-MConfig", "-e"
+									"print join( '-',"
+									"$Config{api_versionstring}||$Config{apiversion}||$],"
+									"grep {$Config{\"use$_\"}}"
+									"qw(threads multiplicity 64bitall longdouble perlio) ),"
+									"\" $Config{installarchlib}\"",
 
-				/* Set stdout back */
-				dup2(old_stdout, STDOUT_FILENO);
-				close(stdout_pipe[1]);
+									(char *)0 );
+					/* execlp only returns on error
+					   (as on success the process gets overlayed). */
+					((*interpreter)->display_message_function)
+						(ERROR_MESSAGE, "%s: %s", perl_executable, strerror(errno) );
+					exit(EXIT_FAILURE);
+				}
 
-				FD_ZERO(&readfds);
-				FD_SET(stdout_pipe[0], &readfds);
-				timeout_struct.tv_sec = 2;
-				timeout_struct.tv_usec = 0;
-				if (select(FD_SETSIZE, &readfds, NULL, NULL, &timeout_struct))
+				/* Parent (or no fork) */
+				close(stdout_pipe[1]); /* This was for the child. */
+
+				if( -1 == process_id )
 				{
-					char perl_result_buffer[500];
-					if (number_read = read(stdout_pipe[0], perl_result_buffer, 499))
+					((*interpreter)->display_message_function)
+						(ERROR_MESSAGE,
+						 "resolve_example_path.  Unable to fork process: %s",
+						 strerror(errno) );
+					close(stdout_pipe[0]);
+				}
+				else /* Have child */
+				{
+					FD_ZERO(&readfds);
+					FD_SET(stdout_pipe[0], &readfds);
+					timeout_struct.tv_sec = 2;
+					timeout_struct.tv_usec = 0;
+					if (select(FD_SETSIZE, &readfds, NULL, NULL, &timeout_struct))
 					{
-						perl_result_buffer[number_read] = 0;
-						if (2 == sscanf(perl_result_buffer, "%190s %290s",
-														perl_api_string, perl_archlib))
+						char perl_result_buffer[500];
+						if (number_read = read(stdout_pipe[0], perl_result_buffer, 499))
 						{
-							for (i = 0 ; i < number_of_perl_interpreters ; i++)
+							perl_result_buffer[number_read] = 0;
+							if (2 == sscanf(perl_result_buffer, "%190s %290s",
+															perl_api_string, perl_archlib))
 							{
-								if (0 == strcmp(perl_api_string, interpreter_strings[i].api_string))
+								for (i = 0 ; i < number_of_perl_interpreters ; i++)
 								{
-									perl_interpreter_string = interpreter_strings[i].base64_string;
+									if (0 == strcmp(perl_api_string, interpreter_strings[i].api_string))
+									{
+										perl_interpreter_string = interpreter_strings[i].base64_string;
+									}
 								}
+							}
+							else
+							{
+								((*interpreter)->display_message_function)
+									(ERROR_MESSAGE,
+									 "Unexpected result for API information from \"%s\"",
+									 perl_executable);
 							}
 						}
 						else
 						{
-							((*interpreter)->display_message_function)(ERROR_MESSAGE,
-								"Unexpected result from \"%s\"", command);
+							((*interpreter)->display_message_function)
+								(ERROR_MESSAGE,
+								 "No API information received from \"%s\"",
+								 perl_executable);
 						}
 					}
 					else
 					{
-						((*interpreter)->display_message_function)(ERROR_MESSAGE,
-							"No characters received from \"%s\"", command);
+						((*interpreter)->display_message_function)
+							(ERROR_MESSAGE,
+							 "Timed out waiting for API infomation from \"%s\"",
+							 perl_executable);
 					}
-				}
-				else
-				{
-					((*interpreter)->display_message_function)(ERROR_MESSAGE,
-						"Timed out executing \"%s\"", command);
+
+					close(stdout_pipe[0]);
+
+					/* Reap the child */
+
+					/* Assuming that if we got what we expected from the
+					   child, then it is probably going to exit.  Is this
+					   reasonable? */
+					if ( ! perl_archlib )
+					{
+						/* Otherwise tell the child to finish.  If it won't
+						   accept a SIGTERM then does it have a good reason
+						   not to exit yet or should we send a SIGKILL? */
+						kill (process_id, SIGTERM);
+					}
+					waitpid (process_id, status, 0);
 				}
 			}
 		}
@@ -576,6 +636,27 @@ the function pointers and then calls create_interpreter_ for that instance.
 					perl_interpreter_string))
 			{
 				char perl_shared_library[350];
+				/* $Config{libperl} may be libperl.a */
+				/*
+					We could try opening libperl.so(.N) (from /usr/lib) if
+					perl_executable is the same version as /usr/bin/perl.
+
+					On Ubuntu (and probably Debian), libperl.so.N is in the libperl58
+					package but the libperl.so soft link is part of
+					libperl-dev. Fortunately, $Config{libperl} is currently set on
+					Ubuntu.
+
+          A libperl can be opened and run just like the perl executable.
+					("libraries are programs with multiple entry points, and more
+					formally defined interfaces.")  See perldoc perlembed and perlapi
+					for how to invoke perl_parse to run the libperl as if it is a perl
+					executable.  The interface seems fairly simple and looks like it
+					will not be version-specific provided (void *)NULL is passed for the
+					xsinit argument.
+
+          Perhaps a CMISS_LIBPERL environment variable should be checked
+          before CMISS_PERL?
+				*/
 				sprintf(perl_shared_library, "%s/CORE/libperl.so", perl_archlib);
 				if (perl_handle = dlopen(perl_shared_library, RTLD_LAZY | RTLD_GLOBAL))
 				{
