@@ -58,6 +58,34 @@ selected at runtime according to the perl found in the users path.
 #include "static_version.h"       /* for NO_STATIC_FALLBACK */
 #include "perl_interpreter.h"
 
+/******************************************************************************
+
+Types for functions to make inquiries of shared libperls.
+
+These could use information from perl.h, but I don't want to include perl.h as
+this module should be independent of the perl binary api and perl.h is not.
+Fortunately the api to these functions is fairly simple and has not changed
+too much (from 5.6.2 to 5.8.7 at least).
+
+******************************************************************************/
+
+typedef void PerlInterpreter;
+/* I haven't checked if the api to XSINIT_t is consistent but we don't need it
+	 anyway */
+typedef void (*XSINIT_t) ( PerlInterpreter* interp );
+
+typedef PerlInterpreter* (*perl_alloc_t)(void);
+typedef void (*perl_construct_t)( PerlInterpreter* interp );
+/* perl_destruct actually returns an int from 5.8.0 (but not 5.6.2) but is
+	 only useful if PERL_EXIT_DESTRUCT_END is added to PL_exit_flags. */
+typedef void (*perl_destruct_t)( PerlInterpreter* interp );
+typedef void (*perl_free_t)( PerlInterpreter* interp );
+typedef int (*perl_run_t)( PerlInterpreter* interp );
+typedef int (*perl_parse_t)( PerlInterpreter* interp, XSINIT_t xsinit,
+								int argc, char** argv, char** env );
+
+/******************************************************************************/
+
 struct Interpreter
 /*******************************************************************************
 LAST MODIFIED : 25 January 2005
@@ -241,6 +269,235 @@ Takes a <command_string>, processes this through the Perl interpreter.
 			user_data, quit, execute_command_function, status);
 	}
 } /* interpret_command */
+
+/* int type is for equivalence with execvp */ 
+
+static int exec_libperl( const char *libperlname, char *argv[] )
+/*******************************************************************************
+LAST MODIFIED : 3 November 2005
+
+DESCRIPTION : Run a perlinterpreter from a shared libperl, specified as a
+filename for dlopen.  Exits with the exit status from the perlinterpreter or
+just EXIT_FAILURE if the perlinterpreter can't be run.
+==============================================================================*/
+/*
+	A libperl can be opened and run just like the perl executable.
+	"libraries are programs with multiple entry points, and more
+	formally defined interfaces" - libtool.
+
+	See perldoc perlembed and perlapi and (mini)perlmain.c from perl for more
+	information.
+*/
+{
+	int argc;
+	int exitstatus;
+	perl_alloc_t perl_alloc;
+	perl_construct_t perl_construct;
+  perl_parse_t perl_parse;
+  perl_run_t perl_run;
+  perl_destruct_t perl_destruct;
+  perl_free_t perl_free;
+  PerlInterpreter *my_perl;
+	void* libperl;
+
+  dlerror(); /* Clear any existing error */
+
+  if( !( libperl = dlopen( libperlname, RTLD_LAZY ) ) )
+	{
+		interpreter_display_message(ERROR_MESSAGE, "%s\n", dlerror() );
+		exit(EXIT_FAILURE);
+	}
+
+#ifndef FANCY_STUFF
+	if( !( (perl_alloc = (perl_alloc_t) dlsym( libperl, "perl_alloc" ))
+				 && (perl_construct = (perl_construct_t) dlsym( libperl, "perl_construct" ))
+				 && (perl_parse = (perl_parse_t) dlsym( libperl, "perl_parse" ))
+				 && (perl_run = (perl_run_t) dlsym( libperl, "perl_run" ))
+				 && (perl_destruct = (perl_destruct_t) dlsym( libperl, "perl_destruct" ))
+				 && (perl_free = (perl_free_t) dlsym( libperl, "perl_free" )) ) )
+#else
+
+# define LOAD_DL_SYM(handle,symbol) \
+  ( symbol = ( symbol ## _t ) dlsym( handle, #symbol ) )
+
+		if( !( LOAD_DL_SYM( libperl, perl_alloc )
+					 && LOAD_DL_SYM( libperl, perl_construct )
+					 && LOAD_DL_SYM( libperl, perl_parse )
+					 && LOAD_DL_SYM( libperl, perl_run )
+					 && LOAD_DL_SYM( libperl, perl_destruct )
+					 && LOAD_DL_SYM( libperl, perl_free ) ) )
+
+# undef LOAD_DL_SYM
+#endif
+		{
+			char* error = dlerror();
+			interpreter_display_message(
+																	ERROR_MESSAGE, "%s",
+																	error ? error : "required libperl function has NULL reference" );
+			exit(EXIT_FAILURE);
+		}
+
+	my_perl = (perl_alloc)();
+	if( !my_perl )
+		exit(EXIT_FAILURE);
+
+	(perl_construct)( my_perl );
+
+	argc = 0;
+	while( argv[argc] != NULL )
+		argc++;
+
+	exitstatus =
+		(perl_parse)( my_perl, (XSINIT_t)NULL, argc, argv, (char **)NULL);
+
+	if ( !exitstatus )
+		exitstatus = (perl_run)(my_perl);
+
+	(perl_destruct)( my_perl );
+	(perl_free)( my_perl );
+
+	exit(exitstatus);
+	/* 	return(exitstatus); */
+}
+
+
+static int fork_read_stdout( int (*exec_function)
+														   ( const char *file, char *const argv[] ),
+														 const char *file,
+														 char *argv[],
+														 char *buffer,
+														 size_t buffer_size )
+/*******************************************************************************
+LAST MODIFIED : 8 November 2005
+
+DESCRIPTION : Forks and runs a function such as execv or execvp in the child
+while reading up to count bytes from the stdout in the parent.  Exits 1 if the
+child exits EXIT_SUCCESS and less than count bytes are read.  The child is
+killed if more than buffer_size bytes are read or it does not respond quickly.
+
+==============================================================================*/
+{
+	ssize_t number_read;
+	pid_t process_id;
+	fd_set readfds;
+	int stdout_pipe[2];
+	struct timeval timeout_struct;
+
+	number_read = -1; /* Assume error until success */
+
+	if (-1 == pipe(stdout_pipe))
+	{
+		interpreter_display_message
+			( ERROR_MESSAGE, "Unable to create pipe: %s", strerror(errno) );
+	}
+	else
+	{
+		process_id = fork();
+
+		if (0 == process_id)
+		{ /* Child process comes here */
+			int stdin_fd;
+
+			close(stdout_pipe[0]); /* For the parent */
+				
+			/* The child shouldn't read anything */
+			/* Is this the best way to redirect stdin to /dev/null? */
+			stdin_fd = open ("/dev/null", O_RDONLY);
+			dup2 (stdin_fd,STDIN_FILENO);
+			close(stdin_fd);
+			/* Redirect stdout */
+			dup2 (stdout_pipe[1],STDOUT_FILENO);
+			close(stdout_pipe[1]);
+
+			/* Execute the perl */
+			/* !!! Should first ensure that all non-system file descriptors are closed! */
+
+			(exec_function)( file, argv );
+			/* execvp only returns on error
+				 (because on success the process gets overlayed). */
+			interpreter_display_message
+				( ERROR_MESSAGE, "%s: %s", file, strerror(errno) );
+			exit(EXIT_FAILURE);
+		}
+
+		/* Parent (or no fork) */
+
+		close( stdout_pipe[1] ); /* This was for the child. */
+
+		if( -1 == process_id )
+		{
+			interpreter_display_message
+				( ERROR_MESSAGE, "Unable to fork process: %s", strerror(errno) );
+			close( stdout_pipe[0] );
+		}
+		else /* Have child */
+		{
+			int status;
+
+			FD_ZERO(&readfds);
+			FD_SET(stdout_pipe[0], &readfds);
+			timeout_struct.tv_sec = 2;
+			timeout_struct.tv_usec = 0;
+			/* !!! Select return -1 for errors including EINTR */
+			if (select(FD_SETSIZE, &readfds, NULL, NULL, &timeout_struct))
+			{
+				number_read = read( stdout_pipe[0], buffer, buffer_size );
+			}
+			else
+			{
+				interpreter_display_message
+					( ERROR_MESSAGE, "Timed out waiting for \"%s\"", file );
+			}
+
+			close(stdout_pipe[0]);
+
+			/* Reap the child */
+
+			/* Assuming that if we got what we expected from the
+				 child, then it is probably going to exit.  Is this
+				 reasonable? */
+			if( number_read < 0 || number_read == buffer_size )
+			{
+				/* Otherwise tell the child to finish.  If it won't
+					 accept a SIGTERM then does it have a good reason
+					 not to exit yet or should we send a SIGKILL? */
+				kill (process_id, SIGTERM);
+			}
+
+			/* Do we want to loop until status does not reflect SIGSTOP or
+				 similar? */
+			waitpid (process_id, &status, 0);
+
+			if( WIFEXITED(status) )
+			{
+				if( WEXITSTATUS(status) != EXIT_SUCCESS )
+				{
+					interpreter_display_message
+						( ERROR_MESSAGE,
+							"\"%s\" exited with status %i", file, WEXITSTATUS(status) );
+					number_read = -1;
+				}
+			}
+			else if( WIFSIGNALED(status) )
+			{
+				interpreter_display_message
+					( ERROR_MESSAGE,
+						"\"%s\" received signal %i", file, WTERMSIG(status) );
+				number_read = -1;
+			}
+			else
+			{
+				interpreter_display_message
+					( ERROR_MESSAGE,
+						"unexpected status %i from \"%s\"", status, file );
+				number_read = -1;
+			}
+		}
+	}
+
+ 	return(number_read);
+}
+
 
 #if __GLIBC__ >= 2
 #include <gnu/libc-version.h>
@@ -461,11 +718,8 @@ the function pointers and then calls create_interpreter_ for that instance.
 	char *library, perl_api_string[200], *perl_executable,
 		*perl_executable_default = "perl", *perl_interpreter_string,
 		perl_archlib[300];
-	fd_set readfds;
-	int i, number_of_perl_interpreters, process_id, return_code,
-		stdout_pipe[2];
+	int i, number_of_perl_interpreters, return_code;
 	ssize_t number_read;
-	struct timeval timeout_struct;
 	void *interpreter_handle, *perl_handle;
 
 	return_code = 0;
@@ -486,147 +740,76 @@ the function pointers and then calls create_interpreter_ for that instance.
 
 		number_of_perl_interpreters = sizeof(interpreter_strings) /
 			sizeof(struct Interpreter_library_strings);
+
 		if (number_of_perl_interpreters)
 		{
-			if (-1 == pipe(stdout_pipe))
+			char *argv[5];
+			const size_t perl_result_buffer_size = 500;
+			char perl_result_buffer[ perl_result_buffer_size + 1 ];
+
+			argv[0] = perl_executable;
+			argv[1] = "-MConfig";
+			argv[2] = "-e";
+			/* api_versionstring specifies the binary interface version.
+				 5.005 series perls use apiversion.
+				 It seems that versions prior to 5.005 did not have an api version,
+				 but we don't support these anyway so just get the version for
+				 the mismatch message below.
+				 usethreads use64bitall use64bitint uselongdouble useperlio
+				 usemultiplicity specify compile-time options affecting binary
+				 compatibility.
+				 $Config{version} is filesystem dependent so use
+				 $^V ? sprintf("%vd",$^V) : $] if the version is required, and
+				 $Config{api_revision}.$Config{api_version}.$Config{api_subversion}
+				 may be better that $Config{api_version_string}.
+			*/
+			argv[3] = "print join( '-',"
+				"$Config{api_versionstring}||$Config{apiversion}||$],"
+				"grep {$Config{\"use$_\"}}"
+				"qw(threads multiplicity 64bitall longdouble perlio) ),"
+				"\" $Config{installarchlib}\"";
+			argv[4] = (char *)NULL;
+
+			if (!(perl_executable = getenv("CMISS" ABI_ENV "_PERL")))
 			{
-				((*interpreter)->display_message_function)
-					( ERROR_MESSAGE, "Unable to create pipe: %s", strerror(errno) );
-			}
-			else
-			{
-				/* We are only expecting a little bit of stuff so I am
-					hoping that the pipe can buffer it */
-				if (!(perl_executable = getenv("CMISS" ABI_ENV "_PERL")))
+				if (!(perl_executable = getenv("CMISS_PERL")))
 				{
-					if (!(perl_executable = getenv("CMISS_PERL")))
+					perl_executable = perl_executable_default;
+				}
+			}
+
+			number_read =
+				fork_read_stdout( execvp, perl_executable, argv,
+													perl_result_buffer, perl_result_buffer_size );
+
+			if( number_read > 0 )
+			{
+				perl_result_buffer[number_read] = 0;
+				if (2 == sscanf(perl_result_buffer, "%190s %290s",
+												perl_api_string, perl_archlib))
+				{
+					for (i = 0 ; i < number_of_perl_interpreters ; i++)
 					{
-						perl_executable = perl_executable_default;
+						if (0 == strcmp(perl_api_string, interpreter_strings[i].api_string))
+						{
+							perl_interpreter_string = interpreter_strings[i].base64_string;
+						}
 					}
 				}
-
-				process_id = fork();
-
-				if (0 == process_id)
-				{ /* Child process comes here */
-					int stdin_fd;
-
-					close(stdout_pipe[0]); /* For the parent */
-				
-					/* The child shouldn't read anything */
-					/* Is this the best way to redirect stdin to /dev/null? */
-					stdin_fd = open ("/dev/null", O_RDONLY);
-					dup2 (stdin_fd,STDIN_FILENO);
-					close(stdin_fd);
-					/* Redirect stdout */
-					dup2 (stdout_pipe[1],STDOUT_FILENO);
-					close(stdout_pipe[1]);
-
-					/* Execute the perl */
-/* !!! Should first ensure that all non-system file descriptors are closed! */
-
-				/* api_versionstring specifies the binary interface version.
-           5.005 series perls use apiversion.
-					 It seems that versions prior to 5.005 did not have an api version,
-					 but we don't support these anyway so just get the version for
-					 the mismatch message below.
-				   usethreads use64bitall use64bitint uselongdouble useperlio
-				   usemultiplicity specify compile-time options affecting binary
-				   compatibility.
-					 $Config{version} is filesystem dependent so use
-           $^V ? sprintf("%vd",$^V) : $] if the version is required, and
-					 $Config{api_revision}.$Config{api_version}.$Config{api_subversion}
-           may be better that $Config{api_version_string}.
-				*/
-					execlp( perl_executable, perl_executable, "-MConfig", "-e"
-									"print join( '-',"
-									"$Config{api_versionstring}||$Config{apiversion}||$],"
-									"grep {$Config{\"use$_\"}}"
-									"qw(threads multiplicity 64bitall longdouble perlio) ),"
-									"\" $Config{installarchlib}\"",
-
-									(char *)0 );
-					/* execlp only returns on error
-					   (as on success the process gets overlayed). */
-					((*interpreter)->display_message_function)
-						(ERROR_MESSAGE, "%s: %s", perl_executable, strerror(errno) );
-					exit(EXIT_FAILURE);
-				}
-
-				/* Parent (or no fork) */
-				close(stdout_pipe[1]); /* This was for the child. */
-
-				if( -1 == process_id )
+				else
 				{
 					((*interpreter)->display_message_function)
 						(ERROR_MESSAGE,
-						 "resolve_example_path.  Unable to fork process: %s",
-						 strerror(errno) );
-					close(stdout_pipe[0]);
+						 "Unexpected result for API information from \"%s\"",
+						 perl_executable);
 				}
-				else /* Have child */
-				{
-					FD_ZERO(&readfds);
-					FD_SET(stdout_pipe[0], &readfds);
-					timeout_struct.tv_sec = 2;
-					timeout_struct.tv_usec = 0;
-					if (select(FD_SETSIZE, &readfds, NULL, NULL, &timeout_struct))
-					{
-						char perl_result_buffer[500];
-						if (number_read = read(stdout_pipe[0], perl_result_buffer, 499))
-						{
-							perl_result_buffer[number_read] = 0;
-							if (2 == sscanf(perl_result_buffer, "%190s %290s",
-															perl_api_string, perl_archlib))
-							{
-								for (i = 0 ; i < number_of_perl_interpreters ; i++)
-								{
-									if (0 == strcmp(perl_api_string, interpreter_strings[i].api_string))
-									{
-										perl_interpreter_string = interpreter_strings[i].base64_string;
-									}
-								}
-							}
-							else
-							{
-								((*interpreter)->display_message_function)
-									(ERROR_MESSAGE,
-									 "Unexpected result for API information from \"%s\"",
-									 perl_executable);
-							}
-						}
-						else
-						{
-							((*interpreter)->display_message_function)
-								(ERROR_MESSAGE,
-								 "No API information received from \"%s\"",
-								 perl_executable);
-						}
-					}
-					else
-					{
-						((*interpreter)->display_message_function)
-							(ERROR_MESSAGE,
-							 "Timed out waiting for API infomation from \"%s\"",
-							 perl_executable);
-					}
-
-					close(stdout_pipe[0]);
-
-					/* Reap the child */
-
-					/* Assuming that if we got what we expected from the
-					   child, then it is probably going to exit.  Is this
-					   reasonable? */
-					if ( ! perl_archlib )
-					{
-						/* Otherwise tell the child to finish.  If it won't
-						   accept a SIGTERM then does it have a good reason
-						   not to exit yet or should we send a SIGKILL? */
-						kill (process_id, SIGTERM);
-					}
-					waitpid (process_id, status, 0);
-				}
+			}
+			else
+			{
+				((*interpreter)->display_message_function)
+					(ERROR_MESSAGE,
+					 "No API information received from \"%s\"",
+					 perl_executable);
 			}
 		}
 
@@ -636,23 +819,25 @@ the function pointers and then calls create_interpreter_ for that instance.
 					perl_interpreter_string))
 			{
 				char perl_shared_library[350];
-				/* $Config{libperl} may be libperl.a */
 				/*
-					We could try opening libperl.so(.N) (from /usr/lib) if
-					perl_executable is the same version as /usr/bin/perl.
+					$Config{libperl} may be libperl.a if $Config{useshrplib} is false.
 
-					On Ubuntu (and probably Debian), libperl.so.N is in the libperl58
-					package but the libperl.so soft link is part of
-					libperl-dev. Fortunately, $Config{libperl} is currently set on
-					Ubuntu.
+					perl 5.8.2 from AIX 5.3 has $Config{useshrplib} = true and
+					$Config{libperl} = libperl.a but this file is an archive.  The
+					shared library that can be dlopened is called libperl.o even though
+					$Config{dlext} = so.
 
-          A libperl can be opened and run just like the perl executable.
-					("libraries are programs with multiple entry points, and more
-					formally defined interfaces.")  See perldoc perlembed and perlapi
-					for how to invoke perl_parse to run the libperl as if it is a perl
-					executable.  The interface seems fairly simple and looks like it
-					will not be version-specific provided (void *)NULL is passed for the
-					xsinit argument.
+					On Debian (including Ubuntu), libperl.so is in /usr/lib (if it
+					exists) and there is no soft link in $Config{archlib}/CORE.
+					/usr/lib/libperl.so.N.N is in the libperl58 package but the
+					/usr/lib/libperl.so soft link is part of libperl-dev. There is no
+					libperl.so.N.  Fortunately, $Config{libperl} is currently set.  The
+					Debian perl source package ensures that the shared perl is built
+					last so Config.pm is for the shared perl even if the installed perl
+					is statically linked (which is the case on i386 only).
+
+					We could try opening libperl.so(.N(|.N)) and checking its api if
+					there is no suitable file in $Config{archlib}/CORE.
 
           Perhaps a CMISS_LIBPERL environment variable should be checked
           before CMISS_PERL?
@@ -995,7 +1180,9 @@ Dynamic loader wrapper
 } /* interpreter_set_pointer */
 
 /*
+	??? Is there a suitable c-file-style?
 	Local Variables: 
 	tab-width: 2
+	c-file-offsets: ((substatement-open . 0))
 	End: 
 */
