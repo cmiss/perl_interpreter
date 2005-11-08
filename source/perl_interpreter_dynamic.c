@@ -331,9 +331,9 @@ just EXIT_FAILURE if the perlinterpreter can't be run.
 #endif
 		{
 			char* error = dlerror();
-			interpreter_display_message(
-																	ERROR_MESSAGE, "%s",
-																	error ? error : "required libperl function has NULL reference" );
+			interpreter_display_message
+				( ERROR_MESSAGE, "%s",
+					error ? error : "required libperl function has NULL reference" );
 			exit(EXIT_FAILURE);
 		}
 
@@ -416,7 +416,7 @@ killed if more than buffer_size bytes are read or it does not respond quickly.
 			/* execvp only returns on error
 				 (because on success the process gets overlayed). */
 			interpreter_display_message
-				( ERROR_MESSAGE, "%s: %s", file, strerror(errno) );
+				( ERROR_MESSAGE, "Failed to exec %s: %s", file, strerror(errno) );
 			exit(EXIT_FAILURE);
 		}
 
@@ -747,6 +747,14 @@ the function pointers and then calls create_interpreter_ for that instance.
 			const size_t perl_result_buffer_size = 500;
 			char perl_result_buffer[ perl_result_buffer_size + 1 ];
 
+			if (!(perl_executable = getenv("CMISS" ABI_ENV "_PERL")))
+			{
+				if (!(perl_executable = getenv("CMISS_PERL")))
+				{
+					perl_executable = perl_executable_default;
+				}
+			}
+
 			argv[0] = perl_executable;
 			argv[1] = "-MConfig";
 			argv[2] = "-e";
@@ -769,14 +777,6 @@ the function pointers and then calls create_interpreter_ for that instance.
 				"qw(threads multiplicity 64bitall longdouble perlio) ),"
 				"\" $Config{installarchlib}\"";
 			argv[4] = (char *)NULL;
-
-			if (!(perl_executable = getenv("CMISS" ABI_ENV "_PERL")))
-			{
-				if (!(perl_executable = getenv("CMISS_PERL")))
-				{
-					perl_executable = perl_executable_default;
-				}
-			}
 
 			number_read =
 				fork_read_stdout( execvp, perl_executable, argv,
@@ -804,7 +804,7 @@ the function pointers and then calls create_interpreter_ for that instance.
 						 perl_executable);
 				}
 			}
-			else
+			else if( number_read == 0 )
 			{
 				((*interpreter)->display_message_function)
 					(ERROR_MESSAGE,
