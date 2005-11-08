@@ -248,7 +248,7 @@ endif
 
 # There may be an issue with the perl 5.8.1 threaded build if Perl_cmiss calls
 # "certain re-entrant system calls".  See perldoc perl582delta.
-get_perl_api_string = $(shell $1 -MConfig -e 'print $$Config{api_versionstring}, map { $$Config{"use$$_"} ? "-$$_" : () } qw(threads multiplicity 64bitall longdouble perlio)')
+get_perl_api_string = $(shell $1 -MConfig -e 'print join "-", $$Config{api_versionstring}, grep { $$Config{"use$$_"} } qw(threads multiplicity 64bitall longdouble perlio)')
 PERL_API_STRING := $(call get_perl_api_string,$(PERL))
 ifeq ($(PERL_API_STRING),)
   $(error problem with $(PERL))
@@ -340,6 +340,10 @@ else
 endif
 
 ifeq ($(SET_STATIC_PERL_LIB),true)
+   #!!! Ubuntu has a libperl.a in /usr/lib and no link in $(PERL_ARCHLIB)/CORE.
+   # But how can we know what version /usr/lib/libperl.a corresponds to?
+   # Assume it is the same as /usr/bin/perl?
+   # Or /usr/lib/libperl.so is probably more likely to be the same?
    STATIC_PERL_LIB = $(firstword $(wildcard $(PERL_ARCHLIB)/CORE/libperl.a) $(wildcard $(PERL_ARCHLIB)/CORE/libperl56.a))
    ifneq ($(USE_DYNAMIC_LOADER), true)
       ifeq ($(STATIC_PERL_LIB),)
@@ -423,7 +427,8 @@ LIB_EXP := $(patsubst %$(LIBRARY_SUFFIX), %.exp, $(LIBRARY_LINK))
 
 SOURCE_FILES := $(notdir $(wildcard $(SOURCE_DIR)/*.*) )
 
-# DynaLoader module should be same version as library.
+# DynaLoader module should be same version as library.  (It changed
+# incompatibly between perl 5.8.3 and 5.8.4.)
 # Is there a reason why the other modules are not just taken from the perl?
 PMH_FILES := $(patsubst %.pm, %.pmh, $(filter %.pm, $(SOURCE_FILES)))
 ifneq ($(DYNALOADER_LIB),)
@@ -489,6 +494,7 @@ ifeq ($(filter-out IRIX%,$(SYSNAME)),)# SGI
   L_FLGS += -rdata_shared -DEBUG:error=158
   CFL_FLGS = -$(ABI) -mips$(MIPS)
   OPTCF_FLGS = -O3 -OPT:Olimit=8000
+  LD_SHARED += -Bsymbolic
   ifeq ($(ABI),n32)
     LD_SHARED += -check_registry /usr/lib32/so_locations
   else
@@ -513,6 +519,9 @@ ifeq ($(SYSNAME),Linux)
 #     endif
   else
     CC=gcc
+    # Wparantheses seems good but our code doesn't do things that way.
+    # Wunitialized often gives warnings where things are valid.
+    CFLAGS += -Wall -Wno-parentheses -Wno-uninitialized
     CPPFLAGS += -Dbool=char -DHAS_BOOL
     ifeq ($(filter $(INSTRUCTION),i686 ia64),)# not i686 nor ia64
       CFE_FLGS += -m$(ABI)
@@ -580,6 +589,7 @@ ifeq ($(SYSNAME),AIX)
   DBGC_FLGS += -qinitauto=7F
   OPTCF_FLGS = -O3 -qmaxmem=12000 -qtune=auto
   OPTC_FLGS += -qnoignerrno
+  LD_SHARED += -bsymbolic
 endif
 ifeq ($(SHARED_OBJECT), true)
   CPPFLAGS += -DSHARED_OBJECT
@@ -760,6 +770,10 @@ ifeq ($(TASK),source)
   main : $(DEPEND_FILES) \
     $(foreach file,$(PMH_FILES), $(WORKING_DIR)/$(file) )
 
+  # !!! Todo: include a file that contains the perl version so that version-
+  # (rather than api-) sensitive files are updated when that changes.
+  # e.g. Dynaloader module and library.
+
   # include the depend file dependencies
   ifneq ($(DEPEND_FILES),)
     sinclude $(DEPEND_FILES)
@@ -922,10 +936,13 @@ endif
 
   # implicit rules for making the objects
   $(WORKING_DIR)/%.o : $(SOURCE_DIR)/%.c
+  ifeq ($(DEBUG),false)
 	$(CC) -o $@ $(CPPFLAGS) $(CFLAGS) $<
+  else
 # Useful when using the debugger to find out which subroutine of the same name.
-# 	[ -L $(@D)/$*.c ] || ln -s $(CURDIR)/$< $(@D)/$*.c
-# 	$(CC) -o $@ -I$(<D) $(CPPFLAGS) $(CFLAGS) $(@D)/$*.c
+	[ -L $(@D)/$*.c ] || ln -s $(CURDIR)/$< $(@D)/$*.c
+	$(CC) -o $@ $(CPPFLAGS) -I$(<D) $(CFLAGS) $(@D)/$*.c
+  endif
 
 #-----------------------------------------------------------------------------
 endif
