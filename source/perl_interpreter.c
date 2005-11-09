@@ -79,6 +79,12 @@ Internal data storage for this interpreter.
 	 /***    The Perl interpreter    ***/
 	 PerlInterpreter *my_perl;
 
+	 /* perl keeps the argv argument to perl_parse and uses it to modify the
+			string at argv[0] when the perl variable $0 is set.  argv[0] and the
+			memory at argv[0] must therefore continue to be available until the
+			interpreter is destroyed. */
+	 char *argv[3];
+	
 	 int perl_interpreter_filehandle_in;
 	 int perl_interpreter_filehandle_out;
 	 int perl_interpreter_kept_quit;
@@ -87,6 +93,13 @@ Internal data storage for this interpreter.
 	 int keep_stdout;
 	 int keep_stderr;
 }; /* struct Interpreter */
+
+/* These are really constants but they are passed to perl_parse as argv[1] and
+	 argv[2].  perl currently (5.8.7) doesn't modify them (as they are not
+	 contiguous with argv[0]), but there is no guarantee that it won't in the
+	 future. */
+static char e_string[] = "-e";
+static char zero_string[] = "0";
 
 static void xs_init(pTHX);
 
@@ -220,7 +233,6 @@ DESCRIPTION:
 Creates the interpreter for processing commands.
 ==============================================================================*/
 {
-  char *embedding[3], e_string[] = "-e", zero_string[] = "0";
 	char *perl_invoke_command;
 
   const char *load_commands[] =
@@ -299,12 +311,13 @@ Creates the interpreter for processing commands.
 
 		 (*interpreter)->my_perl = perl_alloc();
 		 my_perl = (*interpreter)->my_perl;
+		 /* !!! Check my_perl was successful */
 
 		 perl_construct(my_perl);
-		 embedding[0] = argv[0];
-		 embedding[1] = e_string;
-		 embedding[2] = zero_string;
-		 perl_parse(my_perl, xs_init, 3, embedding, NULL);
+		 (*interpreter)->argv[0] = argv[0];
+		 (*interpreter)->argv[1] = e_string;
+		 (*interpreter)->argv[2] = zero_string;
+		 perl_parse(my_perl, xs_init, 3, (*interpreter)->argv, NULL);
 		 perl_run(my_perl);
 		 
 		 {
