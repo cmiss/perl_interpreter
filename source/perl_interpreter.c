@@ -370,7 +370,7 @@ Creates the interpreter for processing commands.
 
 				/* Override the $0 variable without actually executing the file */
 
-#if 0 || ! defined (WIN32)
+#if 0 && ! defined (WIN32)
 				/* This code is not working in Win32 at the moment */
 				/* Causes perl to segfault */
 
