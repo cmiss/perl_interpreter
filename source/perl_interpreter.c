@@ -80,11 +80,16 @@ Internal data storage for this interpreter.
 	 PerlInterpreter *my_perl;
 
 	 /* perl keeps the argv argument to perl_parse and uses it to modify the
-			string at argv[0] when the perl variable $0 is set.  argv[0] and the
-			memory at argv[0] must therefore continue to be available until the
+			string argv[0][] when the perl variable $0 is set.  argv[0] and the
+		  argv[0][] must therefore continue to be available until the
 			interpreter is destroyed. */
-	 char *argv[3];
-	
+	 char *argv[4];
+	/* perl feels free to modify the strings argv[n][] if they are contiguous
+		 with argv[0][].  argv[0] could be a constant with just a NUL terminator,
+		 but, to guarantee that it is not contiguous with argv[1][], space is
+		 allocated for a NUL terminator here. */
+	 char argv0[1];
+
 	 int perl_interpreter_filehandle_in;
 	 int perl_interpreter_filehandle_out;
 	 int perl_interpreter_kept_quit;
@@ -96,8 +101,8 @@ Internal data storage for this interpreter.
 
 /* These are really constants but they are passed to perl_parse as argv[1] and
 	 argv[2].  perl currently (5.8.7) doesn't modify them (as they are not
-	 contiguous with argv[0]), but there is no guarantee that it won't in the
-	 future. */
+	 contiguous with argv[0][]), but there is no guarantee that it won't be
+	 modified in the future. */
 static char e_string[] = "-e";
 static char zero_string[] = "0";
 
@@ -311,12 +316,46 @@ Creates the interpreter for processing commands.
 
 		 (*interpreter)->my_perl = perl_alloc();
 		 my_perl = (*interpreter)->my_perl;
-		 /* !!! Check my_perl was successful */
+		 /* !!! Check perl_alloc was successful */
+
+		 /*
+			 If the first element(s) argv[][] to perl_parse is contiguous with
+			 environ (as is likely the case when argv[0] is main's argv[0] and
+			 main's argc = 1) then perl 5.8.6 to at least 5.8.7 modify the first
+			 environment variable if perl's $0 is set.  (The rest of the environment
+			 is safe because it is copied in mg_set from S_init_postdump_symbols in
+			 perl.c.)  This effectively removes the first environment variable.
+
+			 To avoid this either:
+
+			   a) Don't use main's argv[0].  (Setting perl's $0 would then no longer
+			   alter process information.)  A copy of main's argv[0] would mean that
+			   perl's $^X is set correctly.  A zero-length string could be supplied
+			   and $^X set explicitly if perl does not use /proc/self/exe to set
+			   $^X.  Or a copy of main's argv[0] could be used and $^X would always
+			   be set appropriately by perl_parse.
+			   
+				 b) Swap the first two pointers in environ if environ[1] is greater
+			   than environ[0] so the first is not contiguous with main's argv[].
+				 
+				 c) Set PL_use_safe_putenv to 0 so the whole environment is copied.
+			   This seems to have been the default prior to perl 5.8.6.  But the
+			   copy is only used until perl_destruct is called, at which point the
+			   copy is removed and the whole environ is reset to point back at a
+			   corrupted environment, removing all environment variables.
+
+			 Approach (a) is used here.
+		 */
 
 		 perl_construct(my_perl);
-		 (*interpreter)->argv[0] = argv[0];
+		 (*interpreter)->argv[0] = (*interpreter)->argv0;
 		 (*interpreter)->argv[1] = e_string;
 		 (*interpreter)->argv[2] = zero_string;
+		 /* The NULL terminator doesn't seem used in perl 5.8.7 but seems
+				consistent with the description for main in man execve. */
+		 (*interpreter)->argv[3] = (char *)NULL;
+		 (*interpreter)->argv0[0] = 0;
+
 		 perl_parse(my_perl, xs_init, 3, (*interpreter)->argv, NULL);
 		 perl_run(my_perl);
 		 
@@ -329,11 +368,12 @@ Creates the interpreter for processing commands.
 
 				PUSHMARK(sp) ;
 
-#if ! defined (WIN32)
+				/* Override the $0 variable without actually executing the file */
+
+#if 0 || ! defined (WIN32)
 				/* This code is not working in Win32 at the moment */
 				/* Causes perl to segfault */
 
-				/* Override the $0 variable without actually executing the file */
 				if (initial_comfile)
 				{
 					 perl_invoke_command = (char *)malloc(20 + strlen(initial_comfile));
@@ -347,6 +387,20 @@ Creates the interpreter for processing commands.
 				perl_eval_pv(perl_invoke_command, FALSE);
 				free(perl_invoke_command);
 #endif /* ! defined (WIN32) */
+
+				sv_setpv( get_sv("0",/* create = */TRUE),
+									initial_comfile ? initial_comfile : "" );
+
+				{
+					SV* caret_x = get_sv("\030"/* $^X */,/* create = */TRUE);
+					STRLEN len;
+
+					(void) SvPV(caret_x,len);
+					if ( len == 0 )
+					{	/* Perl didn't set $^X */
+						sv_setpv(caret_x,argv[0]);
+					}
+				}
 
 				if (argc > 1)
 				{
@@ -1317,5 +1371,6 @@ To override the cmiss:: package specify the full name in the string.
 /*
 	Local Variables: 
 	tab-width: 2
+	c-file-offsets: ((substatement-open . 0))
 	End: 
 */

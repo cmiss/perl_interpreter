@@ -70,11 +70,7 @@ DESCRIPTION:
 Creates the interpreter for processing commands.
 
 <argc>, <argv> and <initial_comfile> are used to initialise some internal
-variables.  The memory associated with the string at argv[0] must continue to
-be available until the interpreter is destroyed as it is modified when perl
-sets $0 (unless argv[0][0] is NUL or argv is NULL or argc = 0).  The
-environment of environ may also be modified if it is adjacent to argv[0]
-(which is likely when argv[0] is main's argv[0] and main's argc = 1.)
+variables.
 
 If <*warnings_flag> is true then perl is started with its -w option on..
 ==============================================================================*/
