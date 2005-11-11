@@ -56,6 +56,7 @@ Provides an interface between cmiss and a Perl interpreter.
 #endif
 #include <stdio.h>
 #include <unistd.h>
+#include <string.h>
 #include <fcntl.h>
 #include <stdarg.h>
 #include "perl_interpreter.h"
@@ -84,11 +85,12 @@ Internal data storage for this interpreter.
 		  argv[0][] must therefore continue to be available until the
 			interpreter is destroyed. */
 	 char *argv[4];
-	/* perl feels free to modify the strings argv[n][] if they are contiguous
-		 with argv[0][].  argv[0] could be a constant with just a NUL terminator,
-		 but, to guarantee that it is not contiguous with argv[1][], space is
-		 allocated for a NUL terminator here. */
-	 char argv0[1];
+	/*
+		perl feels free to modify the strings argv[n][] if they are contiguous
+  	with argv[0][].  Allocating space for argv[0][] in this struct ensures that
+  	it is not contiguous with argv[1][].
+	*/
+	 char argv0[2];
 
 	 int perl_interpreter_filehandle_in;
 	 int perl_interpreter_filehandle_out;
@@ -99,10 +101,20 @@ Internal data storage for this interpreter.
 	 int keep_stderr;
 }; /* struct Interpreter */
 
-/* These are really constants but they are passed to perl_parse as argv[1] and
-	 argv[2].  perl currently (5.8.7) doesn't modify them (as they are not
-	 contiguous with argv[0][]), but there is no guarantee that it won't be
-	 modified in the future. */
+/*
+	argv[0][] to perl_parse cannot be just a NUL terminator (zero strlen) as
+	from version 5.8.1 (and still 5.8.7) perl tries to set the last non-NUL char
+	to NUL in Perl_magic_set.  If there are no non-NUL chars then it sets
+	argv[0][-1] to 0.  (5.8.0 just reset the NUL terminator to NUL.)
+	Using an arbitrary unlikely string that can be detected later.
+*/
+static const char initial_argv0[] = "/";
+/*
+	These are really constants but they are passed to perl_parse as argv[1] and
+	argv[2].  perl currently (5.8.7) doesn't modify them (as they are not
+	contiguous with argv[0][]), but there is no guarantee that it won't be
+	modified in the future.
+*/
 static char e_string[] = "-e";
 static char zero_string[] = "0";
 
@@ -238,8 +250,6 @@ DESCRIPTION:
 Creates the interpreter for processing commands.
 ==============================================================================*/
 {
-	char *perl_invoke_command;
-
   const char *load_commands[] =
   {
 		"local $SIG{__WARN__} = sub { die $_[0] };\n"
@@ -329,8 +339,7 @@ Creates the interpreter for processing commands.
 			 To avoid this either:
 
 			   a) Don't use main's argv[0].  (Setting perl's $0 would then no longer
-			   alter process information.)  A copy of main's argv[0] would mean that
-			   perl's $^X is set correctly.  A zero-length string could be supplied
+			   alter process information.)  Another string could be supplied
 			   and $^X set explicitly if perl does not use /proc/self/exe to set
 			   $^X.  Or a copy of main's argv[0] could be used and $^X would always
 			   be set appropriately by perl_parse.
@@ -354,11 +363,21 @@ Creates the interpreter for processing commands.
 		 /* The NULL terminator doesn't seem used in perl 5.8.7 but seems
 				consistent with the description for main in man execve. */
 		 (*interpreter)->argv[3] = (char *)NULL;
-		 (*interpreter)->argv0[0] = 0;
+
+		 strcpy( (*interpreter)->argv0, initial_argv0 );
 
 		 perl_parse(my_perl, xs_init, 3, (*interpreter)->argv, NULL);
 		 perl_run(my_perl);
 		 
+		 {
+			 SV* caret_x = get_sv("\030"/* $^X */,/* create = */TRUE);
+
+			 if( 0 == strcmp( SvPV_nolen(caret_x), initial_argv0 ) )
+			 {	/* Perl didn't set $^X */
+				 sv_setpv(caret_x,argv[0]);
+			 }
+		 }
+
 		 {
 				STRLEN n_a;
 				dSP ;
@@ -373,34 +392,26 @@ Creates the interpreter for processing commands.
 #if 0 && ! defined (WIN32)
 				/* This code is not working in Win32 at the moment */
 				/* Causes perl to segfault */
+				{
+					char *perl_invoke_command;
 
-				if (initial_comfile)
-				{
-					 perl_invoke_command = (char *)malloc(20 + strlen(initial_comfile));
-					 sprintf(perl_invoke_command, "$0 = '%s';\n", initial_comfile);
+					if (initial_comfile)
+					{
+						perl_invoke_command = (char *)malloc(20 + strlen(initial_comfile));
+						sprintf(perl_invoke_command, "$0 = '%s';\n", initial_comfile);
+					}
+					else
+					{
+						perl_invoke_command = (char *)malloc(20);
+						sprintf(perl_invoke_command, "$0 = '';\n");
+					}
+					perl_eval_pv(perl_invoke_command, FALSE);
+					free(perl_invoke_command);
 				}
-				else
-				{
-					 perl_invoke_command = (char *)malloc(20);
-					 sprintf(perl_invoke_command, "$0 = '';\n");
-				}
-				perl_eval_pv(perl_invoke_command, FALSE);
-				free(perl_invoke_command);
 #endif /* ! defined (WIN32) */
 
 				sv_setpv( get_sv("0",/* create = */TRUE),
 									initial_comfile ? initial_comfile : "" );
-
-				{
-					SV* caret_x = get_sv("\030"/* $^X */,/* create = */TRUE);
-					STRLEN len;
-
-					(void) SvPV(caret_x,len);
-					if ( len == 0 )
-					{	/* Perl didn't set $^X */
-						sv_setpv(caret_x,argv[0]);
-					}
-				}
 
 				if (argc > 1)
 				{
