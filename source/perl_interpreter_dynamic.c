@@ -50,6 +50,7 @@ selected at runtime according to the perl found in the users path.
 #include <stdlib.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <signal.h>
 #include <sys/wait.h>
 #include <fcntl.h>
@@ -81,6 +82,7 @@ typedef void (*perl_construct_t)( PerlInterpreter* interp );
 typedef void (*perl_destruct_t)( PerlInterpreter* interp );
 typedef void (*perl_free_t)( PerlInterpreter* interp );
 typedef int (*perl_run_t)( PerlInterpreter* interp );
+/* perl 5.8.7 at least writes to argv[] in Perl_magic_set when setting $0 */
 typedef int (*perl_parse_t)( PerlInterpreter* interp, XSINIT_t xsinit,
 								int argc, char** argv, char** env );
 
@@ -361,12 +363,20 @@ just EXIT_FAILURE if the perlinterpreter can't be run.
 }
 
 
-static int fork_read_stdout( int (*exec_function)
-														   ( const char *file, char *const argv[] ),
-														 const char *file,
-														 char *argv[],
-														 char *buffer,
-														 size_t buffer_size )
+static ssize_t fork_read_stdout(/*
+																	int (*execvp)
+																	( const char *file, char *const argv[] )
+																	doesn't quite match
+																	int (*exec_libperl)
+																	( const char *file, char *argv[] )
+																	so the argument prototypes are not here because
+																	of the warning from gcc.
+																*/
+																int (*exec_function)(),
+																const char *file,
+																char *argv[],
+																char *buffer,
+																size_t buffer_size )
 /*******************************************************************************
 LAST MODIFIED : 8 November 2005
 
@@ -438,10 +448,14 @@ killed if more than buffer_size bytes are read or it does not respond quickly.
 			FD_SET(stdout_pipe[0], &readfds);
 			timeout_struct.tv_sec = 2;
 			timeout_struct.tv_usec = 0;
-			/* !!! Select return -1 for errors including EINTR */
+			/* !!! Select returns -1 for errors including EINTR */
+			/* !!! We should loop over select until number_read == 0 */
 			if (select(FD_SETSIZE, &readfds, NULL, NULL, &timeout_struct))
 			{
-				number_read = read( stdout_pipe[0], buffer, buffer_size );
+				while( ( number_read =
+								 read( stdout_pipe[0], buffer, buffer_size ) ) == -1
+							 && errno == EINTR )
+					;
 			}
 			else
 			{
@@ -474,7 +488,7 @@ killed if more than buffer_size bytes are read or it does not respond quickly.
 				{
 					interpreter_display_message
 						( ERROR_MESSAGE,
-							"\"%s\" exited with status %i", file, WEXITSTATUS(status) );
+							"\"%s\" failed with status %i", file, WEXITSTATUS(status) );
 					number_read = -1;
 				}
 			}
@@ -489,7 +503,7 @@ killed if more than buffer_size bytes are read or it does not respond quickly.
 			{
 				interpreter_display_message
 					( ERROR_MESSAGE,
-						"unexpected status %i from \"%s\"", status, file );
+						"Unexpected status %i from \"%s\"", status, file );
 				number_read = -1;
 			}
 		}
@@ -715,25 +729,27 @@ Dynamic loader wrapper which loads an appropriate interpreter, initialises all
 the function pointers and then calls create_interpreter_ for that instance.
 ==============================================================================*/
 {
-	char *library, perl_api_string[200], *perl_executable,
-		*perl_executable_default = "perl", *perl_interpreter_string,
-		perl_archlib[300];
-	int i, number_of_perl_interpreters, return_code;
+	char perl_executable_default[] = "perl";
+	char *perl_executable;
+	char *library, *perl_api_string,
+		*perl_interpreter_string,
+		*perl_archlib, *perl_libperl;
+	int number_of_perl_interpreters, return_code;
 	ssize_t number_read;
 	void *interpreter_handle, *perl_handle;
 
-	return_code = 0;
 	if (*interpreter = (struct Interpreter *)malloc (sizeof(struct Interpreter)))
 	{
+		const size_t perl_result_buffer_size = 500;
+		char perl_result_buffer[perl_result_buffer_size];
+
 		(*interpreter)->use_dynamic_interpreter = 0;
 		(*interpreter)->display_message_function = interpreter_display_message;
 		(*interpreter)->real_interpreter = (struct Interpreter *)NULL;
 
+		perl_api_string = (char *)NULL;
 		perl_interpreter_string = (char *)NULL;
 		library = (char *)NULL;
-
-		*perl_api_string = 0;
-		*perl_archlib = 0;
 
 		interpreter_handle = NULL;
 		perl_handle = NULL;
@@ -744,8 +760,6 @@ the function pointers and then calls create_interpreter_ for that instance.
 		if (number_of_perl_interpreters)
 		{
 			char *argv[5];
-			const size_t perl_result_buffer_size = 500;
-			char perl_result_buffer[ perl_result_buffer_size + 1 ];
 
 			if (!(perl_executable = getenv("CMISS" ABI_ENV "_PERL")))
 			{
@@ -758,7 +772,8 @@ the function pointers and then calls create_interpreter_ for that instance.
 			argv[0] = perl_executable;
 			argv[1] = "-MConfig";
 			argv[2] = "-e";
-			/* api_versionstring specifies the binary interface version.
+			/*
+				 api_versionstring specifies the binary interface version.
 				 5.005 series perls use apiversion.
 				 It seems that versions prior to 5.005 did not have an api version,
 				 but we don't support these anyway so just get the version for
@@ -771,23 +786,81 @@ the function pointers and then calls create_interpreter_ for that instance.
 				 $Config{api_revision}.$Config{api_version}.$Config{api_subversion}
 				 may be better that $Config{api_version_string}.
 			*/
+			/*
+				$Config{libperl} is usually libperl.a if $Config{useshrplib} is
+				false.
+
+				perl 5.8.2 and 5.8.6 on AIX 5.3 have $Config{useshrplib} = true and
+				$Config{libperl} = libperl.a but this file is an archive.  The
+				shared library that can be dlopened is called libperl.o (from
+				obj_ext) even though $Config{dlext} = so.
+			*/
 			argv[3] = "print join( '-',"
 				"$Config{api_versionstring}||$Config{apiversion}||$],"
 				"grep {$Config{\"use$_\"}}"
 				"qw(threads multiplicity 64bitall longdouble perlio) ),"
-				"\" $Config{installarchlib}\"";
+				"\"\\0$Config{installarchlib}\\0\","
+				"$Config{useshrplib} eq 'true' && $Config{libperl},"
+				"\"\\0\"";
 			argv[4] = (char *)NULL;
 
 			number_read =
 				fork_read_stdout( execvp, perl_executable, argv,
 													perl_result_buffer, perl_result_buffer_size );
 
-			if( number_read > 0 )
+			/* Error already reported with number_read < 0 */
+			if( number_read == 0 )
 			{
-				perl_result_buffer[number_read] = 0;
-				if (2 == sscanf(perl_result_buffer, "%190s %290s",
-												perl_api_string, perl_archlib))
+				((*interpreter)->display_message_function)
+					(ERROR_MESSAGE,
+					 "No API information received from \"%s\"",
+					 perl_executable);
+			}
+			else if( number_read > 0 )
+			{
 				{
+					size_t i = 0;
+
+					perl_api_string = perl_result_buffer;
+					while( i < perl_result_buffer_size && perl_result_buffer[i] )
+					{
+						i++;
+					}
+					i++;
+
+					perl_archlib = perl_result_buffer + i;
+					while( i < perl_result_buffer_size && perl_result_buffer[i] )
+					{
+						i++;
+					}
+					i++;
+
+					perl_libperl = perl_result_buffer + i;
+					while( i < perl_result_buffer_size && perl_result_buffer[i] )
+					{
+						i++;
+					}
+					if( i >= perl_result_buffer_size )
+					{
+						((*interpreter)->display_message_function)
+							(ERROR_MESSAGE,
+							 "Unexpected result for API information from \"%s\"",
+							 perl_executable);
+						perl_api_string = (char *)NULL;
+						perl_archlib = (char *)NULL;
+						perl_libperl = (char *)NULL;
+					}
+					else if( perl_libperl[0] == 0 )
+					{
+						perl_libperl = "libperl.so";
+					}
+							
+				}
+
+				if( perl_api_string )
+				{
+					int i;
+
 					for (i = 0 ; i < number_of_perl_interpreters ; i++)
 					{
 						if (0 == strcmp(perl_api_string, interpreter_strings[i].api_string))
@@ -796,36 +869,33 @@ the function pointers and then calls create_interpreter_ for that instance.
 						}
 					}
 				}
-				else
-				{
-					((*interpreter)->display_message_function)
-						(ERROR_MESSAGE,
-						 "Unexpected result for API information from \"%s\"",
-						 perl_executable);
-				}
-			}
-			else if( number_read == 0 )
-			{
-				((*interpreter)->display_message_function)
-					(ERROR_MESSAGE,
-					 "No API information received from \"%s\"",
-					 perl_executable);
 			}
 		}
 
+		return_code = 0;
+
 		if (perl_interpreter_string)
 		{
-			if (library = write_base64_string_to_binary_file(*interpreter,
-					perl_interpreter_string))
-			{
-				char perl_shared_library[350];
-				/*
-					$Config{libperl} may be libperl.a if $Config{useshrplib} is false.
+			const char core_subdir[] = "CORE";
+			char full_libperl_name[ strlen(perl_archlib)
+															+ strlen(core_subdir)
+															+ strlen(perl_libperl)
+															+ 3 ];
+			char *libperl_name = (char *)NULL;
+			struct stat stat_buf;
 
-					perl 5.8.2 from AIX 5.3 has $Config{useshrplib} = true and
-					$Config{libperl} = libperl.a but this file is an archive.  The
-					shared library that can be dlopened is called libperl.o even though
-					$Config{dlext} = so.
+			sprintf( full_libperl_name, "%s/%s/%s",
+							 perl_archlib, core_subdir, perl_libperl);
+
+			if( 0 == stat( full_libperl_name, &stat_buf ) )
+			{
+				libperl_name = full_libperl_name;
+			}
+			else
+			{
+				/*
+					There is no dynamic libperl in the place where the perl distribution
+					would normally install it.
 
 					On Debian (including Ubuntu), libperl.so is in /usr/lib (if it
 					exists) and there is no soft link in $Config{archlib}/CORE.
@@ -839,16 +909,103 @@ the function pointers and then calls create_interpreter_ for that instance.
 					We could try opening libperl.so(.N(|.N)) and checking its api if
 					there is no suitable file in $Config{archlib}/CORE.
 
-          Perhaps a CMISS_LIBPERL environment variable should be checked
-          before CMISS_PERL?
+					Perhaps a CMISS_LIBPERL environment variable should be checked
+					before CMISS_PERL?
 				*/
-				sprintf(perl_shared_library, "%s/CORE/libperl.so", perl_archlib);
-				if (perl_handle = dlopen(perl_shared_library, RTLD_LAZY | RTLD_GLOBAL))
+
+				const size_t libperl_result_buffer_size = 500;
+				char libperl_result_buffer[libperl_result_buffer_size];
+
+				argv[0] = perl_libperl;
+				argv[1] = "-MConfig";
+				argv[2] = "-e";
+				argv[3] = "print "
+#ifdef CHECK_API_ONLY
+					"join( '-',"
+					"$Config{api_versionstring}||$Config{apiversion}||$],"
+					"grep {$Config{\"use$_\"}}"
+					"qw(threads multiplicity 64bitall longdouble perlio) ),"
+					"\"\\0\""
+#else /* ! CHECK_API */
+				"\"$Config{installarchlib}\\0\""
+#endif
+					;
+				argv[4] = (char *)NULL;
+
+				number_read =
+					fork_read_stdout( exec_libperl, perl_libperl, argv,
+														libperl_result_buffer, libperl_result_buffer_size );
+
+				/* Error already reported with number_read < 0 */
+				if( number_read == 0 )
 				{
-					if (interpreter_handle = dlopen(library, RTLD_LAZY))
+					((*interpreter)->display_message_function)
+						(ERROR_MESSAGE,
+						 "No API information received from \"%s\"",
+						 perl_libperl);
+				}
+				else if( number_read > 0 )
+				{
 					{
-						return_code = 1;
+						size_t i = 0;
+
+						while( i < libperl_result_buffer_size && libperl_result_buffer[i] )
+						{
+							i++;
+						}
+						if( i >= libperl_result_buffer_size )
+						{
+							((*interpreter)->display_message_function)
+								(ERROR_MESSAGE,
+								 "Unexpected result for API information from \"%s\"",
+								 perl_libperl);
+						}
+#ifdef CHECK_API_ONLY
+						/*
+							If the api of the libperl is the same as the selected perl
+							executable, then it is probably better to use this libperl than
+							any builtin libperl, but @INC needs to be set to use the
+							modules from the selected perl if they are in a different
+							location to those of the libperl.
+						*/
+						else if( 0 == strcmp( libperl_result_buffer, perl_api_string ) )
+#else /* ! CHECK_API_ONLY */
+						/*
+							This essentially checks that the libperl is using modules from
+							the same place as the perl executable (which probably means
+							they are the same version built with the same options).
+						*/
+						else if( 0 == strcmp( libperl_result_buffer, perl_archlib ) )
+#endif
+						{
+							/* libperl matches perl */
+							libperl_name = perl_libperl;
+						}
 					}
+				}
+			}
+
+			if( libperl_name )
+			{
+				if( !( perl_handle = dlopen( libperl_name, RTLD_LAZY | RTLD_GLOBAL ) ) )
+				{
+					((*interpreter)->display_message_function)
+						( ERROR_MESSAGE, "%s", dlerror() );
+				}
+				else if( !( library =
+										write_base64_string_to_binary_file
+										(*interpreter, perl_interpreter_string ) ) )
+				{
+					/* error message already displayed */
+				}
+				else if( !(interpreter_handle = dlopen(library, RTLD_LAZY)) )
+				{
+					((*interpreter)->display_message_function)
+						( ERROR_MESSAGE, "%s", dlerror() );
+				}
+				else
+				{
+					return_code = 1;
 				}
 			}
 		}
@@ -858,15 +1015,11 @@ the function pointers and then calls create_interpreter_ for that instance.
 			((*interpreter)->display_message_function)(ERROR_MESSAGE,
 				"Unable to open the dynamic perl_interpreter to match your perl \"%s\".",
 				perl_executable);
-			if (perl_interpreter_string)
-			{
-				((*interpreter)->display_message_function)(ERROR_MESSAGE,
-					"dl library error: %s", dlerror());
-			}
-			else
-			{
-				if (*perl_api_string)
+
+			if ( perl_api_string && !perl_interpreter_string )
 				{
+					int i;
+
 					/* We didn't get a match so lets list all the versions strings */
 					((*interpreter)->display_message_function)(ERROR_MESSAGE,
 						"Your perl reported API version and options \"%s\".",
@@ -880,7 +1033,6 @@ the function pointers and then calls create_interpreter_ for that instance.
 							interpreter_strings[i].api_string);
 					}
 				}
-			}
 			if (perl_handle)
 			{
 				/* Don't do this as soon as the interpreter_handle fails otherwise this call 
