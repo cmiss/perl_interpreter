@@ -442,26 +442,54 @@ killed if more than buffer_size bytes are read or it does not respond quickly.
 		}
 		else /* Have child */
 		{
-			int status;
+			int status, select_code, this_read;
 
 			FD_ZERO(&readfds);
 			FD_SET(stdout_pipe[0], &readfds);
-			timeout_struct.tv_sec = 2;
+			timeout_struct.tv_sec = 5;
 			timeout_struct.tv_usec = 0;
-			/* !!! Select returns -1 for errors including EINTR */
-			/* !!! We should loop over select until number_read == 0 */
-			if (select(FD_SETSIZE, &readfds, NULL, NULL, &timeout_struct))
+
+			number_read = 0;
+
+			do
 			{
-				while( ( number_read =
-								 read( stdout_pipe[0], buffer, buffer_size ) ) == -1
-							 && errno == EINTR )
-					;
-			}
-			else
-			{
-				interpreter_display_message
-					( ERROR_MESSAGE, "Timed out waiting for \"%s\"", file );
-			}
+				this_read = -1; /* Assume failure until success */
+
+				do
+				{
+					select_code =
+						select( FD_SETSIZE, &readfds, NULL, NULL,	&timeout_struct );
+				}
+				while( select_code == -1 && errno == EINTR );
+								 ;
+				if( select_code < 0 )
+				{
+					interpreter_display_message
+						( ERROR_MESSAGE, "select failed: %s", strerror(errno) );
+				}
+				else if( select_code == 0 )
+				{
+					interpreter_display_message
+						( ERROR_MESSAGE, "Timed out waiting for \"%s\"", file );
+				}
+				else
+				{
+					do
+					{
+						this_read = read( stdout_pipe[0], buffer + number_read,
+															buffer_size - number_read );
+					} while( this_read == -1 && errno == EINTR );
+				}
+
+				if( this_read < 0 )
+				{
+					number_read = this_read;
+				}
+				else
+				{
+					number_read += this_read;
+				}
+			}	while( this_read > 0 && number_read < buffer_size );
 
 			close(stdout_pipe[0]);
 
