@@ -759,7 +759,7 @@ the function pointers and then calls create_interpreter_ for that instance.
 
 		if (number_of_perl_interpreters)
 		{
-			char *argv[5];
+			char *perl_argv[5];
 
 			if (!(perl_executable = getenv("CMISS" ABI_ENV "_PERL")))
 			{
@@ -769,9 +769,9 @@ the function pointers and then calls create_interpreter_ for that instance.
 				}
 			}
 
-			argv[0] = perl_executable;
-			argv[1] = "-MConfig";
-			argv[2] = "-e";
+			perl_argv[0] = perl_executable;
+			perl_argv[1] = "-MConfig";
+			perl_argv[2] = "-e";
 			/*
 				 api_versionstring specifies the binary interface version.
 				 5.005 series perls use apiversion.
@@ -795,17 +795,17 @@ the function pointers and then calls create_interpreter_ for that instance.
 				shared library that can be dlopened is called libperl.o (from
 				obj_ext) even though $Config{dlext} = so.
 			*/
-			argv[3] = "print join( '-',"
+			perl_argv[3] = "print join( '-',"
 				"$Config{api_versionstring}||$Config{apiversion}||$],"
 				"grep {$Config{\"use$_\"}}"
 				"qw(threads multiplicity 64bitall longdouble perlio) ),"
 				"\"\\0$Config{installarchlib}\\0\","
 				"$Config{useshrplib} eq 'true' && $Config{libperl},"
 				"\"\\0\"";
-			argv[4] = (char *)NULL;
+			perl_argv[4] = (char *)NULL;
 
 			number_read =
-				fork_read_stdout( execvp, perl_executable, argv,
+				fork_read_stdout( execvp, perl_executable, perl_argv,
 													perl_result_buffer, perl_result_buffer_size );
 
 			/* Error already reported with number_read < 0 */
@@ -877,10 +877,9 @@ the function pointers and then calls create_interpreter_ for that instance.
 		if (perl_interpreter_string)
 		{
 			const char core_subdir[] = "CORE";
-			char full_libperl_name[ strlen(perl_archlib)
-															+ strlen(core_subdir)
-															+ strlen(perl_libperl)
-															+ 3 ];
+			char full_libperl_name[ strlen(perl_archlib) + 1
+															+ sizeof(core_subdir)
+															+ strlen(perl_libperl) + 1 ];
 			char *libperl_name = (char *)NULL;
 			struct stat stat_buf;
 
@@ -913,13 +912,14 @@ the function pointers and then calls create_interpreter_ for that instance.
 					before CMISS_PERL?
 				*/
 
+				char *perl_argv[5];
 				const size_t libperl_result_buffer_size = 500;
 				char libperl_result_buffer[libperl_result_buffer_size];
 
-				argv[0] = perl_libperl;
-				argv[1] = "-MConfig";
-				argv[2] = "-e";
-				argv[3] = "print "
+				perl_argv[0] = perl_libperl;
+				perl_argv[1] = "-MConfig";
+				perl_argv[2] = "-e";
+				perl_argv[3] = "print "
 #ifdef CHECK_API_ONLY
 					"join( '-',"
 					"$Config{api_versionstring}||$Config{apiversion}||$],"
@@ -930,10 +930,10 @@ the function pointers and then calls create_interpreter_ for that instance.
 				"\"$Config{installarchlib}\\0\""
 #endif
 					;
-				argv[4] = (char *)NULL;
+				perl_argv[4] = (char *)NULL;
 
 				number_read =
-					fork_read_stdout( exec_libperl, perl_libperl, argv,
+					fork_read_stdout( exec_libperl, perl_libperl, perl_argv,
 														libperl_result_buffer, libperl_result_buffer_size );
 
 				/* Error already reported with number_read < 0 */
