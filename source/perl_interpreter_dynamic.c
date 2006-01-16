@@ -461,7 +461,7 @@ killed if more than buffer_size bytes are read or it does not respond quickly.
 						select( FD_SETSIZE, &readfds, NULL, NULL,	&timeout_struct );
 				}
 				while( select_code == -1 && errno == EINTR );
-								 ;
+
 				if( select_code < 0 )
 				{
 					interpreter_display_message
@@ -1009,6 +1009,14 @@ the function pointers and then calls create_interpreter_ for that instance.
 							/* libperl matches perl */
 							libperl_name = perl_libperl;
 						}
+						else
+						{
+							((*interpreter)->display_message_function)
+								(ERROR_MESSAGE,
+								 "\"%s\" does not match your perl \"%s\".",
+								 perl_libperl, perl_executable);
+
+						}
 					}
 				}
 			}
@@ -1040,8 +1048,10 @@ the function pointers and then calls create_interpreter_ for that instance.
 
 		if (!return_code)
 		{
+			/* ??? This message may only be necessary if perl_api_string and
+				 !perl_interpreter_string. */
 			((*interpreter)->display_message_function)(ERROR_MESSAGE,
-				"Unable to open the dynamic perl_interpreter to match your perl \"%s\".",
+				"Unable to open a dynamic perl_interpreter to match your perl \"%s\".",
 				perl_executable);
 
 			if ( perl_api_string && !perl_interpreter_string )
