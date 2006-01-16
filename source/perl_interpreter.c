@@ -120,17 +120,29 @@ static char zero_string[] = "0";
 
 static void xs_init(pTHX);
 
-void boot_DynaLoader (pTHX_ CV* cv);
 void boot_Perl_cmiss (pTHX_ CV* cv);
+#ifndef WIN32
+#  ifndef USE_DYNAMIC_LOADER
+void boot_DynaLoader (pTHX_ CV* cv);
+#  endif /* ndef USE_DYNAMIC_LOADER */
+#endif /* ndef WIN32 */
 
 static void xs_init(pTHX)
 {
 	char *file_name = __FILE__;
 	newXS("Perl_cmiss::bootstrap", boot_Perl_cmiss, file_name);
-#ifndef USE_DYNAMIC_LOADER
+#ifndef WIN32
+	/*
+		If we have the ability to load a shared libperl then we cannot export
+		symbols from a static perl (because they will mask those in libperl) and
+		trying to load module shared objects causes an abort on unresolved
+		symbols, so don't include the DynaLoader in these cases.
+	*/
+#  ifndef USE_DYNAMIC_LOADER
 	/* DynaLoader is a special case */
 	newXS("DynaLoader::boot_DynaLoader", boot_DynaLoader, file_name);
-#endif /* ndef USE_DYNAMIC_LOADER */
+#  endif /* ndef USE_DYNAMIC_LOADER */
+#endif /* ndef WIN32 */
 }
 
 static int interpreter_display_message(enum Message_type message_type,
@@ -269,9 +281,6 @@ Creates the interpreter for processing commands.
 		/* Using a built-in perl */
 		"Perl_cmiss::set_INC_for_platform('" ABI_ENV "')",
 #endif /* defined (SHARED_OBJECT) */
-#ifndef USE_DYNAMIC_LOADER
-		"Perl_cmiss::load_DynaLoader",
-#endif /* ndef USE_DYNAMIC_LOADER */
 		"Perl_cmiss::add_cmiss_perl_to_INC('" ABI_ENV "')",
 #endif /* ! defined (WIN32) */
 		"Perl_cmiss::register_keyword assign",
@@ -297,15 +306,15 @@ Creates the interpreter for processing commands.
 		"Perl_cmiss::register_keyword set",
 		"Perl_cmiss::register_keyword unemap",
 		"Perl_cmiss::register_keyword var"};
+#if ! defined (WIN32)
 	/* If there are shared perl interpreters, then there is no static
 		 dynaloader linked as it doesn't work with the shared perl.
 	*/ 
-#if ! defined (WIN32)
-#ifndef USE_DYNAMIC_LOADER
+#  ifndef USE_DYNAMIC_LOADER
 	const char DynaLoader_pm[] =
-#  include "DynaLoader.pmh"
+#    include "DynaLoader.pmh"
 		;
-#endif /* ! defined (USE_DYNAMIC_LOADER) */
+#  endif /* ! defined (USE_DYNAMIC_LOADER) */
 #endif /* ! defined (WIN32) */
 
   int i, number_of_load_commands, return_code;
@@ -448,7 +457,7 @@ Creates the interpreter for processing commands.
 				}
 
 #if ! defined (WIN32)				
-#ifndef USE_DYNAMIC_LOADER
+#  ifndef USE_DYNAMIC_LOADER
 				/* Load the DynaLoader module now so that the module is the same
 					 version as the library linked in.  (A hook early in @INC might work
 					 also.) */
@@ -480,7 +489,7 @@ Creates the interpreter for processing commands.
 														0 );
 							}
 					}
-#endif /* ! defined (USE_DYNAMIC_LOADER) */
+#  endif /* ! defined (USE_DYNAMIC_LOADER) */
 #endif /* ! defined (WIN32) */
 
 				{
