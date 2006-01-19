@@ -314,10 +314,12 @@ ifeq ($(TASK),)
     #the executable actually runs.
     SHARED_PERL_API_STRINGS := $(foreach perl_executable,$(SHARED_PERL_EXECUTABLES),$(call get_perl_api_string,$(perl_executable)))
     ifneq ($(filter-out $(SHARED_PERL_API_STRINGS),$(PERL_API_STRING)),)
-      ifneq ($(wildcard $(PERL_ARCHLIB)/CORE/libperl.so),)
-        SHARED_PERL_EXECUTABLES += ${PERL}
-        SHARED_PERL_API_STRINGS += $(PERL_API_STRING)
-      endif
+      # There is no check for the existence of libperl.so as it is not
+      # required to build.  Debian libperl does not put libperl.so in
+      # $(PERL_ARCHLIB)/CORE but only in /usr/lib, which is checked at run
+      # time in perl_interpreter_dynamic.c.
+      SHARED_PERL_EXECUTABLES += ${PERL}
+      SHARED_PERL_API_STRINGS += $(PERL_API_STRING)
     endif
     ifeq ($(USE_DYNAMIC_LOADER),maybe)
       ifeq ($(SHARED_PERL_EXECUTABLES),)
