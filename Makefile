@@ -180,6 +180,10 @@ ifeq ($(ABI),n32)
   ABI_ENV = N32
 endif
 
+ifndef CMISS_ROOT
+  CMISS_ROOT := $(CURDIR)/..
+endif
+
 # Location of perl.
 # Try to determine from environment.
 # !!! if this perl is built with gcc -fPIC and its static library is linked
