@@ -100,8 +100,9 @@ name so as to maintain an identical functional interface.
 	int use_dynamic_interpreter;
 	Interpreter_display_message_function *display_message_function;
 
-	/* dlopened symbol */
+	/* dlopened symbols */
 	void *interpreter_handle;
+	void *perl_handle;
 
 	void(*create_interpreter_handle)(int argc, char **argv, const char *initial_comfile,
 		struct Interpreter **interpreter, int *status);
@@ -1109,6 +1110,7 @@ the function pointers and then calls create_interpreter_ for that instance.
 			/* All the functions should be valid if the return_code
 				is still 1 */
 			(*interpreter)->interpreter_handle = interpreter_handle;
+			(*interpreter)->perl_handle = perl_handle;
 			(*interpreter)->use_dynamic_interpreter = 1;
 		}
 		else
@@ -1158,6 +1160,7 @@ Dynamic loader wrapper
 		if (interpreter->interpreter_handle)
 		{
 			 dlclose(interpreter->interpreter_handle);
+			 dlclose(interpreter->perl_handle);
 		}
 	}
 	else
