@@ -259,8 +259,10 @@ ifeq ($(PERL_API_STRING),)
 endif
 ifeq ($(SYSNAME),win32)
   PERL_ARCHLIB := $(subst \,/,$(shell $(PERL) -MConfig -e 'print "$$Config{installarchlib}\n"'))
+  PERL_VERSION_ARCHNAME = $(subst \,/,$(shell $(PERL) -MConfig -e 'print "$$Config{api_versionstring}/$$Config{archname}\n"'))
 else
   PERL_ARCHLIB := $(shell $(PERL) -MConfig -e 'print "$$Config{installarchlib}\n"')
+  PERL_VERSION_ARCHNAME = $(shell $(PERL) -MConfig -e 'print "$$Config{api_versionstring}/$$Config{archname}\n"')
 endif
 ifeq ($(PERL_ARCHLIB),)
   $(error problem with $(PERL))
@@ -273,6 +275,7 @@ PERL_CFLAGS := $(shell $(PERL) -MConfig -e 'print "$$Config{ccflags}\n"')
 ifeq ($(PERL_CFLAGS),)
   $(error problem with $(CFLAGS))
 endif
+
 
 # I don't think there is any point in having a unique name here unless we also
 # have a unique name for boot_Perl_cmiss, and building the dso with -Bsymbolic
@@ -470,7 +473,7 @@ AR = ar
 # Option lists
 # (suboption lists become more specific so that later ones overrule previous)
 CFLAGS = $(strip $(CFL_FLGS) $(CFE_FLGS) $(CF_FLGS)) '-DCMISS_PERL_CALLBACK=$(CMISS_PERL_CALLBACK)'
-CPPFLAGS := $(addprefix -I, $(C_INCLUDE_DIRS) ) '-DABI_ENV="$(ABI_ENV)"'# -DPERL_NO_SHORT_NAMES
+CPPFLAGS := $(addprefix -I, $(C_INCLUDE_DIRS) ) '-DABI_ENV="$(ABI_ENV)"' '-DPERL_VERSION_ARCHNAME="$(PERL_VERSION_ARCHNAME)"' # -DPERL_NO_SHORT_NAMES
 ARFLAGS = -cr
 ifneq ($(DEBUG),false)
   CFLAGS += $(strip $(DBGCF_FLGS) $(DBGC_FLGS))

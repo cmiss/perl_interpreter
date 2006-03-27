@@ -135,7 +135,7 @@ sub add_cmiss_perl_to_INC
 	  }
 	}
 
-    my ($abi_env) = @_;
+    my ($abi_env, $perl_version_archname) = @_;
 
 	my @path_list;
 
@@ -162,6 +162,7 @@ sub add_cmiss_perl_to_INC
 	  if (exists $ENV{CMISS_ROOT})
 	  {
 		my $cmissroot_perl_lib = "$ENV{CMISS_ROOT}/cmiss_perl/lib";
+		my $try_compiled_version = 1;
 		@path_list = ();
 		if (-d $cmissroot_perl_lib)
 		{
@@ -170,6 +171,16 @@ sub add_cmiss_perl_to_INC
 		if ( $use_config )
 		{
 		  my $cmissroot_perl_lib_arch = "$ENV{CMISS_ROOT}/cmiss_perl/lib/$Config::Config{version}/$Config::Config{archname}";
+		  if (-d $cmissroot_perl_lib_arch)
+		  {
+			push @path_list, $cmissroot_perl_lib_arch;
+			$try_compiled_version = 0;
+		  }
+		}
+		if ($try_compiled_version)
+		{
+		  #If a directory matching the perl executable is not found, try one matching what the perl interpreter was compiled with.
+		  my $cmissroot_perl_lib_arch = "$ENV{CMISS_ROOT}/cmiss_perl/lib/$perl_version_archname";
 		  if (-d $cmissroot_perl_lib_arch)
 		  {
 			push @path_list, $cmissroot_perl_lib_arch;

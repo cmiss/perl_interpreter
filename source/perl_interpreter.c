@@ -281,7 +281,7 @@ Creates the interpreter for processing commands.
 		/* Using a built-in perl */
 		"Perl_cmiss::set_INC_for_platform('" ABI_ENV "')",
 #endif /* defined (SHARED_OBJECT) */
-		"Perl_cmiss::add_cmiss_perl_to_INC('" ABI_ENV "')",
+		"Perl_cmiss::add_cmiss_perl_to_INC('" ABI_ENV "','" PERL_VERSION_ARCHNAME "')",
 #endif /* ! defined (WIN32) */
 		"Perl_cmiss::register_keyword assign",
 		"Perl_cmiss::register_keyword attach",
