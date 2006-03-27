@@ -1160,6 +1160,9 @@ Dynamic loader wrapper
 		if (interpreter->interpreter_handle)
 		{
 			 dlclose(interpreter->interpreter_handle);
+		}
+		if (interpreter->perl_handle)
+		{
 			 dlclose(interpreter->perl_handle);
 		}
 	}
