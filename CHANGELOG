@@ -1,15 +1,32 @@
 # **************************************************************************
 # FILE : CHANGELOG
 #
-# LAST MODIFIED : 23 September 2005
+# LAST MODIFIED : 27 July 2006
 # ==========================================================================
 
 This software is the perl_interpreter for CMISS.
 It is released under the Mozilla Public License v1.1
 
 Further information, help pages, a tracker and a wiki is available at 
-http://dev.cmiss.org/cmgui/
+http://www.cmiss.org/cmgui/
 
 v2.0.0
 First open source release.  License updated to Mozilla Public License.
 Added README, INSTALL, RELEASE_NOTES and CHANGELOG.
+
+v2.0.1
+adding Darwin support
+Include utilities/pm2pmh which was missing in the previous release.
+Provide DynaLoader pm module, so that it is the same version as the library
+  linked against.
+Search for a binary compatible libperl.so based on api_versionstring and
+  compilation options instead of perl archname version directory names, to try
+  to better match the relevant parameters and reduce the number of
+  perl_interpreters required.
+There is no check for the existence of a libperl.so for CMISS_PERL when
+determining whether to use CMISS_PERL for a SHARED_PERL_EXECUTABLE, as
+libperl.so is not required to build and Debian libperl does not put libperl.so
+in $(PERL_ARCHLIB)/CORE but only in /usr/lib (which is checked at run time in
+perl_interpreter_dynamic.c).
+Use a default CMISS_ROOT if none exists.
+When looking for cmiss_perl binary directory if a directory matching the perl executable is not found, try one matching what the perl interpreter was compiled with.
