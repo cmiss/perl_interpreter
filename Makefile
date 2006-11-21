@@ -117,9 +117,19 @@ ifeq ($(SYSNAME),AIX)
   OPERATING_SYSTEM := aix
 endif
 ifeq ($(SYSNAME),Darwin)
-  OPERATING_SYSTEM := darwin
-  LIB_ARCH_DIR = ppc-32-$(OPERATING_SYSTEM)
-  ABI = 32
+  ifeq ($(filter-out i%86,$(MACHNAME)),)
+    INSTRUCTION = i386
+  else
+    ifeq ($(MACHNAME),Power Macintosh)
+      INSTRUCTION = ppc
+    else
+      INSTRUCTION := $(MACHNAME)
+    endif
+  endif
+  ifndef ABI
+    ABI = 32
+  endif
+  OPERATING_SYSTEM = darwin
 endif
 
 ifneq ($(DEBUG),false)
