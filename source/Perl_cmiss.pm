@@ -31,7 +31,7 @@ $use_config = 1;
 sub set_INC_for_platform ($)
   {
 	# Call this if the perl interpreter does not match the modules on the
-	# local system (i.e. it is a built-in interpreter.
+	# local system (e.g. it is a built-in interpreter).
     my ($abi_env) = @_;
 
     my $perlinc;
