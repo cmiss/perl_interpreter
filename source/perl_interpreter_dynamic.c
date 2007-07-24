@@ -611,19 +611,22 @@ It is up to the calling routine to free the string returned and to
 remove the temporary file it refers to.
 ==============================================================================*/
 {
-	char *return_string,temp_bin_name[L_tmpnam],*total_bin,
+	char *return_string,*total_bin,
 		*total_bin_ptr;
-	FILE *bin_file;
+	FILE *bin_file;	
 	size_t bin_length, string_length;
 	int bytes_in, bytes_out, i, j;
 	long bin_long_data;
+	char template_name[]="/tmp/perl_interpreterXXXXXX";
+	int temp_fd;
 
 	if (base64_string)
 	{
 		string_length=strlen(base64_string);
-		if (tmpnam(temp_bin_name) && (bin_file=fopen(temp_bin_name, "w"))
+		temp_fd=mkstemp(template_name);
+		if ((temp_fd != -1) && (bin_file=fdopen(temp_fd, "w"))
 			&& (total_bin = (char *)malloc(string_length+1))
-			&& (return_string = (char *)malloc(strlen(temp_bin_name)+1)))
+			&& (return_string = (char *)malloc(strlen(template_name)+1)))
 		{
 			total_bin_ptr = total_bin;
 			for (i=0;i<string_length;i+=6)
@@ -732,7 +735,7 @@ remove the temporary file it refers to.
 			}
 			free(total_bin);
 			fclose(bin_file);
-			strcpy(return_string, temp_bin_name);
+			strcpy(return_string, template_name);
 		}
 		else
 		{
