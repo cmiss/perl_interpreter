@@ -232,7 +232,7 @@ The different message types.
 #endif /* ! defined (MESSAGE_H) */
 
 typedef int (Interpreter_display_message_function)(enum Message_type message_type,
-	char *format, ... );
+	const char *format, ... );
 
 void interpreter_set_display_message_function_(struct Interpreter *interpreter,
 	Interpreter_display_message_function *function, int *status);

@@ -146,7 +146,7 @@ static void xs_init(pTHX)
 }
 
 static int interpreter_display_message(enum Message_type message_type,
-	char *format, ... )
+	const char *format, ... )
 /*******************************************************************************
 LAST MODIFIED : 24 January 2005
 

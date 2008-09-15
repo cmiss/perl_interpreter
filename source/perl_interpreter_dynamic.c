@@ -133,7 +133,7 @@ name so as to maintain an identical functional interface.
 }; /* struct Interpreter */
 
 static int interpreter_display_message(enum Message_type message_type,
-	char *format, ... )
+	const char *format, ... )
 /*******************************************************************************
 LAST MODIFIED : 25 January 2005
 
