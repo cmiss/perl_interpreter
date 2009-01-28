@@ -312,7 +312,7 @@ ifeq ($(TASK),)
         ifeq ($(filter-out i%86,$(MACHNAME)),)
           SHARED_PERL_EXECUTABLES += $(wildcard $(foreach version,5.6.2 5.8.0,${CMISS_ROOT}/perl/lib/$(version)/i686-linux*/bin/perl))
         else
-          SHARED_PERL_EXECUTABLES += $(wildcard $(foreach version,5.6.2 5.8.0,${CMISS_ROOT}/perl/lib/$(version)/$(MACHNAME)-linux*/bin/perl))
+          SHARED_PERL_EXECUTABLES += $(wildcard $(foreach version,5.6.2 5.8.0 5.10.0,${CMISS_ROOT}/perl/lib/$(version)/$(MACHNAME)-linux*/bin/perl))
         endif
       endif
 #       ifeq ($(SYSNAME),AIX)
@@ -410,7 +410,9 @@ else
 #     DYNALOADER_MAKEFILE = $(DYNALOADER_WORKING_DIR)/Makefile
 #     DYNALOADER_LIB = $(DYNALOADER_WORKING_DIR)/auto/DynaLoader/DynaLoader.a
 #   else
-    DYNALOADER_LIB = $(PERL_ARCHLIB)/auto/DynaLoader/DynaLoader.a
+# Perl 5.10.0 includes the Dynaloader into libperl, so assume that the library
+# is not required if it doesn't exist.
+    DYNALOADER_LIB = $(wildcard $(PERL_ARCHLIB)/auto/DynaLoader/DynaLoader.a)
 #   endif
   endif
 endif
@@ -477,7 +479,11 @@ C_OBJ := $(WORKING_DIR)/libperlinterpreter.o
 # compiling commands
 
 CC = cc
-LD_SHARED = ld -shared $(CFL_FLGS) $(L_FLGS)
+ifneq ($(OPERATING_SYSTEM), darwin)
+  LD_SHARED = ld -shared $(CFL_FLGS) $(L_FLGS)
+else
+  LD_SHARED = ld -dylib $(CFL_FLGS) $(L_FLGS)
+endif
 SHARED_LINK_LIBRARIES = 
 AR = ar
 # Option lists
