@@ -310,7 +310,7 @@ ifeq ($(TASK),)
     ifneq ($(wildcard ${CMISS_ROOT}/perl),)
       ifeq ($(SYSNAME),Linux)
         ifeq ($(filter-out i%86,$(MACHNAME)),)
-          SHARED_PERL_EXECUTABLES += $(wildcard $(foreach version,5.6.2 5.8.0,${CMISS_ROOT}/perl/lib/$(version)/i686-linux*/bin/perl))
+          SHARED_PERL_EXECUTABLES += $(wildcard $(foreach version,5.6.2 5.8.0 5.10.0,${CMISS_ROOT}/perl/lib/$(version)/i686-linux*/bin/perl))
         else
           SHARED_PERL_EXECUTABLES += $(wildcard $(foreach version,5.6.2 5.8.0 5.10.0,${CMISS_ROOT}/perl/lib/$(version)/$(MACHNAME)-linux*/bin/perl))
         endif
