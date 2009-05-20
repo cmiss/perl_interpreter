@@ -453,6 +453,7 @@ SOURCE_FILES := $(notdir $(wildcard $(SOURCE_DIR)/*.*) )
 # Is there a reason why the other modules are not just taken from the perl?
 PMH_FILES := $(patsubst %.pm, %.pmh, $(filter %.pm, $(SOURCE_FILES)))
 ifneq ($(DYNALOADER_LIB),)
+  DYNALOADER_DEFINE = -DINCLUDE_DYNALOADERPMH
   PMH_FILES += DynaLoader.pmh
 endif
 
@@ -488,8 +489,8 @@ SHARED_LINK_LIBRARIES =
 AR = ar
 # Option lists
 # (suboption lists become more specific so that later ones overrule previous)
-CFLAGS = $(strip $(CFL_FLGS) $(CFE_FLGS) $(CF_FLGS)) '-DCMISS_PERL_CALLBACK=$(CMISS_PERL_CALLBACK)'
-CPPFLAGS := $(addprefix -I, $(C_INCLUDE_DIRS) ) '-DABI_ENV="$(ABI_ENV)"' '-DPERL_VERSION_ARCHNAME="$(PERL_VERSION_ARCHNAME)"' # -DPERL_NO_SHORT_NAMES
+CFLAGS = $(strip $(CFL_FLGS) $(CFE_FLGS) $(CF_FLGS)) '-DCMISS_PERL_CALLBACK=$(CMISS_PERL_CALLBACK)' $(DYNALOADER_DEFINE)
+CPPFLAGS := $(addprefix -I, $(C_INCLUDE_DIRS) ) '-DABI_ENV="$(ABI_ENV)"' '-DPERL_VERSION_ARCHNAME="$(PERL_VERSION_ARCHNAME)"' $(DYNALOADER_DEFINE) # -DPERL_NO_SHORT_NAMES
 ARFLAGS = -cr
 ifneq ($(DEBUG),false)
   CFLAGS += $(strip $(DBGCF_FLGS) $(DBGC_FLGS))

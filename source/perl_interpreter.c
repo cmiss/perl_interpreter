@@ -311,9 +311,11 @@ Creates the interpreter for processing commands.
 		 dynaloader linked as it doesn't work with the shared perl.
 	*/ 
 #  ifndef USE_DYNAMIC_LOADER
+#    ifdef INCLUDE_DYNALOADERPMH
 	const char DynaLoader_pm[] =
 #    include "DynaLoader.pmh"
 		;
+#    endif /* INCLUDE_DYNALOADERPMH */
 #  endif /* ! defined (USE_DYNAMIC_LOADER) */
 #endif /* ! defined (WIN32) */
 
@@ -458,6 +460,7 @@ Creates the interpreter for processing commands.
 
 #if ! defined (WIN32)				
 #  ifndef USE_DYNAMIC_LOADER
+#    ifdef INCLUDE_DYNALOADERPMH
 				/* Load the DynaLoader module now so that the module is the same
 					 version as the library linked in.  (A hook early in @INC might work
 					 also.) */
@@ -489,6 +492,7 @@ Creates the interpreter for processing commands.
 														0 );
 							}
 					}
+#    endif /* INCLUDE_DYNALOADERPMH */
 #  endif /* ! defined (USE_DYNAMIC_LOADER) */
 #endif /* ! defined (WIN32) */
 
