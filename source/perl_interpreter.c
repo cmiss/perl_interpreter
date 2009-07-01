@@ -753,8 +753,8 @@ DESCRIPTION:
 Takes a <command_string>, processes this through the Perl interpreter.
 ==============================================================================*/
 {
-	char *escaped_command, *new_pointer, *old_pointer, *quote_pointer,
-		*slash_pointer, *wrapped_command;
+	char *escaped_command, *new_pointer, *slash_pointer, *wrapped_command;
+	const char *quote_pointer, *old_pointer;
 	int escape_symbols, return_code;
 	PerlInterpreter *my_perl;
 	SV *ret;
@@ -1077,11 +1077,11 @@ as an double then <status> will be set to zero.
 {
 	int return_code;
 	SV *ret;
-	// PerlInterpreter *my_perl; // Unused
+	PerlInterpreter *my_perl;
 
 	return_code = 1;
 
-	if (interpreter->my_perl)
+	if ((my_perl=interpreter->my_perl))
 	{
 		 STRLEN n_a;
 		 dSP ;
