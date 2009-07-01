@@ -112,7 +112,7 @@ name so as to maintain an identical functional interface.
 	void (*interpreter_set_display_message_function_handle)
 		(struct Interpreter *interpreter, Interpreter_display_message_function *function, int *status);
 	void (*interpret_command_handle)(struct Interpreter *interpreter, 
-		char *command_string, void *user_data, int *quit,
+		const char *command_string, void *user_data, int *quit,
 		execute_command_function_type execute_command_function, int *status);
 	void (*interpreter_evaluate_integer_handle)(struct Interpreter *interpreter,
 		char *expression, int *result, int *status);
@@ -125,9 +125,9 @@ name so as to maintain an identical functional interface.
 	void (*interpreter_evaluate_string_handle)(struct Interpreter *interpreter,
 		char *expression, char **result, int *status);
 	void (*interpreter_set_string_handle)(struct Interpreter *interpreter,
-		char *variable_name, char *value, int *status);
+		const char *variable_name, const char *value, int *status);
 	void (*interpreter_set_pointer_handle)(struct Interpreter *interpreter,
-		char *variable_name, char *class_name, void *value, int *status);
+		const char *variable_name, const char *class_name, void *value, int *status);
 
 	struct Interpreter *real_interpreter;
 }; /* struct Interpreter */
@@ -197,7 +197,7 @@ void __interpreter_set_display_message_function_(struct Interpreter *interpreter
 #endif /* ! defined (NO_STATIC_FALLBACK) */
 
 #if ! defined (NO_STATIC_FALLBACK)
-void __interpret_command_(struct Interpreter *interpreter, char *command_string, 
+void __interpret_command_(struct Interpreter *interpreter, const char *command_string, 
 	void *user_data, int *quit, execute_command_function_type execute_command_function,
 	int *status);
 #else /* ! defined (NO_STATIC_FALLBACK) */
@@ -241,20 +241,20 @@ void __interpreter_evaluate_string_(struct Interpreter *interpreter, char *expre
 #endif /* ! defined (NO_STATIC_FALLBACK) */
 
 #if ! defined (NO_STATIC_FALLBACK)
-void __interpreter_set_string_(struct Interpreter *interpreter, char *variable_name,
-	char *value, int *status);
+void __interpreter_set_string_(struct Interpreter *interpreter, const char *variable_name,
+	const char *value, int *status);
 #else /* ! defined (NO_STATIC_FALLBACK) */
 #define __interpreter_set_string_(interpreter, variable_name, value, status);
 #endif /* ! defined (NO_STATIC_FALLBACK) */
 
 #if ! defined (NO_STATIC_FALLBACK)
-void __interpreter_set_pointer_(struct Interpreter *interpreter, char *variable_name,
-	char *class_name, void *value, int *status);
+void __interpreter_set_pointer_(struct Interpreter *interpreter, const char *variable_name,
+	const char *class_name, void *value, int *status);
 #else /* ! defined (NO_STATIC_FALLBACK) */
 #define __interpreter_set_pointer_(interpreter, variable_name, class_name, value, status);
 #endif /* ! defined (NO_STATIC_FALLBACK) */
 
-void interpret_command_(struct Interpreter *interpreter, char *command_string,
+void interpret_command_(struct Interpreter *interpreter, const char *command_string,
 	void *user_data, int *quit,
 	execute_command_function_type execute_command_function, int *status)
 /*******************************************************************************
@@ -1345,7 +1345,7 @@ Dynamic loader wrapper
 } /* interpreter_destroy_string */
 
 void interpreter_set_string_(struct Interpreter *interpreter, 
-	char *variable_name, char *value, int *status)
+	const char *variable_name, const char *value, int *status)
 /*******************************************************************************
 LAST MODIFIED : 25 January 2005
 
@@ -1366,7 +1366,7 @@ Dynamic loader wrapper
 } /* interpreter_set_string */
 
 void interpreter_set_pointer_(struct Interpreter *interpreter, 
-	char *variable_name, char *class_name, void *value, int *status)
+	const char *variable_name, const char *class_name, void *value, int *status)
 /*******************************************************************************
 LAST MODIFIED : 25 January 2005
 

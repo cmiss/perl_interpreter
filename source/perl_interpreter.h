@@ -44,10 +44,10 @@ Provides an interface between cmiss and a Perl interpreter.
 
 struct Interpreter;
 
-typedef void (*execute_command_function_type)(char *, void *, int *, int *);
+typedef void (*execute_command_function_type)(const char *, void *, int *, int *);
 
 void interpret_command_(struct Interpreter *interpreter, 
-	char *command_string, void *user_data, int *quit,
+	const char *command_string, void *user_data, int *quit,
 	execute_command_function_type execute_command_function, int *status);
 #if ! defined (FORTRAN_INTERPRETER_INTERFACE)
 #define interpret_command interpret_command_
@@ -180,7 +180,7 @@ Frees the memory associated with a string allocated by the interpreter.
 ==============================================================================*/
 
 void interpreter_set_string_(struct Interpreter *interpreter, 
-	char *variable_name, char *value, int *status);
+	const char *variable_name, const char *value, int *status);
 #if ! defined (FORTRAN_INTERPRETER_INTERFACE)
 #define interpreter_set_string interpreter_set_string_
 #endif /* ! defined (FORTRAN_INTERPRETER_INTERFACE) */
@@ -193,7 +193,7 @@ To override the cmiss: package specify the full name in the string.
 ==============================================================================*/
 
 void interpreter_set_pointer_(struct Interpreter *interpreter, 
-	char *variable_name, char *class_name, void *value,int *status);
+	const char *variable_name, const char *class_name, void *value,int *status);
 #if ! defined (FORTRAN_INTERPRETER_INTERFACE)
 #define interpreter_set_pointer interpreter_set_pointer_
 #endif /* ! defined (FORTRAN_INTERPRETER_INTERFACE) */

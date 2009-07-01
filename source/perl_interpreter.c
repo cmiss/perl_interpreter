@@ -320,7 +320,7 @@ Creates the interpreter for processing commands.
 #endif /* ! defined (WIN32) */
 
   int i, number_of_load_commands, return_code;
-
+	SV *ret;
   return_code = 1;
 
 #ifdef WIN32
@@ -452,7 +452,7 @@ Creates the interpreter for processing commands.
 							((*interpreter)->display_message_function)(ERROR_MESSAGE,"initialise_interpreter.  "
 								 "Uh oh - %s\n", SvPV(ERRSV, n_a)) ;
 							/* !!! What does this pop? */
-							POPs ;
+							ret = POPs ;
 							*interpreter = (struct Interpreter *)NULL;
 							return_code = 0;
 					 }
@@ -743,7 +743,7 @@ and then executes the returned strings
 	return (return_code);
 } /* cmiss_perl_callback */
 
-void interpret_command_(struct Interpreter *interpreter, char *command_string, 
+void interpret_command_(struct Interpreter *interpreter, const char *command_string, 
 	 void *user_data, int *quit,
   execute_command_function_type execute_command_function, int *status)
 /*******************************************************************************
@@ -757,6 +757,7 @@ Takes a <command_string>, processes this through the Perl interpreter.
 		*slash_pointer, *wrapped_command;
 	int escape_symbols, return_code;
 	PerlInterpreter *my_perl;
+	SV *ret;
 
 	if (interpreter && (my_perl = interpreter->my_perl))
 	{
@@ -870,7 +871,7 @@ Takes a <command_string>, processes this through the Perl interpreter.
 					 {
 							(interpreter->display_message_function)(ERROR_MESSAGE,
 								 "%s", SvPV(ERRSV, n_a)) ;
-							POPs ;
+							ret = POPs ;
 							return_code = 0;
 					 }
 
@@ -938,6 +939,7 @@ as an integer then <status> will be set to zero.
 {
 	int return_code;
 	PerlInterpreter *my_perl;
+	SV *ret;
 
 	return_code = 1;
 
@@ -977,7 +979,7 @@ as an integer then <status> will be set to zero.
 				{
 					 (interpreter->display_message_function)(ERROR_MESSAGE,
 							"%s", SvPV(ERRSV, n_a)) ;
-					 POPs ;
+					 ret = POPs ;
 					 return_code = 0;
 				}
 				else
@@ -1074,7 +1076,8 @@ as an double then <status> will be set to zero.
 ==============================================================================*/
 {
 	int return_code;
-	PerlInterpreter *my_perl;
+	SV *ret;
+	// PerlInterpreter *my_perl; // Unused
 
 	return_code = 1;
 
@@ -1114,7 +1117,7 @@ as an double then <status> will be set to zero.
 				{
 					 (interpreter->display_message_function)(ERROR_MESSAGE,
 							"%s", SvPV(ERRSV, n_a)) ;
-					 POPs ;
+					 ret = POPs ;
 					 return_code = 0;
 				}
 				else
@@ -1224,6 +1227,7 @@ as an string then <status> will be set to zero and <*result> will be NULL.
 		 STRLEN n_a, string_length;
 		 dSP ;
 		 SV *sv_result;
+		 SV *ret;
 
 		 ENTER ;
 		 SAVETMPS;
@@ -1255,7 +1259,7 @@ as an string then <status> will be set to zero and <*result> will be NULL.
 				{
 					 (interpreter->display_message_function)(ERROR_MESSAGE,
 							"%s", SvPV(ERRSV, n_a)) ;
-					 POPs ;
+					 ret = POPs ;
 					 return_code = 0;
 				}
 				else
@@ -1304,7 +1308,7 @@ as an string then <status> will be set to zero and <*result> will be NULL.
 } /* interpreter_evaluate_string_ */
 
 void interpreter_set_string_(struct Interpreter *interpreter, 
-	 char *variable_name, char *value, int *status)
+	 const char *variable_name, const char *value, int *status)
 /*******************************************************************************
 LAST MODIFIED : 24 January 2005
 
@@ -1350,7 +1354,7 @@ To override the cmiss:: package specify the full name in the string.
 } /* interpreter_set_string_ */
 
 void interpreter_set_pointer_(struct Interpreter *interpreter,
-	 char *variable_name, char *class_name, void *value,int *status)
+	 const char *variable_name, const char *class_name, void *value,int *status)
 /*******************************************************************************
 LAST MODIFIED : 24 January 2005
 
