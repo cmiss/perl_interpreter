@@ -1081,7 +1081,7 @@ as an double then <status> will be set to zero.
 
 	return_code = 1;
 
-	if ((my_perl=interpreter->my_perl))
+	if (interpreter && (my_perl=interpreter->my_perl))
 	{
 		 STRLEN n_a;
 		 dSP ;
