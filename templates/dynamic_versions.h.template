@@ -1,0 +1,9 @@
+
+static char libperlinterpreter@PERL_API_STRING_STANDARD_CHARACTERS@[] =
+	#include "@PERLINTERPRETER_SHARED_LIB_HEADER@"
+;
+
+static struct Interpreter_library_strings interpreter_strings[] = {
+	{"@PERL_API_STRING@", libperlinterpreter@PERL_API_STRING_STANDARD_CHARACTERS@ },
+};
+

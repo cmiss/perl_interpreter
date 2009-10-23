@@ -1,0 +1,3 @@
+
+#cmakedefine NO_STATIC_FALLBACK
+
