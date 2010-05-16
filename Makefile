@@ -151,6 +151,7 @@ endif
 #need to override this to false and you must have the corresponding
 #static libperl.a
 ifndef USE_DYNAMIC_LOADER
+  DYNAMIC_LOADER_NOT_DEF = true
   ifeq ($(SYSNAME),AIX)
     #AIX distributions have a static perl and even if I build
     #a shared "libperl.a" I cannot seem to dlopen it.
@@ -161,6 +162,7 @@ ifndef USE_DYNAMIC_LOADER
       #I have not even been including a dynaloader at all so far.
       USE_DYNAMIC_LOADER = false
     else
+      DYNAMIC_LOADER_SET = maybe
       USE_DYNAMIC_LOADER = maybe# if shared libraries are found
     endif
   endif
@@ -343,6 +345,12 @@ ifeq ($(TASK),)
       ifeq ($(SHARED_PERL_EXECUTABLES),)
         USE_DYNAMIC_LOADER = false
       else
+				define WRITE_DEBUG_MESSAGE
+					@echo 'Executables'
+					$(foreach perl_executable, $(SHARED_PERL_EXECUTABLES), @echo ' $(perl_executable)' )
+
+      endef
+				DYNAMIC_LOADER_MAYBE = true
         USE_DYNAMIC_LOADER = true
       endif
     endif
@@ -548,8 +556,8 @@ ifeq ($(SYSNAME),Linux)
     CC=gcc
     # Wparantheses seems good but our code doesn't do things that way.
     # Wunitialized often gives warnings where things are valid.
-    CFLAGS += -Wall -Wno-parentheses -Wno-uninitialized
-    CPPFLAGS += -Dbool=char -DHAS_BOOL
+    CFLAGS += -Wall -Wno-parentheses -Wno-uninitialized -fPIC
+    CPPFLAGS += -Dbool=char -DHAS_BOOL -fPIC
     ifeq ($(filter $(INSTRUCTION),i686 ia64),)# not i686 nor ia64
       CFE_FLGS += -m$(ABI)
     endif
@@ -714,6 +722,11 @@ endif
 
   main : $(PERL_CMISS_MAKEFILE) $(WORKING_DIR) $(LIBRARY_DIR)# $(DYNALOADER_MAKEFILE)
   ifeq ($(USE_DYNAMIC_LOADER),true)
+		@echo 
+		@echo 'Doing shared interpreter builds and dyn loader is $(USE_DYNAMIC_LOADER)'
+		@echo 'init: $(DYNAMIC_LOADER_NOT_DEF), then: $(DYNAMIC_LOADER_SET), and: $(DYNAMIC_LOADER_MAYBE)' 
+		$(WRITE_DEBUG_MESSAGE)
+		@echo
 	$(SHARED_INTERPRETER_BUILDS)
   endif
 	@echo
