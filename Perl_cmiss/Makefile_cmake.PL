@@ -1,5 +1,7 @@
 use strict;
 use ExtUtils::MakeMaker;
+use Config;
+
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
 # the contents of the Makefile that is written.
 
@@ -7,9 +9,11 @@ my $name = 'Perl_cmiss';
 my $xs = "$name.xs";
 
 my $num_args = $#ARGV + 1;
-if ( $num_args != 2 ) {
-	die "requires 2 parameters CMISS_PERL_CALLBACK and WORKING_DIR, in that order";
+if ( $num_args != 3 ) {
+	die "requires 3 parameters CMISS_PERL_CALLBACK, WORKING_DIR and build type \(debug/release\), in that order";
 }
+
+my $osname = $^O;
 
 my $working_dir = $ARGV[1];#$ENV{WORKING_DIR} or
 #  die "required environment variable WORKING_DIR not set";
@@ -25,18 +29,24 @@ chdir $working_dir or die "$0: can't chdir to $working_dir";
 my $source_dir = '../../..';
 
 foreach my $link ( 'Makefile.PL', $xs ) {
-    my $source = "$source_dir/$link";
-        unless( -l $link ) {
-        print "making link $link\n";
-        defined eval { symlink $source,$link } or
-          #Win32 does not have symlink in perl so lets fallback to cp
-	  (! system ("cp $source $link")) or
-	    die "$0: can't link $source, $link: $!\n";
-    }
+	my $source = "$source_dir/$link";
+	my $dest = "$link";
+	if ($link eq 'Makefile.PL') {
+		$dest = 'Makefile.PL';
+	}
+	unless( -l $dest ) {
+		print "Making link $source, $dest\n";
+
+		#Win32 does not have symlink in perl so lets fallback to copy
+		defined eval { symlink $source,$dest } or
+			(! eval { $source =~ s/\//\\/g } ) or
+			(! system ("copy $source $dest")) or
+			die "$0: can't link $source, $dest: $!\n";
+	}
 }
 
 my $define_list;
-if ($num_args == 2)
+if ($num_args == 3)
   {
 	 $define_list .= " -DCMISS_PERL_CALLBACK=\"$ARGV[0]\"";
 # I don't think this is necessary because XS_Perl_cmiss_cmiss is a static
@@ -49,6 +59,22 @@ else
   }
 
 #my $object = "$name.o";
+my $c_flags .= $Config{ccflags};
+my $c_flags_opt = '';
+if( $osname eq 'MSWin32' ){
+	sub MY::const_loadlibs { "" }
+	#$c_flags .= perl '-V:ccflags';
+	print "stuff happens $ARGV[2]";
+
+	if( "$ARGV[2]" eq "Debug" ) {
+		$c_flags =~ s/-MD/-MDd/;
+		$c_flags =~ s/-DNDEBUG/-D_DEBUG/;
+		$c_flags =~ s/-O1/-Od/;
+		$c_flags_opt = '-DWIN32';
+	}
+	print "config c_flagss ----- $c_flags";
+}
+
 WriteMakefile(
     'NAME'	=> $name,
     # ??? Shouldn't this be "$source_dir/../source/$name.pm" or should that be moved here.
@@ -58,6 +84,8 @@ WriteMakefile(
     'INC'	=> "-I$source_dir",     # e.g., '-I/usr/include/other'
     'DEFINE'	=> $define_list,
     'LINKTYPE'  => 'static',
+	'CCFLAGS' => $c_flags,
+	'OPTIMIZE' => $c_flags_opt,
     'INST_ARCHLIB' => '.'
 );
 

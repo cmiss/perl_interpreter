@@ -45,6 +45,9 @@ Provides an interface between cmiss and a Perl interpreter.
 #ifdef WIN32
 /* Need this to make static linking work... */
 #define PERLDLL
+#define STDIN_FILENO 0
+#define STDOUT_FILENO 1
+#define STDERR_FILENO 2
 #endif
 
 #include "EXTERN.h"               /* from the Perl distribution     */
@@ -55,7 +58,13 @@ Provides an interface between cmiss and a Perl interpreter.
 #  include "perlapi.h"
 #endif
 #include <stdio.h>
-#include <unistd.h>
+#ifndef WIN32
+#	include <unistd.h>
+#else
+#	define close _close
+#	define dup2	_dup2
+#	define read _read
+#endif
 #include <string.h>
 #include <fcntl.h>
 #include <stdarg.h>
@@ -329,19 +338,19 @@ Creates the interpreter for processing commands.
 
 	if (*interpreter = (struct Interpreter *)malloc(sizeof (struct Interpreter)))
 	{
-		 PerlInterpreter *my_perl;
-		 
-		 (*interpreter)->display_message_function = interpreter_display_message;
-		 (*interpreter)->perl_interpreter_filehandle_in = 0;
-		 (*interpreter)->perl_interpreter_filehandle_out = 0;
-		 (*interpreter)->keep_stdout = 0;
-		 (*interpreter)->keep_stderr = 0;
+		PerlInterpreter *my_perl;
+		
+		(*interpreter)->display_message_function = interpreter_display_message;
+		(*interpreter)->perl_interpreter_filehandle_in = 0;
+		(*interpreter)->perl_interpreter_filehandle_out = 0;
+		(*interpreter)->keep_stdout = 0;
+		(*interpreter)->keep_stderr = 0;
 
-		 (*interpreter)->my_perl = perl_alloc();
-		 my_perl = (*interpreter)->my_perl;
-		 /* !!! Check perl_alloc was successful */
+		(*interpreter)->my_perl = perl_alloc();
+		my_perl = (*interpreter)->my_perl;
+		/* !!! Check perl_alloc was successful */
 
-		 /*
+		/*
 			 If the first element(s) argv[][] to perl_parse is contiguous with
 			 environ (as is likely the case when argv[0] is main's argv[0] and
 			 main's argc = 1) then perl 5.8.6 to at least 5.8.7 modify the first
@@ -367,30 +376,32 @@ Creates the interpreter for processing commands.
 			   corrupted environment, removing all environment variables.
 
 			 Approach (a) is used here.
-		 */
+		*/
 
-		 perl_construct(my_perl);
-		 (*interpreter)->argv[0] = (*interpreter)->argv0;
-		 (*interpreter)->argv[1] = e_string;
-		 (*interpreter)->argv[2] = zero_string;
-		 /* The NULL terminator doesn't seem used in perl 5.8.7 but seems
+		perl_construct(my_perl);
+		(*interpreter)->argv[0] = (*interpreter)->argv0;
+		(*interpreter)->argv[1] = e_string;
+		(*interpreter)->argv[2] = zero_string;
+		/* The NULL terminator doesn't seem used in perl 5.8.7 but seems
 				consistent with the description for main in man execve. */
-		 (*interpreter)->argv[3] = (char *)NULL;
+		(*interpreter)->argv[3] = (char *)NULL;
 
-		 strcpy( (*interpreter)->argv0, initial_argv0 );
+		strcpy( (*interpreter)->argv0, initial_argv0 );
 
-		 perl_parse(my_perl, xs_init, 3, (*interpreter)->argv, NULL);
-		 perl_run(my_perl);
-		 
-		 {
-			 SV* caret_x = get_sv("\030"/* $^X */,/* create = */TRUE);
+		perl_parse(my_perl, xs_init, 3, (*interpreter)->argv, NULL);
+		return_code = 1;
+		//perl_parse(my_perl, xs_init, 3, embedding, NULL);
+		perl_run(my_perl);
+		{
+			SV* caret_x = get_sv("\030"/* $^X */,/* create = */TRUE);
 
-			 if( 0 == strcmp( SvPV_nolen(caret_x), initial_argv0 ) )
-			 {	/* Perl didn't set $^X */
-				 sv_setpv(caret_x,argv[0]);
-			 }
-		 }
+			if( 0 == strcmp( SvPV_nolen(caret_x), initial_argv0 ) )
+			{	/* Perl didn't set $^X */
+				sv_setpv(caret_x,argv[0]);
+			}
+		}
 
+	   perl_eval_pv(load_commands[0], FALSE);
 		 {
 				STRLEN n_a;
 				dSP ;
@@ -446,16 +457,22 @@ Creates the interpreter for processing commands.
 				number_of_load_commands = sizeof (load_commands) / sizeof (char *);
 				for (i = 0 ; i < number_of_load_commands && return_code ; i++)
 				{
-					 perl_eval_pv(load_commands[i], FALSE);
-					 if (SvTRUE(ERRSV))
-					 {
+					SV *errsv;
+					perl_eval_pv(load_commands[i], FALSE);
+#if defined (BUILD_WITH_CMAKE) && defined (WIN32)
+					errsv = GvSV(PL_stderrgv);
+#else
+					errsv = ERRSV;
+#endif
+					if (SvTRUE(errsv))
+					{
 							((*interpreter)->display_message_function)(ERROR_MESSAGE,"initialise_interpreter.  "
-								 "Uh oh - %s\n", SvPV(ERRSV, n_a)) ;
+								 "Uh oh - %s\n", SvPV(errsv, n_a)) ;
 							/* !!! What does this pop? */
 							ret = POPs ;
 							*interpreter = (struct Interpreter *)NULL;
 							return_code = 0;
-					 }
+					}
 				}
 
 #if ! defined (WIN32)				
@@ -603,11 +620,11 @@ This redirects the output from stdout to a pipe so that the handle_output
 routine can write this to the command window.
 ==============================================================================*/
 {
+#if ! defined (WIN32)
   int filehandles[2], return_code;
 
   return_code = 1;
 
-#if ! defined (WIN32)
 	/* Windows is not yet working with the redirect but that is OK */
   if (0 == pipe (filehandles))
   {
@@ -623,6 +640,8 @@ routine can write this to the command window.
 		  "Unable to create pipes") ;
 	  return_code = 0;
   }
+#else
+	int return_code = 1;
 #endif /* ! defined (WIN32) */
 
   *status = return_code;
@@ -637,7 +656,10 @@ DESCRIPTION:
 {
 	char buffer[1000];
 	fd_set readfds;
-	int flags, return_code;
+	int return_code;
+#if !defined (WIN32)
+	int flags;
+#endif
 #if defined (WIN32)
 #define ssize_t long
 #endif
@@ -695,9 +717,9 @@ and then executes the returned strings
 	int quit, return_code;
 	struct Interpreter *interpreter;
 
+	interpreter = (struct Interpreter *)interpreter_void;
 	if (command_string)
 	{
-		 interpreter = (struct Interpreter *)interpreter_void;
 
 		/* Change STDOUT and STDERR back to the standard pipes */
 		if (interpreter->keep_stdout)
@@ -757,7 +779,7 @@ Takes a <command_string>, processes this through the Perl interpreter.
 	const char *quote_pointer, *old_pointer;
 	int escape_symbols, return_code;
 	PerlInterpreter *my_perl;
-	SV *ret;
+	SV *ret, *errsv;
 
 	if (interpreter && (my_perl = interpreter->my_perl))
 	{
@@ -867,13 +889,18 @@ Takes a <command_string>, processes this through the Perl interpreter.
 
 					 handle_output(interpreter);
 
-					 if (SvTRUE(ERRSV))
-					 {
+#if defined (BUILD_WITH_CMAKE) && defined (WIN32)
+					errsv = GvSV(PL_stderrgv);
+#else
+					errsv = ERRSV;
+#endif
+					if (SvTRUE(errsv))
+					{
 							(interpreter->display_message_function)(ERROR_MESSAGE,
-								 "%s", SvPV(ERRSV, n_a)) ;
-							ret = POPs ;
+								"%s", SvPV(errsv, n_a));
+							ret = POPs;
 							return_code = 0;
-					 }
+					}
 
 					 /* Change STDOUT and STDERR back again */
 					 if (interpreter->keep_stdout)
@@ -939,7 +966,7 @@ as an integer then <status> will be set to zero.
 {
 	int return_code;
 	PerlInterpreter *my_perl;
-	SV *ret;
+	SV *ret, *errsv;
 
 	return_code = 1;
 
@@ -975,12 +1002,17 @@ as an integer then <status> will be set to zero.
  
 				handle_output(interpreter);
 
-				if (SvTRUE(ERRSV))
+#if defined (BUILD_WITH_CMAKE) && defined (WIN32)
+				errsv = GvSV(PL_stderrgv);
+#else
+				errsv = ERRSV;
+#endif
+				if (SvTRUE(errsv))
 				{
-					 (interpreter->display_message_function)(ERROR_MESSAGE,
-							"%s", SvPV(ERRSV, n_a)) ;
-					 ret = POPs ;
-					 return_code = 0;
+					(interpreter->display_message_function)(ERROR_MESSAGE,
+							"%s", SvPV(errsv, n_a));
+					ret = POPs;
+					return_code = 0;
 				}
 				else
 				{
@@ -1076,7 +1108,7 @@ as an double then <status> will be set to zero.
 ==============================================================================*/
 {
 	int return_code;
-	SV *ret;
+	SV *ret, *errsv;
 	PerlInterpreter *my_perl;
 
 	return_code = 1;
@@ -1113,12 +1145,17 @@ as an double then <status> will be set to zero.
  
 				handle_output(interpreter);
 
-				if (SvTRUE(ERRSV))
+#if defined (BUILD_WITH_CMAKE) && defined (WIN32)
+				errsv = GvSV(PL_stderrgv);
+#else
+				errsv = ERRSV;
+#endif
+				if (SvTRUE(errsv))
 				{
-					 (interpreter->display_message_function)(ERROR_MESSAGE,
-							"%s", SvPV(ERRSV, n_a)) ;
-					 ret = POPs ;
-					 return_code = 0;
+					(interpreter->display_message_function)(ERROR_MESSAGE,
+							"%s", SvPV(errsv, n_a));
+					ret = POPs;
+					return_code = 0;
 				}
 				else
 				{
@@ -1218,6 +1255,7 @@ as an string then <status> will be set to zero and <*result> will be NULL.
 	char *internal_string;
 	int return_code;
 	PerlInterpreter *my_perl;
+	SV *errsv;
 
 	return_code = 1;
 
@@ -1255,12 +1293,17 @@ as an string then <status> will be set to zero and <*result> will be NULL.
  
 				handle_output(interpreter);
 
-				if (SvTRUE(ERRSV))
+#if defined (BUILD_WITH_CMAKE) && defined (WIN32)
+				errsv = GvSV(PL_stderrgv);
+#else
+				errsv = ERRSV;
+#endif
+				if (SvTRUE(errsv))
 				{
-					 (interpreter->display_message_function)(ERROR_MESSAGE,
-							"%s", SvPV(ERRSV, n_a)) ;
-					 ret = POPs ;
-					 return_code = 0;
+					(interpreter->display_message_function)(ERROR_MESSAGE,
+							"%s", SvPV(errsv, n_a));
+					ret = POPs;
+					return_code = 0;
 				}
 				else
 				{
