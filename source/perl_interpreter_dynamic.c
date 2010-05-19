@@ -45,16 +45,23 @@ selected at runtime according to the perl found in the users path.
  * ***** END LICENSE BLOCK ***** */
 #include <errno.h>
 #include <stdio.h>
-#include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <signal.h>
-#include <sys/wait.h>
+#ifndef WIN32
+#  include <unistd.h>
+#  include <sys/time.h>
+#  include <sys/types.h>
+#  include <sys/stat.h>
+#  include <signal.h>
+#  include <sys/wait.h>
+#  include <dlfcn.h>
+#else
+#  include <windows.h>
+#  define dlerror GetLastError
+#  define dlsym	GetProcAddress
+  typedef int ssize_t;
+#endif
 #include <fcntl.h>
-#include <dlfcn.h>
 #include <stdarg.h>
 #include "static_version.h"       /* for NO_STATIC_FALLBACK */
 #include "perl_interpreter.h"
@@ -306,21 +313,32 @@ just EXIT_FAILURE if the perlinterpreter can't be run.
   PerlInterpreter *my_perl;
 	void* libperl;
 
+#if !defined (WIN32)
   dlerror(); /* Clear any existing error */
-
   if( !( libperl = dlopen( libperlname, RTLD_LAZY ) ) )
 	{
 		interpreter_display_message(ERROR_MESSAGE, "%s\n", dlerror() );
 		exit(EXIT_FAILURE);
 	}
+#else
+	if( !( libperl = LoadLibrary(libperlname)))
+	{
+		interpreter_display_message(ERROR_MESSAGE, "Error 0x%x\n", GetLastError() );
+		exit(EXIT_FAILURE);
+	}
+#endif
+
+  #if !defined (WIN32)
+  #else
+  #endif
 
 #ifndef FANCY_STUFF
 	if( !( (perl_alloc = (perl_alloc_t) dlsym( libperl, "perl_alloc" ))
-				 && (perl_construct = (perl_construct_t) dlsym( libperl, "perl_construct" ))
-				 && (perl_parse = (perl_parse_t) dlsym( libperl, "perl_parse" ))
-				 && (perl_run = (perl_run_t) dlsym( libperl, "perl_run" ))
-				 && (perl_destruct = (perl_destruct_t) dlsym( libperl, "perl_destruct" ))
-				 && (perl_free = (perl_free_t) dlsym( libperl, "perl_free" )) ) )
+		&& (perl_construct = (perl_construct_t) dlsym( libperl, "perl_construct" ))
+		&& (perl_parse = (perl_parse_t) dlsym( libperl, "perl_parse" ))
+		&& (perl_run = (perl_run_t) dlsym( libperl, "perl_run" ))
+		&& (perl_destruct = (perl_destruct_t) dlsym( libperl, "perl_destruct" ))
+		&& (perl_free = (perl_free_t) dlsym( libperl, "perl_free" )) ) )
 #else
 
 # define LOAD_DL_SYM(handle,symbol) \
