@@ -66,6 +66,7 @@ selected at runtime according to the perl found in the users path.
 #include "static_version.h"       /* for NO_STATIC_FALLBACK */
 #include "perl_interpreter.h"
 
+
 /******************************************************************************
 
 Types for functions to make inquiries of shared libperls.
@@ -170,7 +171,7 @@ struct Interpreter_library_strings { char *api_string; char *base64_string; };
 		((*interpreter)->display_message_function)(ERROR_MESSAGE,"Unable to find symbol %s", #symbol ); \
 		return_code = 0; \
 	}
-
+	
 #if ! defined (NO_STATIC_FALLBACK)
 void __create_interpreter_(int argc, char **argv, const char *initial_comfile,
 	struct Interpreter **interpreter, int *status);
@@ -386,19 +387,19 @@ just EXIT_FAILURE if the perlinterpreter can't be run.
 
 
 static ssize_t fork_read_stdout(/*
-																	int (*execvp)
-																	( const char *file, char *const argv[] )
-																	doesn't quite match
-																	int (*exec_libperl)
-																	( const char *file, char *argv[] )
-																	so the argument prototypes are not here because
-																	of the warning from gcc.
-																*/
-																int (*exec_function)(),
-																const char *file,
-																char *argv[],
-																char *buffer,
-																size_t buffer_size )
+	int (*execvp)
+	( const char *file, char *const argv[] )
+	doesn't quite match
+	int (*exec_libperl)
+	( const char *file, char *argv[] )
+	so the argument prototypes are not here because
+	of the warning from gcc.
+	*/
+	int (*exec_function)(),
+	const char *file,
+	char *argv[],
+	char *buffer,
+	size_t buffer_size )
 /*******************************************************************************
 LAST MODIFIED : 8 November 2005
 
