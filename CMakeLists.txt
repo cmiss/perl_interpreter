@@ -38,15 +38,24 @@
 CMAKE_MINIMUM_REQUIRED( VERSION 2.6.2 )
 
 # Need some way of getting CMISS_ROOT defined otherwise we are in trouble.
-IF( NOT DEFINED CMISS_ROOT )
-	IF( NOT EXISTS $ENV{CMISS_ROOT} )
-		MESSAGE( FATAL_ERROR "Dude there is no CMISS_ROOT environment or command line variable set" )
-	ELSE( NOT EXISTS $ENV{CMISS_ROOT} )
-		FILE( TO_CMAKE_PATH "$ENV{CMISS_ROOT}" CMISS_ROOT_LOCATION )
-	ENDIF( NOT EXISTS $ENV{CMISS_ROOT} )
-ELSE( NOT DEFINED CMISS_ROOT )
-	FILE( TO_CMAKE_PATH "${CMISS_ROOT}" CMISS_ROOT_LOCATION )
-ENDIF( NOT DEFINED CMISS_ROOT )
+SET(HAVE_CMISS_ROOT NO)
+IF( CMISS_ROOT )
+	IF(EXISTS ${CMISS_ROOT})
+		SET(HAVE_CMISS_ROOT YES)
+	ENDIF(EXISTS ${CMISS_ROOT})
+ELSEIF( EXISTS $ENV{CMISS_ROOT})
+	SET(HAVE_CMISS_ROOT YES)
+	SET(CMISS_ROOT "$ENV{CMISS_ROOT}" CACHE STRING "No help, variable specified by an environment variable.")
+ENDIF( CMISS_ROOT )
+
+IF(NOT HAVE_CMISS_ROOT)
+	UNSET(CMISS_ROOT CACHE)
+	MESSAGE( FATAL_ERROR "Dude there is no CMISS_ROOT environment/command line variable set" )
+ENDIF(NOT HAVE_CMISS_ROOT)
+
+# Set the CMISS_ROOT_LOCATION to CMISS_ROOT
+SET(CMISS_ROOT ${CMISS_ROOT} CACHE STRING "This is where Cmgui is going to look for it's dependencies." FORCE)
+FILE( TO_CMAKE_PATH "${CMISS_ROOT}" CMISS_ROOT_LOCATION )
 
 # Using our own CMake modules first, most notably in this case a bug fix for
 # FindPerlLibs.cmake
