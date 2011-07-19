@@ -178,7 +178,7 @@ DESCRIPTION :
 	{
 		char_data = l64a(data);
 #if defined (DEBUG)
-		printf("%c%c%c%c%c%c\n", char_data[0], 
+		printf("'%c%c%c%c%c%c'\n", char_data[0], 
 			char_data[1], char_data[2], char_data[3],
 			char_data[4], char_data[5]);
 #endif /* defined (DEBUG) */
