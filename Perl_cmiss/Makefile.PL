@@ -1,10 +1,13 @@
 use strict;
 use ExtUtils::MakeMaker;
+use Config;
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
 # the contents of the Makefile that is written.
 
 my $name = 'Perl_cmiss';
 my $xs = "$name.xs";
+
+my $osname = $^O;
 
 my $working_dir = $ENV{WORKING_DIR} or
   die "required environment variable WORKING_DIR not set";
@@ -43,15 +46,25 @@ else
 	 die ("Required environment variable CMISS_PERL_CALLBACK not set by Makefile");
   }
 
+my $c_flags .= $Config{ccflags};
+if( $osname eq 'darwin' ){
+        $c_flags =~ s/-arch x86_64//;
+        $c_flags =~ s/-arch ppc//;
+        if( "$ARGV[2]" eq "Debug" ) {
+                $c_flags =~ s/-O3/-g/;
+        }
+        print "config darwin c_flags ----- $c_flags\n";
+}
+
 #my $object = "$name.o";
 WriteMakefile(
     'NAME'	=> $name,
     # ??? Shouldn't this be "$source_dir/../source/$name.pm" or should that be moved here.
     'VERSION_FROM' => "$source_dir/$name.pm", # finds $VERSION
-#    'EXTRALIBS' => '',# to prevent undefined warnings in Makefile
     'MYEXTLIB'  => '',# to prevent undefined warnings in Makefile
     'INC'	=> "-I$source_dir",     # e.g., '-I/usr/include/other'
     'DEFINE'	=> $define_list,
+    'CCFLAGS'	=> $c_flags,
     'LINKTYPE'  => 'static',
     'INST_ARCHLIB' => '.'
 );

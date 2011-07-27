@@ -401,83 +401,83 @@ Creates the interpreter for processing commands.
 			}
 		}
 
-	   perl_eval_pv(load_commands[0], FALSE);
-		 {
-				STRLEN n_a;
-				dSP ;
-	  
-				ENTER ;
-				SAVETMPS;
+		perl_eval_pv(load_commands[0], FALSE);
+		{
+			STRLEN n_a;
+			dSP ;
+	 
+			ENTER ;
+			SAVETMPS;
 
-				PUSHMARK(sp) ;
+			PUSHMARK(sp) ;
 
-				/* Override the $0 variable without actually executing the file */
+			/* Override the $0 variable without actually executing the file */
 
 #if 0 && ! defined (WIN32)
-				/* This code is not working in Win32 at the moment */
-				/* Causes perl to segfault */
-				{
-					char *perl_invoke_command;
+			/* This code is not working in Win32 at the moment */
+			/* Causes perl to segfault */
+			{
+				char *perl_invoke_command;
 
-					if (initial_comfile)
-					{
-						perl_invoke_command = (char *)malloc(20 + strlen(initial_comfile));
-						sprintf(perl_invoke_command, "$0 = '%s';\n", initial_comfile);
-					}
-					else
-					{
-						perl_invoke_command = (char *)malloc(20);
-						sprintf(perl_invoke_command, "$0 = '';\n");
-					}
-					perl_eval_pv(perl_invoke_command, FALSE);
-					free(perl_invoke_command);
+				if (initial_comfile)
+				{
+					perl_invoke_command = (char *)malloc(20 + strlen(initial_comfile));
+					sprintf(perl_invoke_command, "$0 = '%s';\n", initial_comfile);
 				}
+				else
+				{
+					perl_invoke_command = (char *)malloc(20);
+					sprintf(perl_invoke_command, "$0 = '';\n");
+				}
+				perl_eval_pv(perl_invoke_command, FALSE);
+				free(perl_invoke_command);
+			}
 #endif /* ! defined (WIN32) */
 
-				sv_setpv( get_sv("0",/* create = */TRUE),
-									initial_comfile ? initial_comfile : "" );
+			sv_setpv( get_sv("0",/* create = */TRUE),
+				initial_comfile ? initial_comfile : "" );
 
-				if (argc > 1)
+			if (argc > 1)
+			{
+				AV *perl_argv;
+				if (perl_argv = perl_get_av("ARGV", FALSE))
 				{
-					 AV *perl_argv;
-					 if (perl_argv = perl_get_av("ARGV", FALSE))
-					 {
-							for (i = 1 ; i < argc ; i++)
-							{
-								 av_push(perl_argv, newSVpv(argv[i], 0));
-							}
-					 }
-					 else
-					 {
-							((*interpreter)->display_message_function)(ERROR_MESSAGE,"initialise_interpreter.  "
-								 "Unable to get ARGV\n") ;
-					 }
-				}
-
-				number_of_load_commands = sizeof (load_commands) / sizeof (char *);
-				for (i = 0 ; i < number_of_load_commands && return_code ; i++)
-				{
-					SV *errsv;
-					perl_eval_pv(load_commands[i], FALSE);
-#if defined (BUILD_WITH_CMAKE) && defined (WIN32)
-					errsv = GvSV(PL_stderrgv);
-#else
-					errsv = ERRSV;
-#endif
-					if (SvTRUE(errsv))
+					for (i = 1 ; i < argc ; i++)
 					{
-							((*interpreter)->display_message_function)(ERROR_MESSAGE,"initialise_interpreter.  "
-								 "Uh oh - %s\n", SvPV(errsv, n_a)) ;
-							/* !!! What does this pop? */
-							ret = POPs ;
-							*interpreter = (struct Interpreter *)NULL;
-							return_code = 0;
-					}
+							 av_push(perl_argv, newSVpv(argv[i], 0));
+						}
 				}
+				else
+				{
+						((*interpreter)->display_message_function)(ERROR_MESSAGE,"initialise_interpreter.  "
+							 "Unable to get ARGV\n") ;
+				}
+			}
+
+			number_of_load_commands = sizeof (load_commands) / sizeof (char *);
+			for (i = 0 ; i < number_of_load_commands && return_code ; i++)
+			{
+				SV *errsv;
+				perl_eval_pv(load_commands[i], FALSE);
+#if defined (BUILD_WITH_CMAKE) && defined (WIN32)
+				errsv = GvSV(PL_stderrgv);
+#else
+				errsv = ERRSV;
+#endif
+				if (SvTRUE(errsv))
+				{
+						((*interpreter)->display_message_function)(ERROR_MESSAGE,"initialise_interpreter.  "
+							 "Uh oh - %s\n", SvPV(errsv, n_a)) ;
+						/* !!! What does this pop? */
+						ret = POPs ;
+						*interpreter = (struct Interpreter *)NULL;
+						return_code = 0;
+				}
+			}
 
 #if ! defined (WIN32)				
-#  ifndef USE_DYNAMIC_LOADER
-#    ifdef INCLUDE_DYNALOADERPMH
+#	ifndef USE_DYNAMIC_LOADER
+#		ifdef INCLUDE_DYNALOADERPMH
 				/* Load the DynaLoader module now so that the module is the same
 					 version as the library linked in.  (A hook early in @INC might work
 					 also.) */
@@ -509,8 +509,8 @@ Creates the interpreter for processing commands.
 														0 );
 							}
 					}
-#    endif /* INCLUDE_DYNALOADERPMH */
-#  endif /* ! defined (USE_DYNAMIC_LOADER) */
+#		endif /* INCLUDE_DYNALOADERPMH */
+#	endif /* ! defined (USE_DYNAMIC_LOADER) */
 #endif /* ! defined (WIN32) */
 
 				{
@@ -528,8 +528,7 @@ Creates the interpreter for processing commands.
 				FREETMPS ;
 				LEAVE ;
 
-		 }
-		 
+		}
 
 	}
 	else

@@ -177,11 +177,11 @@ DESCRIPTION :
 	else
 	{
 		char_data = l64a(data);
-#if defined (DEBUG)
+#if defined (CMISS_DEBUG)
 		printf("'%c%c%c%c%c%c'\n", char_data[0], 
 			char_data[1], char_data[2], char_data[3],
 			char_data[4], char_data[5]);
-#endif /* defined (DEBUG) */
+#endif /* defined (CMISS_DEBUG) */
 #if (defined (BYTE_ORDER)) && (1234==BYTE_ORDER)
 		if (!glibc_version_greater_than_2_2_4())
 		{
@@ -227,11 +227,11 @@ DESCRIPTION :
 	}
 					
 	bytes_written = fwrite(out_data, sizeof(char), bytes_out, outfile);
-#if defined (DEBUG)
-	printf("%c%c%c%c%c%c\n", out_data[0], 
+#if defined (CMISS_DEBUG)
+	printf("'%c%c%c%c%c%c'\n", out_data[0], 
 		out_data[1], out_data[2], out_data[3],
 		out_data[4], out_data[5]);
-#endif /* defined (DEBUG) */
+#endif /* defined (CMISS_DEBUG) */
 
 	return (bytes_written);
 }
@@ -239,7 +239,7 @@ DESCRIPTION :
 int main(int argc, char *argv[])	  
 {
 	char buffer;
-   FILE *infile, *outfile;
+	FILE *infile, *outfile;
 	long byte_data, data;
 	int byte_count, index;
 
@@ -265,15 +265,18 @@ int main(int argc, char *argv[])
 				{
 					if(1 == fread(&buffer, sizeof(char), 1, infile))
 					{
-#if defined (DEBUG)
-						printf("%d\n", buffer);
-#endif /* defined (DEBUG) */
+#if defined (CMISS_DEBUG)
+						printf("%d ", buffer);
+#endif /* defined (CMISS_DEBUG) */
 						byte_data = buffer & 255;
 						data += byte_data << (8 * byte_count);
 						byte_count++;
 
 						if(byte_count == 4)
 						{
+#if defined (CMISS_DEBUG)
+							printf("\n");
+#endif /* defined (CMISS_DEBUG) */
 							write_base64_data(outfile, byte_count, data);
 
 							data = 0;
@@ -283,6 +286,9 @@ int main(int argc, char *argv[])
 				}
 				if (byte_count > 0)
 				{
+#if defined (CMISS_DEBUG)
+					printf("\n");
+#endif /* defined (CMISS_DEBUG) */
 					write_base64_data(outfile, byte_count, data);
 				}
 
@@ -291,16 +297,17 @@ int main(int argc, char *argv[])
 			}
 			else
 			{
-				fprintf(stderr,"uid2uidh.  Unable to open output file %s\n",
+				fprintf(stderr,"bin2base64h.  Unable to open output file %s\n",
 					argv[index]);
 			}
 			fclose (infile);
 		}
 		else
 		{
-			fprintf(stderr,"uid2uidh.  Unable to open input file %s\n",
+			fprintf(stderr,"bin2base64h.  Unable to open input file %s\n",
 				argv[index]);
 		}
    }
 	return(0);
 }
+

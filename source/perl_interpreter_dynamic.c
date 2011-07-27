@@ -65,7 +65,7 @@ selected at runtime according to the perl found in the users path.
 #include <stdarg.h>
 #include "static_version.h"       /* for NO_STATIC_FALLBACK */
 #include "perl_interpreter.h"
-
+#include "base64.h"
 
 /******************************************************************************
 
@@ -307,16 +307,16 @@ just EXIT_FAILURE if the perlinterpreter can't be run.
 	int exitstatus;
 	perl_alloc_t perl_alloc;
 	perl_construct_t perl_construct;
-  perl_parse_t perl_parse;
-  perl_run_t perl_run;
-  perl_destruct_t perl_destruct;
-  perl_free_t perl_free;
-  PerlInterpreter *my_perl;
+	perl_parse_t perl_parse;
+	perl_run_t perl_run;
+	perl_destruct_t perl_destruct;
+	perl_free_t perl_free;
+	PerlInterpreter *my_perl;
 	void* libperl;
 
 #if !defined (WIN32)
-  dlerror(); /* Clear any existing error */
-  if( !( libperl = dlopen( libperlname, RTLD_LAZY ) ) )
+	dlerror(); /* Clear any existing error */
+	if( !( libperl = dlopen( libperlname, RTLD_LAZY ) ) )
 	{
 		interpreter_display_message(ERROR_MESSAGE, "%s\n", dlerror() );
 		exit(EXIT_FAILURE);
@@ -328,10 +328,6 @@ just EXIT_FAILURE if the perlinterpreter can't be run.
 		exit(EXIT_FAILURE);
 	}
 #endif
-
-  #if !defined (WIN32)
-  #else
-  #endif
 
 #ifndef FANCY_STUFF
 	if( !( (perl_alloc = (perl_alloc_t) dlsym( libperl, "perl_alloc" ))
@@ -630,12 +626,10 @@ It is up to the calling routine to free the string returned and to
 remove the temporary file it refers to.
 ==============================================================================*/
 {
-	char *return_string,*total_bin,
-		*total_bin_ptr;
+	char *return_string, *binary, data[4];
 	FILE *bin_file;	
-	size_t bin_length, string_length;
-	int bytes_in, bytes_out, i, j;
-	long bin_long_data;
+	size_t string_length;
+	int char_count, byte_count, i, j;
 	char template_name[]="/tmp/perl_interpreterXXXXXX";
 	int temp_fd;
 
@@ -644,115 +638,29 @@ remove the temporary file it refers to.
 		string_length=strlen(base64_string);
 		temp_fd=mkstemp(template_name);
 		if ((temp_fd != -1) && (bin_file=fdopen(temp_fd, "w"))
-			&& (total_bin = (char *)malloc(string_length+1))
 			&& (return_string = (char *)malloc(strlen(template_name)+1)))
 		{
-			total_bin_ptr = total_bin;
-			for (i=0;i<string_length;i+=6)
-			{
-				if (string_length - i < 6)
-				{
-					bytes_in = string_length - i;
-					switch (bytes_in)
-					{
-						case 2:
-						{
-							bytes_out = 1;
-						} break;
-						case 3:
-						{
-							bytes_out = 2;
-						} break;
-						case 5:
-						{
-							bytes_out = 3;
-						} break;
-						default:
-						{
-							(*interpreter->display_message_function)(ERROR_MESSAGE,
-								"write_base64_string_to_binary_file.  Unexpected remaining length: %d",
-								bytes_in);
-						} break;
-					}
-#if defined (BYTE_ORDER)
-#if (1234==BYTE_ORDER)
-					if (glibc_version_greater_than_2_2_4())
-					{
-						/* Don't need to swap now */
-						bin_long_data=a64l(base64_string + i);
-					}
-					else
-					{
-						char tmp_string[6];
-						for (j = 0 ; j < bytes_in ; j++)
-						{
-							tmp_string[j] = base64_string[i + bytes_in - 1 - j];
-						}
-						tmp_string[j] = 0;
-						bin_long_data=a64l(tmp_string);
-					}
-#else /* (1234==BYTE_ORDER) */
-					bin_long_data=a64l(base64_string + i);
-#endif /* (1234==BYTE_ORDER) */
-#else /* defined (BYTE_ORDER) */
-					bin_long_data=a64l(base64_string + i);
-#endif /* defined (BYTE_ORDER) */
-					*total_bin_ptr = (char)(255 & bin_long_data);
-					total_bin_ptr++;
-					if (bytes_out > 1)
-					{
-						*total_bin_ptr = (char)(255 & (bin_long_data >> 8));
-						total_bin_ptr++;
-						if (bytes_out > 2)
-						{
-							*total_bin_ptr = (char)(255 & (bin_long_data >> 16));
-							total_bin_ptr++;
-						}
-					}
-				}
-				else
-				{
-#if defined (BYTE_ORDER)
-#if (1234==BYTE_ORDER)
-					if (glibc_version_greater_than_2_2_4())
-					{
-						/* Don't need to swap now */
-						bin_long_data=a64l(base64_string + i);
-					}
-					else
-					{
-						char tmp_string[6];
-						tmp_string[0]=base64_string[i + 5];
-						tmp_string[1]=base64_string[i + 4];
-						tmp_string[2]=base64_string[i + 3];
-						tmp_string[3]=base64_string[i + 2];
-						tmp_string[4]=base64_string[i + 1];
-						tmp_string[5]=base64_string[i];
-						bin_long_data=a64l(tmp_string);
-					}
-#else /* (1234==BYTE_ORDER) */
-					bin_long_data=a64l(base64_string + i);
-#endif /* (1234==BYTE_ORDER) */
-#else /* defined (BYTE_ORDER) */
-					bin_long_data=a64l(base64_string + i);
-#endif /* defined (BYTE_ORDER) */
-					*total_bin_ptr = (char)(255 & bin_long_data);
-					total_bin_ptr++;
-					*total_bin_ptr = (char)(255 & (bin_long_data >> 8));
-					total_bin_ptr++;
-					*total_bin_ptr = (char)(255 & (bin_long_data >> 16));
-					total_bin_ptr++;
-					*total_bin_ptr = (char)(255 & (bin_long_data >> 24));
-					total_bin_ptr++;
-				}
-			}
-			bin_length = total_bin_ptr - total_bin;
-			if (bin_length != fwrite(total_bin,1,bin_length,bin_file))
+			if (string_length % 4 != 0)
 			{
 				(*interpreter->display_message_function)(ERROR_MESSAGE,
-					"write_base64_string_to_binary_file.  Short write of temporary binary file.");				
+					"write_base64_string_to_binary_file.  Unexpected length: %d",
+					string_length);
+				return 0;
 			}
-			free(total_bin);
+			for (i = 0; i < string_length; i++)
+			{
+		                data[char_count] = base64_string[i];
+		                char_count++;
+		                if (char_count == 4)
+		                {
+		                        binary = base642bin(data, &byte_count);
+		                        for (j = 0; j < byte_count; j++)
+		                        {
+		                                fprintf(bin_file, "%c", binary[j]);
+		                        }
+		                        char_count = 0;
+		                }				
+			}
 			fclose(bin_file);
 			strcpy(return_string, template_name);
 		}
@@ -860,7 +768,7 @@ the function pointers and then calls create_interpreter_ for that instance.
 
 			number_read =
 				fork_read_stdout( execvp, perl_executable, perl_argv,
-													perl_result_buffer, perl_result_buffer_size );
+					perl_result_buffer, perl_result_buffer_size );
 
 			/* Error already reported with number_read < 0 */
 			if( number_read == 0 )
@@ -874,6 +782,9 @@ the function pointers and then calls create_interpreter_ for that instance.
 			{
 				{
 					size_t i = 0;
+					size_t dist = 0;
+					char buf[256];
+					char *perl_updates = 0;
 
 					perl_api_string = perl_result_buffer;
 					while( i < perl_result_buffer_size && perl_result_buffer[i] )
@@ -908,6 +819,20 @@ the function pointers and then calls create_interpreter_ for that instance.
 					{
 						perl_libperl = "libperl.so";
 					}
+
+					perl_updates = strstr(perl_archlib, "Updates");
+					if (perl_updates)
+					{
+				                /* Yup, so we need to do some work on the archlib string */
+				                dist = perl_updates-perl_archlib;
+				                strncpy(buf, perl_archlib, dist);
+				                buf[dist] = '\0';
+				                /* Notice the space here to make up for
+				                   the different lengths of the two strings */
+				                strncpy(perl_archlib, " /System", 8);
+				                strncpy(&perl_archlib[8], buf, dist);
+				                perl_archlib++;
+					}
 							
 				}
 
@@ -932,13 +857,13 @@ the function pointers and then calls create_interpreter_ for that instance.
 		{
 			const char core_subdir[] = "CORE";
 			char full_libperl_name[ strlen(perl_archlib) + 1
-															+ sizeof(core_subdir)
-															+ strlen(perl_libperl) + 1 ];
+				+ sizeof(core_subdir)
+				+ strlen(perl_libperl) + 1 ];
 			char *libperl_name = (char *)NULL;
 			struct stat stat_buf;
 
 			sprintf( full_libperl_name, "%s/%s/%s",
-							 perl_archlib, core_subdir, perl_libperl);
+				perl_archlib, core_subdir, perl_libperl);
 
 			if( 0 == stat( full_libperl_name, &stat_buf ) )
 			{
@@ -988,7 +913,7 @@ the function pointers and then calls create_interpreter_ for that instance.
 
 				number_read =
 					fork_read_stdout( exec_libperl, perl_libperl, perl_argv,
-														libperl_result_buffer, libperl_result_buffer_size );
+						libperl_result_buffer, libperl_result_buffer_size );
 
 				/* Error already reported with number_read < 0 */
 				if( number_read == 0 )
@@ -1055,8 +980,8 @@ the function pointers and then calls create_interpreter_ for that instance.
 						( ERROR_MESSAGE, "%s", dlerror() );
 				}
 				else if( !( library =
-										write_base64_string_to_binary_file
-										(*interpreter, perl_interpreter_string ) ) )
+					write_base64_string_to_binary_file
+						(*interpreter, perl_interpreter_string ) ) )
 				{
 					/* error message already displayed */
 				}
@@ -1079,7 +1004,6 @@ the function pointers and then calls create_interpreter_ for that instance.
 			((*interpreter)->display_message_function)(ERROR_MESSAGE,
 				"Unable to open a dynamic perl_interpreter to match your perl \"%s\".",
 				perl_executable);
-
 			if ( perl_api_string && !perl_interpreter_string )
 				{
 					int i;

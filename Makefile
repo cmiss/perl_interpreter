@@ -275,6 +275,10 @@ ifeq ($(SYSNAME),win32)
 else
   PERL_ARCHLIB := $(shell $(PERL) -MConfig -e 'print "$$Config{installarchlib}\n"')
   PERL_VERSION_ARCHNAME = $(shell $(PERL) -MConfig -e 'print "$$Config{api_versionstring}/$$Config{archname}\n"')
+  ifeq ($(SYSNAME),Darwin)
+    PERL_ARCHLIB := $(subst /Updates,,$(PERL_ARCHLIB))
+    PERL_ARCHLIB := $(subst /Library,/System/Library,$(PERL_ARCHLIB))
+  endif
 endif
 ifeq ($(PERL_ARCHLIB),)
   $(error problem with $(PERL))
@@ -461,6 +465,7 @@ SOURCE_FILES := $(notdir $(wildcard $(SOURCE_DIR)/*.*) )
 # incompatibly between perl 5.8.3 and 5.8.4.)
 # Is there a reason why the other modules are not just taken from the perl?
 PMH_FILES := $(patsubst %.pm, %.pmh, $(filter %.pm, $(SOURCE_FILES)))
+DYNALOADER_DEFINE :=
 ifneq ($(DYNALOADER_LIB),)
   DYNALOADER_DEFINE = -DINCLUDE_DYNALOADERPMH
   PMH_FILES += DynaLoader.pmh
@@ -476,7 +481,7 @@ else
   endif
 endif
 ifeq ($(USE_DYNAMIC_LOADER), true)
-   C_SOURCES += perl_interpreter_dynamic.c
+   C_SOURCES += perl_interpreter_dynamic.c base64.c
 endif
 C_UNITS := $(basename $(C_SOURCES) )
 DEPEND_FILES := $(foreach unit, $(C_UNITS), $(WORKING_DIR)/$(unit).d )
@@ -535,6 +540,10 @@ ifeq ($(filter-out IRIX%,$(SYSNAME)),)# SGI
   else
     LD_SHARED += -check_registry /usr/lib64/so_locations
   endif
+endif
+ifeq ($(SYSNAME),Darwin)
+  L_FLGS += -arch $(INSTRUCTION)
+  SHARED_LINK_LIBRARIES += -L$(PERL_ARCHLIB)/CORE -lperl
 endif
 ifeq ($(SYSNAME),Linux)
 #  ifneq ($(filter $(MACHNAME),ia64 x86_64),)# ia64 or x86_64
@@ -635,6 +644,10 @@ endif
 
 SHARED_LINK_LIBRARIES += -lc
 CFLAGS += $(PERL_CFLAGS)
+ifeq ($(SYSNAME), Darwin)
+  CFLAGS := $(subst -arch x86_64,,$(CFLAGS))
+  CFLAGS := $(subst -arch ppc,,$(CFLAGS))
+endif
 .PHONY : main
 
 vpath $(PERL) $(subst :, ,$(PATH))
@@ -849,7 +862,7 @@ ifeq ($(USE_DYNAMIC_LOADER),true)
    SHARED_LIBRARY_HEADERS = $(foreach api_string, $(SHARED_PERL_API_STRINGS),\
 	$(call get_shared_lib_header,$(api_string)))
 
-   UID2UIDH = $(CMISS_ROOT)/utilities/bin/$(BIN_ARCH_DIR)/bin2base64h
+   UID2UIDH = $(CMISS_ROOT)/utilities/bin/$(BIN_ARCH_DIR)/bin2base64str
 
   .SUFFIXES : .so .soh
 

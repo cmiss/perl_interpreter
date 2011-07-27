@@ -64,15 +64,13 @@ my $c_flags_opt = '';
 if( $osname eq 'MSWin32' ){
 	sub MY::const_loadlibs { "" }
 	#$c_flags .= perl '-V:ccflags';
-	print "stuff happens $ARGV[2]";
-
 	if( "$ARGV[2]" eq "Debug" ) {
 		$c_flags =~ s/-MD/-MDd/;
 		$c_flags =~ s/-DNDEBUG/-D_DEBUG/;
 		$c_flags =~ s/-O1/-Od/;
 		$c_flags_opt = '-DWIN32';
 	}
-	print "config c_flags ----- $c_flags\n";
+	print "config win32 c_flags ----- $c_flags\n";
 }
 if( $osname eq 'darwin' ){
 	$c_flags =~ s/-arch x86_64//;
@@ -80,7 +78,7 @@ if( $osname eq 'darwin' ){
 	if( "$ARGV[2]" eq "Debug" ) {
 		$c_flags =~ s/-O3/-g/;
 	}
-	print "darwin c_flags ----- $c_flags\n";
+	print "config darwin c_flags ----- $c_flags\n";
 }
 
 WriteMakefile(
