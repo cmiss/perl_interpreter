@@ -4,7 +4,7 @@ FILE : perl_interpreter.c
 LAST MODIFIED : 24 January 2005
 
 DESCRIPTION :
-Provides an interface between cmiss and a Perl interpreter
+Provides an interface between cmiss and a Perl interpreter.
 ==============================================================================*/
 /* ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
