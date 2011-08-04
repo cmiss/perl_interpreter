@@ -629,7 +629,7 @@ remove the temporary file it refers to.
 	char *return_string, *binary, data[4];
 	FILE *bin_file;	
 	size_t string_length;
-	int char_count, byte_count, i, j;
+	int char_count = 0, byte_count, i, j;
 	char template_name[]="/tmp/perl_interpreterXXXXXX";
 	int temp_fd;
 
@@ -984,7 +984,7 @@ the function pointers and then calls create_interpreter_ for that instance.
 						(*interpreter, perl_interpreter_string ) ) )
 				{
 					/* error message already displayed */
-				}
+				} 
 				else if( !(interpreter_handle = dlopen(library, RTLD_LAZY)) )
 				{
 					((*interpreter)->display_message_function)

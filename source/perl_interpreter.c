@@ -332,9 +332,7 @@ Creates the interpreter for processing commands.
 	SV *ret;
   return_code = 1;
 
-#ifdef WIN32
-	PERL_SYS_INIT(&argc, &argv);
-#endif
+	PERL_SYS_INIT3(&argc, &argv, NULL);
 
 	if (*interpreter = (struct Interpreter *)malloc(sizeof (struct Interpreter)))
 	{
@@ -576,6 +574,7 @@ and then executes the returned strings
 			}
 
 			free (interpreter);
+			PERL_SYS_TERM();
 			*status = 1;
 	 }
 	 else
