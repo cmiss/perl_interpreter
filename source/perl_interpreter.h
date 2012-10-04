@@ -42,6 +42,12 @@ Provides an interface between cmiss and a Perl interpreter.
  *
  * ***** END LICENSE BLOCK ***** */
 
+#ifndef CMISS_PERL_INTERPRETER_H_
+#define CMISS_PERL_INTERPRETER_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 struct Interpreter;
 
 typedef void (*execute_command_function_type)(const char *, void *, int *, int *);
@@ -246,4 +252,11 @@ DESCRIPTION:
 Sets the function that will be called whenever the Interpreter wants to report
 information.
 ==============================================================================*/
+
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif
 
