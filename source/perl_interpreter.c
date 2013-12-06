@@ -668,9 +668,10 @@ DESCRIPTION:
 	char buffer[1000];
 	fd_set readfds;
 	int return_code;
-	size_t io_mode = 1; // non-blocking mode
 #if !defined (WIN32)
 	int flags;
+#else
+	u_long io_mode = 1; // non-blocking mode
 #endif
 #if defined (WIN32)
 #define ssize_t long

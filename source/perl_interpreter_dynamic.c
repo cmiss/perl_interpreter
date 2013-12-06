@@ -59,9 +59,9 @@ selected at runtime according to the perl found in the users path.
 #  include <windows.h>
 #  include <sys/stat.h>
 #  include <io.h>
-#  define dlerror GetLastError
 #  define dlsym GetProcAddress
 #  define dlclose FreeLibrary
+#  define fdopen _fdopen
   typedef int ssize_t;
 #endif
 #include <fcntl.h>
@@ -325,6 +325,7 @@ just EXIT_FAILURE if the perlinterpreter can't be run.
 		exit(EXIT_FAILURE);
 	}
 #else
+	GetLastError(); /* Clear existing error */
 	if( !( libperl = LoadLibrary(libperlname)))
 	{
 		interpreter_display_message(ERROR_MESSAGE, "Error 0x%x\n", GetLastError() );
@@ -354,10 +355,14 @@ just EXIT_FAILURE if the perlinterpreter can't be run.
 # undef LOAD_DL_SYM
 #endif
 		{
+#if !defined (WIN32)
 			char* error = dlerror();
 			interpreter_display_message
 				( ERROR_MESSAGE, "%s",
 					error ? error : "required libperl function has NULL reference" );
+#else
+			interpreter_display_message(ERROR_MESSAGE, "Error 0x%x\n", GetLastError() );
+#endif
 			exit(EXIT_FAILURE);
 		}
 
@@ -384,6 +389,103 @@ just EXIT_FAILURE if the perlinterpreter can't be run.
 	/* 	return(exitstatus); */
 }
 
+#if defined (WIN32)
+#define BUFSIZE 500 
+ 
+HANDLE g_hChildStd_IN_Rd = NULL;
+HANDLE g_hChildStd_IN_Wr = NULL;
+HANDLE g_hChildStd_OUT_Rd = NULL;
+HANDLE g_hChildStd_OUT_Wr = NULL;
+
+void CreateChildProcess(const TCHAR *szCmd, TCHAR *szCmdline[])
+// Create a child process that uses the previously created pipes for STDIN and STDOUT.
+{ 
+   //TCHAR szCmdline[]=TEXT("child");
+   PROCESS_INFORMATION piProcInfo; 
+   STARTUPINFO siStartInfo;
+   BOOL bSuccess = FALSE; 
+ 
+// Set up members of the PROCESS_INFORMATION structure. 
+ 
+   ZeroMemory( &piProcInfo, sizeof(PROCESS_INFORMATION) );
+ 
+// Set up members of the STARTUPINFO structure. 
+// This structure specifies the STDIN and STDOUT handles for redirection.
+ 
+   ZeroMemory( &siStartInfo, sizeof(STARTUPINFO) );
+   siStartInfo.cb = sizeof(STARTUPINFO); 
+   siStartInfo.hStdError = g_hChildStd_OUT_Wr;
+   siStartInfo.hStdOutput = g_hChildStd_OUT_Wr;
+   siStartInfo.hStdInput = g_hChildStd_IN_Rd;
+   siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
+ 
+// Create the child process. 
+    
+   bSuccess = CreateProcess(szCmd, 
+      szCmdline[0],     // command line 
+      NULL,          // process security attributes 
+      NULL,          // primary thread security attributes 
+      TRUE,          // handles are inherited 
+      0,             // creation flags 
+      NULL,          // use parent's environment 
+      NULL,          // use parent's current directory 
+      &siStartInfo,  // STARTUPINFO pointer 
+      &piProcInfo);  // receives PROCESS_INFORMATION 
+   
+   // If an error occurs, exit the application. 
+   if ( ! bSuccess ) 
+      printf(TEXT("CreateProcess"));
+   else 
+   {
+      // Close handles to the child process and its primary thread.
+      // Some applications might keep these handles to monitor the status
+      // of the child process, for example. 
+
+      CloseHandle(piProcInfo.hProcess);
+      CloseHandle(piProcInfo.hThread);
+   }
+}
+
+ssize_t spawn_and_read(const char *file, char *argv[], char *buffer, size_t buffer_size)
+{
+   SECURITY_ATTRIBUTES saAttr; 
+ 
+   printf("\n->Start of parent execution.\n");
+
+// Set the bInheritHandle flag so pipe handles are inherited. 
+ 
+   saAttr.nLength = sizeof(SECURITY_ATTRIBUTES); 
+   saAttr.bInheritHandle = TRUE; 
+   saAttr.lpSecurityDescriptor = NULL; 
+
+// Create a pipe for the child process's STDOUT. 
+ 
+   if ( ! CreatePipe(&g_hChildStd_OUT_Rd, &g_hChildStd_OUT_Wr, &saAttr, 0) ) 
+      printf(TEXT("StdoutRd CreatePipe")); 
+
+// Ensure the read handle to the pipe for STDOUT is not inherited.
+
+   if ( ! SetHandleInformation(g_hChildStd_OUT_Rd, HANDLE_FLAG_INHERIT, 0) )
+      printf(TEXT("Stdout SetHandleInformation")); 
+
+// Create a pipe for the child process's STDIN. 
+ 
+   if (! CreatePipe(&g_hChildStd_IN_Rd, &g_hChildStd_IN_Wr, &saAttr, 0)) 
+      printf(TEXT("Stdin CreatePipe")); 
+
+// Ensure the write handle to the pipe for STDIN is not inherited. 
+ 
+   if ( ! SetHandleInformation(g_hChildStd_IN_Wr, HANDLE_FLAG_INHERIT, 0) )
+      printf(TEXT("Stdin SetHandleInformation")); 
+ 
+// Create the child process. 
+   
+   CreateChildProcess(file, argv);
+	return -1;
+}
+
+#else
+#endif
 
 static ssize_t fork_read_stdout(/*
 	int (*execvp)
@@ -699,7 +801,7 @@ remove the temporary file it refers to.
 
 #if defined (WIN32)
 /* Supply dummy function for execvp */
-int execvp() {}
+int execvp() {return 0;}
 #endif
 
 void create_interpreter_ (int argc, char **argv, const char *initial_comfile,
@@ -1013,8 +1115,13 @@ the function pointers and then calls create_interpreter_ for that instance.
 				if( !( perl_handle = LoadLibrary( libperl_name ) ) )
 #endif
 				{
+#if ! defined (WIN32)
 					((*interpreter)->display_message_function)
 						( ERROR_MESSAGE, "%s", dlerror() );
+#else
+					((*interpreter)->display_message_function)
+						( ERROR_MESSAGE, "0x%x", GetLastError() );
+#endif
 				}
 				else if( !( library =
 					write_base64_string_to_binary_file
@@ -1028,8 +1135,13 @@ the function pointers and then calls create_interpreter_ for that instance.
 				else if( !(interpreter_handle = LoadLibrary(library)) )
 #endif
 				{
+#if ! defined (WIN32)
 					((*interpreter)->display_message_function)
 						( ERROR_MESSAGE, "%s", dlerror() );
+#else
+					((*interpreter)->display_message_function)
+						( ERROR_MESSAGE, "0x%x", GetLastError() );
+#endif
 				}
 				else
 				{

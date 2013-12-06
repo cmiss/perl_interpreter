@@ -37,37 +37,40 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	fprintf(fid64, "\"");
+	fprintf(fid64, "{");
 	data[0] = '\0';data[1] = '\0';data[2] = '\0';
 	for (i = 0; i < binsize; i++)
 	{
-		if ((i + 1) % 4000 == 0)
-		{
-			fprintf(fid64, "\"\n\"");
-		}
+		//if ((i + 1) % 4000 == 0)
+		//{
+		//	fprintf(fid64, "\"\n\"");
+		//}
 		data[byte_count] = inbuffer[i];
 		byte_count++;
 		if (byte_count == 3)
 		{
 			buf = bin2base64(data, byte_count);
-			fprintf(fid64, "%c%c%c%c", buf[0], buf[1], buf[2], buf[3]);
+			fprintf(fid64, "%d,%d,%d,%d", buf[0], buf[1], buf[2], buf[3]);
 #if defined CMISS_DEBUG
-			printf("%c%c%c%c", buf[0], buf[1], buf[2], buf[3]);
+			printf("%d, %d, %d, %d, ", buf[0], buf[1], buf[2], buf[3]);
 #endif /* CMISS_DEBUG */
 			byte_count = 0;
 			data[0] = '\0';data[1] = '\0';data[2] = '\0';
+			if (!(i == (binsize-1)))
+			{
+				fprintf(fid64, ",");
+			}
 		}
-		
 	}
 	if (byte_count != 0)
 	{
 		buf = bin2base64(data, byte_count);
-		fprintf(fid64, "%c%c%c%c", buf[0], buf[1], buf[2], buf[3]);
+		fprintf(fid64, "%d,%d,%d,%d", buf[0], buf[1], buf[2], buf[3]);
 #if defined CMISS_DEBUG
-		printf("%c%c%c%c", buf[0], buf[1], buf[2], buf[3]);
+		printf("%d, %d, %d, %d", buf[0], buf[1], buf[2], buf[3]);
 #endif /* CMISS_DEBUG */
 	}
-	fprintf(fid64, "\"");
+	fprintf(fid64, "}");
 	fclose(fidbin);
 	fclose(fid64);
 	free(inbuffer);
