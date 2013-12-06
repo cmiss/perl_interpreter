@@ -7,19 +7,18 @@
 
 int main(int argc, char **argv)
 {
-	int i = 0, byte_count = 0, result = 0;
+	size_t i = 0, byte_count = 0, result = 0;
 	char data[3];
 	FILE *fidbin, *fid64;
 	char *buf = 0;
 	char *inbuffer = 0;
-	long binsize = 0;
+	size_t binsize = 0;
 
 	if (argc != 3)
 	{
 		printf("usage: bin2base64str <infile> <outfile>\n");
 		return 1;
 	}
-	printf("bin2base64str\n");
 
 	fidbin = fopen(argv[1], "rb");
 	fid64 = fopen(argv[2], "w");
@@ -42,6 +41,10 @@ int main(int argc, char **argv)
 	data[0] = '\0';data[1] = '\0';data[2] = '\0';
 	for (i = 0; i < binsize; i++)
 	{
+		if ((i + 1) % 4000 == 0)
+		{
+			fprintf(fid64, "\"\n\"");
+		}
 		data[byte_count] = inbuffer[i];
 		byte_count++;
 		if (byte_count == 3)

@@ -57,8 +57,11 @@ selected at runtime according to the perl found in the users path.
 #  include <dlfcn.h>
 #else
 #  include <windows.h>
+#  include <sys/stat.h>
+#  include <io.h>
 #  define dlerror GetLastError
-#  define dlsym	GetProcAddress
+#  define dlsym GetProcAddress
+#  define dlclose FreeLibrary
   typedef int ssize_t;
 #endif
 #include <fcntl.h>
@@ -406,14 +409,13 @@ killed if more than buffer_size bytes are read or it does not respond quickly.
 
 ==============================================================================*/
 {
-	ssize_t number_read;
+	ssize_t number_read = -1;  /* Assume error until success */
+
+#if ! defined (WIN32)
 	pid_t process_id;
 	fd_set readfds;
 	int stdout_pipe[2];
 	struct timeval timeout_struct;
-
-	number_read = -1; /* Assume error until success */
-
 	if (-1 == pipe(stdout_pipe))
 	{
 		interpreter_display_message
@@ -496,7 +498,7 @@ killed if more than buffer_size bytes are read or it does not respond quickly.
 					do
 					{
 						this_read = read( stdout_pipe[0], buffer + number_read,
-															buffer_size - number_read );
+							buffer_size - number_read );
 					} while( this_read == -1 && errno == EINTR );
 				}
 
@@ -555,7 +557,7 @@ killed if more than buffer_size bytes are read or it does not respond quickly.
 			}
 		}
 	}
-
+#endif
  	return(number_read);
 }
 
@@ -613,6 +615,20 @@ swap the endianness of values going into a64l
 #endif /* (1234==BYTE_ORDER) */
 #endif /* defined (BYTE_ORDER) */
 
+#if defined (WIN32)
+int mkstemp(char *template)
+{
+	DWORD path_size;
+	char path_buffer[MAX_PATH];
+	char tempfilename[MAX_PATH];
+	UINT unique_number;
+	
+	path_size = GetTempPath( MAX_PATH, path_buffer);
+	unique_number = GetTempFileName(path_buffer, "pin", 0, tempfilename);
+	return _open(tempfilename, _O_RDWR | _O_BINARY);
+}
+#endif
+
 static char *write_base64_string_to_binary_file(struct Interpreter *interpreter,
 	char *base64_string)
 /*******************************************************************************
@@ -629,7 +645,7 @@ remove the temporary file it refers to.
 	char *return_string, *binary, data[4];
 	FILE *bin_file;	
 	size_t string_length;
-	int char_count = 0, byte_count, i, j;
+	size_t char_count = 0, byte_count, i, j;
 	char template_name[]="/tmp/perl_interpreterXXXXXX";
 	int temp_fd;
 
@@ -681,6 +697,11 @@ remove the temporary file it refers to.
 	return (return_string);
 } /* write_base64_string_to_binary_file */
 
+#if defined (WIN32)
+/* Supply dummy function for execvp */
+int execvp() {}
+#endif
+
 void create_interpreter_ (int argc, char **argv, const char *initial_comfile,
 	struct Interpreter **interpreter, int *status)
 /*******************************************************************************
@@ -703,7 +724,7 @@ the function pointers and then calls create_interpreter_ for that instance.
 	if (*interpreter = (struct Interpreter *)malloc (sizeof(struct Interpreter)))
 	{
 		const size_t perl_result_buffer_size = 500;
-		char perl_result_buffer[perl_result_buffer_size];
+		char *perl_result_buffer = (char *)malloc(perl_result_buffer_size * sizeof(char));//[perl_result_buffer_size];
 
 		(*interpreter)->use_dynamic_interpreter = 0;
 		(*interpreter)->display_message_function = interpreter_display_message;
@@ -856,16 +877,23 @@ the function pointers and then calls create_interpreter_ for that instance.
 		if (perl_interpreter_string)
 		{
 			const char core_subdir[] = "CORE";
-			char full_libperl_name[ strlen(perl_archlib) + 1
+			char *full_libperl_name = (char *)malloc( strlen(perl_archlib) + 1
 				+ sizeof(core_subdir)
-				+ strlen(perl_libperl) + 1 ];
+				+ strlen(perl_libperl) + 1 );
 			char *libperl_name = (char *)NULL;
+#if ! defined (WIN32)
 			struct stat stat_buf;
-
+#else
+			struct _stat stat_buf;
+#endif
 			sprintf( full_libperl_name, "%s/%s/%s",
 				perl_archlib, core_subdir, perl_libperl);
 
+#if ! defined (WIN32)
 			if( 0 == stat( full_libperl_name, &stat_buf ) )
+#else
+			if( 0 == _stat( full_libperl_name, &stat_buf ) )
+#endif
 			{
 				libperl_name = full_libperl_name;
 			}
@@ -893,7 +921,7 @@ the function pointers and then calls create_interpreter_ for that instance.
 
 				char *perl_argv[5];
 				const size_t libperl_result_buffer_size = 500;
-				char libperl_result_buffer[libperl_result_buffer_size];
+				char *libperl_result_buffer = (char *)malloc(libperl_result_buffer_size*sizeof(char));//[libperl_result_buffer_size];
 
 				perl_argv[0] = perl_libperl;
 				perl_argv[1] = "-MConfig";
@@ -970,11 +998,20 @@ the function pointers and then calls create_interpreter_ for that instance.
 						}
 					}
 				}
+				
+				if(libperl_result_buffer)
+				{
+					free(libperl_result_buffer);
+				}
 			}
 
 			if( libperl_name )
 			{
+#if ! defined (WIN32)
 				if( !( perl_handle = dlopen( libperl_name, RTLD_LAZY | RTLD_GLOBAL ) ) )
+#else
+				if( !( perl_handle = LoadLibrary( libperl_name ) ) )
+#endif
 				{
 					((*interpreter)->display_message_function)
 						( ERROR_MESSAGE, "%s", dlerror() );
@@ -985,7 +1022,11 @@ the function pointers and then calls create_interpreter_ for that instance.
 				{
 					/* error message already displayed */
 				} 
+#if ! defined (WIN32)
 				else if( !(interpreter_handle = dlopen(library, RTLD_LAZY)) )
+#else
+				else if( !(interpreter_handle = LoadLibrary(library)) )
+#endif
 				{
 					((*interpreter)->display_message_function)
 						( ERROR_MESSAGE, "%s", dlerror() );
@@ -994,6 +1035,11 @@ the function pointers and then calls create_interpreter_ for that instance.
 				{
 					return_code = 1;
 				}
+			}
+			
+			if(full_libperl_name)
+			{
+				free(full_libperl_name);
 			}
 		}
 
@@ -1081,6 +1127,11 @@ the function pointers and then calls create_interpreter_ for that instance.
 				wants it, it will just keep a handle */
 			remove(library);
 			free(library);
+		}
+		
+		if(perl_result_buffer)
+		{
+			free(perl_result_buffer);
 		}
 	}
 	else

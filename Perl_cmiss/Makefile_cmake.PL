@@ -68,9 +68,10 @@ if( $osname eq 'MSWin32' ){
 		$c_flags =~ s/-MD/-MDd/;
 		$c_flags =~ s/-DNDEBUG/-D_DEBUG/;
 		$c_flags =~ s/-O1/-Od/;
-		$c_flags_opt = '-DWIN32';
 	}
-	print "config win32 c_flags ----- $c_flags\n";
+	$c_flags_opt = '-DWIN32';
+	$c_flags =~ s/-GL//;
+	#print "config win32 c_flags ----- $c_flags\n";
 }
 if( $osname eq 'darwin' ){
 	$c_flags =~ s/-arch x86_64//;
@@ -78,7 +79,11 @@ if( $osname eq 'darwin' ){
 	if( "$ARGV[2]" eq "Debug" ) {
 		$c_flags =~ s/-O3/-g/;
 	}
-	print "config darwin c_flags ----- $c_flags\n";
+	#print "config darwin c_flags ----- $c_flags\n";
+}
+
+if( "$ARGV[2]" eq "Debug" ) {
+#	$name = $name . "d";
 }
 
 WriteMakefile(

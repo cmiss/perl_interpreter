@@ -62,7 +62,7 @@ Provides an interface between cmiss and a Perl interpreter.
 #	include <unistd.h>
 #else
 #	define close _close
-#	define dup2	_dup2
+#	define dup2 _dup2
 #	define read _read
 #endif
 #include <string.h>
@@ -618,28 +618,41 @@ This redirects the output from stdout to a pipe so that the handle_output
 routine can write this to the command window.
 ==============================================================================*/
 {
+	int return_code = 1;
 #if ! defined (WIN32)
-  int filehandles[2], return_code;
-
-  return_code = 1;
+	int filehandles[2];
 
 	/* Windows is not yet working with the redirect but that is OK */
-  if (0 == pipe (filehandles))
-  {
-	  interpreter->perl_interpreter_filehandle_in = filehandles[1];
-	  interpreter->perl_interpreter_filehandle_out = filehandles[0];
+	if (0 == pipe (filehandles))
+	{
+		interpreter->perl_interpreter_filehandle_in = filehandles[1]; // write end of pipe
+		interpreter->perl_interpreter_filehandle_out = filehandles[0]; // read end of pipe
 
-	  interpreter->keep_stdout = dup(STDOUT_FILENO);
+		interpreter->keep_stdout = dup(STDOUT_FILENO);
 		interpreter->keep_stderr = dup(STDERR_FILENO);
-  }
-  else
-  {
-	  (interpreter->display_message_function)(ERROR_MESSAGE,"redirect_interpreter_output.  "
-		  "Unable to create pipes") ;
-	  return_code = 0;
-  }
+	}
+	else
+	{
+		(interpreter->display_message_function)(ERROR_MESSAGE,"redirect_interpreter_output.  "
+			"Unable to create pipes") ;
+		return_code = 0;
+	}
 #else
-	int return_code = 1;
+	int filehandles[2];
+	if( 0 == _pipe(filehandles, 512, O_BINARY))
+	{
+		interpreter->perl_interpreter_filehandle_in = filehandles[1]; // write end of pipe
+		interpreter->perl_interpreter_filehandle_out = filehandles[0]; // read end of pipe
+
+		interpreter->keep_stdout = _dup(STDOUT_FILENO);
+		interpreter->keep_stderr = _dup(STDERR_FILENO);
+	}
+	else
+	{
+		(interpreter->display_message_function)(ERROR_MESSAGE,"redirect_interpreter_output.  "
+			"Unable to create pipes") ;
+		return_code = 0;
+	}
 #endif /* ! defined (WIN32) */
 
   *status = return_code;
@@ -655,6 +668,7 @@ DESCRIPTION:
 	char buffer[1000];
 	fd_set readfds;
 	int return_code;
+	size_t io_mode = 1; // non-blocking mode
 #if !defined (WIN32)
 	int flags;
 #endif
@@ -687,6 +701,9 @@ DESCRIPTION:
 		flags &= O_NONBLOCK;
 		fcntl (interpreter->perl_interpreter_filehandle_out, F_SETFL, flags);
 		/* fsync(perl_interpreter_filehandle_out); */
+#else
+		ioctlsocket(interpreter->perl_interpreter_filehandle_out, FIONBIO, &io_mode);
+//		flags = WSAIoctl(interpreter->perl_interpreter_filehandle_out, SIO_GET_INTERFACE_LIST, 0, 0, 0, 0, 0, 0, 0);
 #endif /* ! defined (WIN32) */
 		while (select(FD_SETSIZE, &readfds, NULL, NULL, &timeout_struct))
 		{

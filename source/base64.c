@@ -4,11 +4,11 @@
 
 static const char base64table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-char *bin2base64(char *data, int byte_count)
+char *bin2base64(char *data, size_t byte_count)
 {
 	static char base64[4];
-	int i = 0, index;
-	long u = 0;
+	size_t i = 0, index;
+	size_t u = 0;
 
 	for (i = 0; i < 4; i++)
 	{
@@ -30,12 +30,12 @@ char *bin2base64(char *data, int byte_count)
 	return base64;
 }
 
-char *base642bin(char *data, int *byte_count)
+char *base642bin(char *data, size_t *byte_count)
 {
 	static char bin[3];
 	char *ch, chstr[2];
-	int i, index;
-	long u = 0;
+	size_t i, index;
+	size_t u = 0;
 
 	chstr[1] = '\0';
 	for (i = 0; i < 4; i++)
