@@ -393,7 +393,7 @@ just EXIT_FAILURE if the perlinterpreter can't be run.
 #if defined (WIN32)
 //#define BUFSIZE 500 
 
-ssize_t read_stdout(char *executable, char *argv[], char *buffer, size_t buffer_size)
+ssize_t createprocess_read_stdout(char *executable, char *argv[], char *buffer, size_t buffer_size)
 {
 	ssize_t number_read = -1, cur_number_read;
 	BOOL bSuccess = FALSE;
@@ -406,8 +406,6 @@ ssize_t read_stdout(char *executable, char *argv[], char *buffer, size_t buffer_
 	PROCESS_INFORMATION pi;
 
 	SECURITY_ATTRIBUTES saAttr; 
-
-	printf("\n->Start of parent execution.\n");
 
 	// Set the bInheritHandle flag so pipe handles are inherited. 
 	saAttr.nLength = sizeof(SECURITY_ATTRIBUTES); 
@@ -450,7 +448,6 @@ ssize_t read_stdout(char *executable, char *argv[], char *buffer, size_t buffer_
 		strcat(cmdLine, " ");
 		index++;
 	}
-	printf("'%s'\n", cmdLine);
 	// Start the child process. 
 	if( !CreateProcess( NULL,   // No module name (use command line)
 		cmdLine,        // Command line
@@ -468,11 +465,9 @@ ssize_t read_stdout(char *executable, char *argv[], char *buffer, size_t buffer_
 		printf( "CreateProcess failed (%d).\n", GetLastError() );
 		return -1;
 	}
-	printf("wait for single object\n");
 	// Wait until child process exits.
 	WaitForSingleObject( pi.hProcess, INFINITE );
 
-	printf("close process handles\n");
 	// Close process and thread handles. 
 	CloseHandle( pi.hProcess );
 	CloseHandle( pi.hThread );
@@ -896,24 +891,27 @@ the function pointers and then calls create_interpreter_ for that instance.
 				obj_ext) even though $Config{dlext} = so.
 			*/
 #if ! defined (WIN32)
-#define PERLLIB_INSTALL_DIR "installarchlib"
+			perl_argv[3] = "print join( '-'," 
+				"$Config{api_versionstring}||$Config{apiversion}||$],"
+				"grep {$Config{\"use$_\"}}"
+				"qw(threads multiplicity 64bitall longdouble perlio) ),"
+				"\"\\0$Config{installarchlib}\\0\","
+				"$Config{useshrplib} eq 'true' && $Config{libperl},"
+				"\"\\0\"";
 #else
-#define PERLLIB_INSTALL_DIR "installbin"
-#endif
-			perl_argv[3] = "\"print join( '-'," 
+			perl_argv[3] = "\"print join( '-',"
 				"$Config{api_versionstring}||$Config{apiversion}||$],"
 				"grep {$Config{\\\"use$_\\\"}}"
 				"qw(threads multiplicity 64bitall longdouble perlio) ),"
-				"\\\"\\0$Config{"
-				PERLLIB_INSTALL_DIR
-				"}\\0\\\","
+				"\\\"\\0$Config{installbin}\\0\\\","
 				"$Config{useshrplib} eq 'true' && $Config{libperl},"
 				"\\\"\\0\\\"\"";
+#endif
 			perl_argv[4] = (char *)NULL;
 
 			number_read =
 #if defined (WIN32)
-				read_stdout(perl_executable, perl_argv, perl_result_buffer, perl_result_buffer_size);
+				createprocess_read_stdout(perl_executable, perl_argv, perl_result_buffer, perl_result_buffer_size);
 #else
 				fork_read_stdout( execvp, perl_executable, perl_argv,
 					perl_result_buffer, perl_result_buffer_size );
@@ -1238,12 +1236,6 @@ the function pointers and then calls create_interpreter_ for that instance.
 
 		if (return_code)
 		{
-			//if (return_code && (!((*interpreter)->create_interpreter_handle =	\
-			//	(void (*)())dlsym(interpreter_handle, "__create_interpreter_" )))) \
-			//{ \
-			//	((*interpreter)->display_message_function)(ERROR_MESSAGE,"Unable to find symbol %s", "create_interpreter_" ); \
-			//	return_code = 0; \
-			//}
 			LOAD_FUNCTION(create_interpreter_);
 			if (return_code)
 			{
@@ -1363,7 +1355,6 @@ Dynamic loader wrapper
 		/* Now set it in the actual perl interpreter module */
 		if (interpreter->use_dynamic_interpreter)
 		{
-		printf("=============================\n");
 			(interpreter->interpreter_set_display_message_function_handle)
 				(interpreter->real_interpreter, function, status);
 		}
@@ -1384,7 +1375,6 @@ Dynamic loader wrapper
 {
 	if (interpreter)
 	{
-	printf("0000000000000000000000000000\n");
 		if (interpreter->use_dynamic_interpreter)
 		{
 			(interpreter->redirect_interpreter_output_handle)(interpreter->real_interpreter, status);
