@@ -80,6 +80,7 @@ Fortunately the api to these functions is fairly simple and has not changed
 too much (from 5.6.2 to 5.8.7 at least).
 
 ******************************************************************************/
+const size_t perl_result_buffer_size = 500;
 
 typedef void PerlInterpreter;
 /* I haven't checked if the api to XSINIT_t is consistent but we don't need it
@@ -95,7 +96,7 @@ typedef void (*perl_free_t)( PerlInterpreter* interp );
 typedef int (*perl_run_t)( PerlInterpreter* interp );
 /* perl 5.8.7 at least writes to argv[] in Perl_magic_set when setting $0 */
 typedef int (*perl_parse_t)( PerlInterpreter* interp, XSINIT_t xsinit,
-								int argc, char** argv, char** env );
+	int argc, char** argv, char** env );
 
 /******************************************************************************/
 
@@ -390,102 +391,109 @@ just EXIT_FAILURE if the perlinterpreter can't be run.
 }
 
 #if defined (WIN32)
-#define BUFSIZE 500 
- 
-HANDLE g_hChildStd_IN_Rd = NULL;
-HANDLE g_hChildStd_IN_Wr = NULL;
-HANDLE g_hChildStd_OUT_Rd = NULL;
-HANDLE g_hChildStd_OUT_Wr = NULL;
+//#define BUFSIZE 500 
 
-void CreateChildProcess(const TCHAR *szCmd, TCHAR *szCmdline[])
-// Create a child process that uses the previously created pipes for STDIN and STDOUT.
-{ 
-   //TCHAR szCmdline[]=TEXT("child");
-   PROCESS_INFORMATION piProcInfo; 
-   STARTUPINFO siStartInfo;
-   BOOL bSuccess = FALSE; 
- 
-// Set up members of the PROCESS_INFORMATION structure. 
- 
-   ZeroMemory( &piProcInfo, sizeof(PROCESS_INFORMATION) );
- 
-// Set up members of the STARTUPINFO structure. 
-// This structure specifies the STDIN and STDOUT handles for redirection.
- 
-   ZeroMemory( &siStartInfo, sizeof(STARTUPINFO) );
-   siStartInfo.cb = sizeof(STARTUPINFO); 
-   siStartInfo.hStdError = g_hChildStd_OUT_Wr;
-   siStartInfo.hStdOutput = g_hChildStd_OUT_Wr;
-   siStartInfo.hStdInput = g_hChildStd_IN_Rd;
-   siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
- 
-// Create the child process. 
-    
-   bSuccess = CreateProcess(szCmd, 
-      szCmdline[0],     // command line 
-      NULL,          // process security attributes 
-      NULL,          // primary thread security attributes 
-      TRUE,          // handles are inherited 
-      0,             // creation flags 
-      NULL,          // use parent's environment 
-      NULL,          // use parent's current directory 
-      &siStartInfo,  // STARTUPINFO pointer 
-      &piProcInfo);  // receives PROCESS_INFORMATION 
-   
-   // If an error occurs, exit the application. 
-   if ( ! bSuccess ) 
-      printf(TEXT("CreateProcess"));
-   else 
-   {
-      // Close handles to the child process and its primary thread.
-      // Some applications might keep these handles to monitor the status
-      // of the child process, for example. 
-
-      CloseHandle(piProcInfo.hProcess);
-      CloseHandle(piProcInfo.hThread);
-   }
-}
-
-ssize_t spawn_and_read(const char *file, char *argv[], char *buffer, size_t buffer_size)
+ssize_t read_stdout(char *executable, char *argv[], char *buffer, size_t buffer_size)
 {
-   SECURITY_ATTRIBUTES saAttr; 
- 
-   printf("\n->Start of parent execution.\n");
+	ssize_t number_read = -1, cur_number_read;
+	BOOL bSuccess = FALSE;
+	HANDLE g_hChildStd_OUT_Rd = NULL;
+	HANDLE g_hChildStd_OUT_Wr = NULL;
+	char *cmdLine;
+	size_t length = 0, index = 0;
+	
+	STARTUPINFO si;
+	PROCESS_INFORMATION pi;
 
-// Set the bInheritHandle flag so pipe handles are inherited. 
- 
-   saAttr.nLength = sizeof(SECURITY_ATTRIBUTES); 
-   saAttr.bInheritHandle = TRUE; 
-   saAttr.lpSecurityDescriptor = NULL; 
+	SECURITY_ATTRIBUTES saAttr; 
+
+	printf("\n->Start of parent execution.\n");
+
+	// Set the bInheritHandle flag so pipe handles are inherited. 
+	saAttr.nLength = sizeof(SECURITY_ATTRIBUTES); 
+	saAttr.bInheritHandle = TRUE; 
+	saAttr.lpSecurityDescriptor = NULL; 
 
 // Create a pipe for the child process's STDOUT. 
  
-   if ( ! CreatePipe(&g_hChildStd_OUT_Rd, &g_hChildStd_OUT_Wr, &saAttr, 0) ) 
-      printf(TEXT("StdoutRd CreatePipe")); 
+	if ( ! CreatePipe(&g_hChildStd_OUT_Rd, &g_hChildStd_OUT_Wr, &saAttr, 0) ) 
+	{
+		printf(TEXT("Error: StdoutRd CreatePipe %d\n"), GetLastError());
+		return -1;
+	}
 
 // Ensure the read handle to the pipe for STDOUT is not inherited.
 
-   if ( ! SetHandleInformation(g_hChildStd_OUT_Rd, HANDLE_FLAG_INHERIT, 0) )
-      printf(TEXT("Stdout SetHandleInformation")); 
+	if ( ! SetHandleInformation(g_hChildStd_OUT_Rd, HANDLE_FLAG_INHERIT, 0) )
+	{
+		printf(TEXT("Error: Stdout SetHandleInformation %d\n"), GetLastError());
+		return -1;
+	}
 
-// Create a pipe for the child process's STDIN. 
- 
-   if (! CreatePipe(&g_hChildStd_IN_Rd, &g_hChildStd_IN_Wr, &saAttr, 0)) 
-      printf(TEXT("Stdin CreatePipe")); 
+	ZeroMemory( &si, sizeof(si) );
+	si.cb = sizeof(si);
+	si.hStdError = g_hChildStd_OUT_Wr;
+	si.hStdOutput = g_hChildStd_OUT_Wr;
+	si.dwFlags |= STARTF_USESTDHANDLES;
+	ZeroMemory( &pi, sizeof(pi) );
+	
+	while (argv[index])
+	{
+		length += strlen(argv[index]);
+		index++;
+	}
+	cmdLine = (char *)calloc(length + index + 1, sizeof(char));
+	index = 0;
+	while (argv[index])
+	{
+		strcat(cmdLine, argv[index]);
+		strcat(cmdLine, " ");
+		index++;
+	}
+	printf("'%s'\n", cmdLine);
+	// Start the child process. 
+	if( !CreateProcess( NULL,   // No module name (use command line)
+		cmdLine,        // Command line
+		NULL,           // Process handle not inheritable
+		NULL,           // Thread handle not inheritable
+		TRUE,          // Set handle inheritance to FALSE
+		0,              // No creation flags
+		NULL,           // Use parent's environment block
+		NULL,           // Use parent's starting directory 
+		&si,            // Pointer to STARTUPINFO structure
+		&pi )           // Pointer to PROCESS_INFORMATION structure
+	) 
+	{
+		free(cmdLine);
+		printf( "CreateProcess failed (%d).\n", GetLastError() );
+		return -1;
+	}
+	printf("wait for single object\n");
+	// Wait until child process exits.
+	WaitForSingleObject( pi.hProcess, INFINITE );
 
-// Ensure the write handle to the pipe for STDIN is not inherited. 
- 
-   if ( ! SetHandleInformation(g_hChildStd_IN_Wr, HANDLE_FLAG_INHERIT, 0) )
-      printf(TEXT("Stdin SetHandleInformation")); 
- 
-// Create the child process. 
-   
-   CreateChildProcess(file, argv);
-	return -1;
+	printf("close process handles\n");
+	// Close process and thread handles. 
+	CloseHandle( pi.hProcess );
+	CloseHandle( pi.hThread );
+	free(cmdLine);
+
+	// Must close this handle before we can successfully return from reading from pipe.
+	CloseHandle(g_hChildStd_OUT_Wr);
+	number_read = 0;
+	for (;;) 
+	{ 
+		bSuccess = ReadFile( g_hChildStd_OUT_Rd, buffer, buffer_size, &cur_number_read, NULL);
+		if (bSuccess)
+		{
+			number_read += cur_number_read;
+		}
+		if( ! bSuccess || cur_number_read == 0 ) break; 
+	}
+	return number_read;
 }
 
 #else
-#endif
 
 static ssize_t fork_read_stdout(/*
 	int (*execvp)
@@ -513,7 +521,6 @@ killed if more than buffer_size bytes are read or it does not respond quickly.
 {
 	ssize_t number_read = -1;  /* Assume error until success */
 
-#if ! defined (WIN32)
 	pid_t process_id;
 	fd_set readfds;
 	int stdout_pipe[2];
@@ -581,7 +588,7 @@ killed if more than buffer_size bytes are read or it does not respond quickly.
 				do
 				{
 					select_code =
-						select( FD_SETSIZE, &readfds, NULL, NULL,	&timeout_struct );
+						select( FD_SETSIZE, &readfds, NULL, NULL, &timeout_struct );
 				}
 				while( select_code == -1 && errno == EINTR );
 
@@ -659,9 +666,10 @@ killed if more than buffer_size bytes are read or it does not respond quickly.
 			}
 		}
 	}
-#endif
- 	return(number_read);
+
+	return(number_read);
 }
+#endif
 
 
 #if __GLIBC__ >= 2
@@ -718,16 +726,16 @@ swap the endianness of values going into a64l
 #endif /* defined (BYTE_ORDER) */
 
 #if defined (WIN32)
-int mkstemp(char *template)
+int mkstemp(char *template_name)
 {
 	DWORD path_size;
 	char path_buffer[MAX_PATH];
-	char tempfilename[MAX_PATH];
+	//char tempfilename[MAX_PATH];
 	UINT unique_number;
 	
 	path_size = GetTempPath( MAX_PATH, path_buffer);
-	unique_number = GetTempFileName(path_buffer, "pin", 0, tempfilename);
-	return _open(tempfilename, _O_RDWR | _O_BINARY);
+	unique_number = GetTempFileName(path_buffer, "pin", 0, template_name);
+	return _open(template_name, _O_RDWR | _O_BINARY);
 }
 #endif
 
@@ -748,14 +756,18 @@ remove the temporary file it refers to.
 	FILE *bin_file;	
 	size_t string_length;
 	size_t char_count = 0, byte_count, i, j;
+#if ! defined (WIN32)
 	char template_name[]="/tmp/perl_interpreterXXXXXX";
+#else
+	char template_name[MAX_PATH];
+#endif
 	int temp_fd;
 
 	if (base64_string)
 	{
 		string_length=strlen(base64_string);
 		temp_fd=mkstemp(template_name);
-		if ((temp_fd != -1) && (bin_file=fdopen(temp_fd, "w"))
+		if ((temp_fd != -1) && (bin_file=fdopen(temp_fd, "wb"))
 			&& (return_string = (char *)malloc(strlen(template_name)+1)))
 		{
 			if (string_length % 4 != 0)
@@ -767,17 +779,17 @@ remove the temporary file it refers to.
 			}
 			for (i = 0; i < string_length; i++)
 			{
-		                data[char_count] = base64_string[i];
-		                char_count++;
-		                if (char_count == 4)
-		                {
-		                        binary = base642bin(data, &byte_count);
-		                        for (j = 0; j < byte_count; j++)
-		                        {
-		                                fprintf(bin_file, "%c", binary[j]);
-		                        }
-		                        char_count = 0;
-		                }				
+				data[char_count] = base64_string[i];
+				char_count++;
+				if (char_count == 4)
+				{
+					binary = base642bin(data, &byte_count);
+					for (j = 0; j < byte_count; j++)
+					{
+						fprintf(bin_file, "%c", binary[j]);
+					}
+					char_count = 0;
+				}
 			}
 			fclose(bin_file);
 			strcpy(return_string, template_name);
@@ -821,11 +833,14 @@ the function pointers and then calls create_interpreter_ for that instance.
 		*perl_archlib, *perl_libperl;
 	int number_of_perl_interpreters, return_code;
 	ssize_t number_read;
+#if defined (WIN32)
+	size_t len_perl_libperl;
+#endif
 	void *interpreter_handle, *perl_handle;
 
 	if (*interpreter = (struct Interpreter *)malloc (sizeof(struct Interpreter)))
 	{
-		const size_t perl_result_buffer_size = 500;
+		
 		char *perl_result_buffer = (char *)malloc(perl_result_buffer_size * sizeof(char));//[perl_result_buffer_size];
 
 		(*interpreter)->use_dynamic_interpreter = 0;
@@ -880,18 +895,29 @@ the function pointers and then calls create_interpreter_ for that instance.
 				shared library that can be dlopened is called libperl.o (from
 				obj_ext) even though $Config{dlext} = so.
 			*/
-			perl_argv[3] = "print join( '-',"
+#if ! defined (WIN32)
+#define PERLLIB_INSTALL_DIR "installarchlib"
+#else
+#define PERLLIB_INSTALL_DIR "installbin"
+#endif
+			perl_argv[3] = "\"print join( '-'," 
 				"$Config{api_versionstring}||$Config{apiversion}||$],"
-				"grep {$Config{\"use$_\"}}"
+				"grep {$Config{\\\"use$_\\\"}}"
 				"qw(threads multiplicity 64bitall longdouble perlio) ),"
-				"\"\\0$Config{installarchlib}\\0\","
+				"\\\"\\0$Config{"
+				PERLLIB_INSTALL_DIR
+				"}\\0\\\","
 				"$Config{useshrplib} eq 'true' && $Config{libperl},"
-				"\"\\0\"";
+				"\\\"\\0\\\"\"";
 			perl_argv[4] = (char *)NULL;
 
 			number_read =
+#if defined (WIN32)
+				read_stdout(perl_executable, perl_argv, perl_result_buffer, perl_result_buffer_size);
+#else
 				fork_read_stdout( execvp, perl_executable, perl_argv,
 					perl_result_buffer, perl_result_buffer_size );
+#endif
 
 			/* Error already reported with number_read < 0 */
 			if( number_read == 0 )
@@ -928,6 +954,16 @@ the function pointers and then calls create_interpreter_ for that instance.
 					{
 						i++;
 					}
+#if defined (WIN32)
+					// Going to turn the link library name into the object library name
+					if( perl_libperl[0] )
+					{
+						len_perl_libperl = strlen(perl_libperl);
+						perl_libperl[len_perl_libperl-3] = 'd';
+						perl_libperl[len_perl_libperl-2] = 'l';
+						perl_libperl[len_perl_libperl-1] = 'l';
+					}
+#endif
 					if( i >= perl_result_buffer_size )
 					{
 						((*interpreter)->display_message_function)
@@ -940,21 +976,25 @@ the function pointers and then calls create_interpreter_ for that instance.
 					}
 					else if( perl_libperl[0] == 0 )
 					{
+#if ! defined (WIN32)
 						perl_libperl = "libperl.so";
+#else
+						perl_libperl = "perl.dll";
+#endif
 					}
 
 					perl_updates = strstr(perl_archlib, "Updates");
 					if (perl_updates)
 					{
-				                /* Yup, so we need to do some work on the archlib string */
-				                dist = perl_updates-perl_archlib;
-				                strncpy(buf, perl_archlib, dist);
-				                buf[dist] = '\0';
-				                /* Notice the space here to make up for
-				                   the different lengths of the two strings */
-				                strncpy(perl_archlib, " /System", 8);
-				                strncpy(&perl_archlib[8], buf, dist);
-				                perl_archlib++;
+						/* Yup, so we need to do some work on the archlib string */
+						dist = perl_updates-perl_archlib;
+						strncpy(buf, perl_archlib, dist);
+						buf[dist] = '\0';
+						/* Notice the space here to make up for
+							the different lengths of the two strings */
+						strncpy(perl_archlib, " /System", 8);
+						strncpy(&perl_archlib[8], buf, dist);
+						perl_archlib++;
 					}
 							
 				}
@@ -988,8 +1028,13 @@ the function pointers and then calls create_interpreter_ for that instance.
 #else
 			struct _stat stat_buf;
 #endif
+#if ! defined (WIN32)
 			sprintf( full_libperl_name, "%s/%s/%s",
 				perl_archlib, core_subdir, perl_libperl);
+#else
+			sprintf( full_libperl_name, "%s/%s",
+				perl_archlib, perl_libperl);
+#endif
 
 #if ! defined (WIN32)
 			if( 0 == stat( full_libperl_name, &stat_buf ) )
@@ -1042,8 +1087,12 @@ the function pointers and then calls create_interpreter_ for that instance.
 				perl_argv[4] = (char *)NULL;
 
 				number_read =
+#if defined (WIN32)
+					0;
+#else
 					fork_read_stdout( exec_libperl, perl_libperl, perl_argv,
 						libperl_result_buffer, libperl_result_buffer_size );
+#endif
 
 				/* Error already reported with number_read < 0 */
 				if( number_read == 0 )
@@ -1189,6 +1238,12 @@ the function pointers and then calls create_interpreter_ for that instance.
 
 		if (return_code)
 		{
+			//if (return_code && (!((*interpreter)->create_interpreter_handle =	\
+			//	(void (*)())dlsym(interpreter_handle, "__create_interpreter_" )))) \
+			//{ \
+			//	((*interpreter)->display_message_function)(ERROR_MESSAGE,"Unable to find symbol %s", "create_interpreter_" ); \
+			//	return_code = 0; \
+			//}
 			LOAD_FUNCTION(create_interpreter_);
 			if (return_code)
 			{
@@ -1263,23 +1318,26 @@ DESCRIPTION :
 Dynamic loader wrapper
 ==============================================================================*/
 {
-	if (interpreter->use_dynamic_interpreter)
+	if (interpreter)
 	{
-		(interpreter->destroy_interpreter_handle)(interpreter->real_interpreter, status);
-		if (interpreter->interpreter_handle)
+		if (interpreter->use_dynamic_interpreter)
 		{
-			 dlclose(interpreter->interpreter_handle);
+			(interpreter->destroy_interpreter_handle)(interpreter->real_interpreter, status);
+			if (interpreter->interpreter_handle)
+			{
+				 dlclose(interpreter->interpreter_handle);
+			}
+			if (interpreter->perl_handle)
+			{
+				 dlclose(interpreter->perl_handle);
+			}
 		}
-		if (interpreter->perl_handle)
+		else
 		{
-			 dlclose(interpreter->perl_handle);
+			__destroy_interpreter_(interpreter->real_interpreter, status);
 		}
+		free (interpreter);
 	}
-	else
-	{
-		__destroy_interpreter_(interpreter->real_interpreter, status);
-	}
-	free (interpreter);
 } /* destroy_interpreter */
 
 void interpreter_set_display_message_function_(struct Interpreter *interpreter, 
@@ -1292,23 +1350,27 @@ Dynamic loader wrapper
 ==============================================================================*/
 {
 	/* Set the display message function in this module */
-	if (function)
+	if (interpreter)
 	{
-		interpreter->display_message_function = function;
-	}
-	else
-	{
-		interpreter->display_message_function = interpreter_display_message;			
-	}
-	/* Now set it in the actual perl interpreter module */
-	if (interpreter->use_dynamic_interpreter)
-	{
-		(interpreter->interpreter_set_display_message_function_handle)
-			(interpreter->real_interpreter, function, status);
-	}
-	else
-	{
-		__interpreter_set_display_message_function_(interpreter->real_interpreter, function, status);
+		if (function)
+		{
+			interpreter->display_message_function = function;
+		}
+		else
+		{
+			interpreter->display_message_function = interpreter_display_message;
+		}
+		/* Now set it in the actual perl interpreter module */
+		if (interpreter->use_dynamic_interpreter)
+		{
+		printf("=============================\n");
+			(interpreter->interpreter_set_display_message_function_handle)
+				(interpreter->real_interpreter, function, status);
+		}
+		else
+		{
+			__interpreter_set_display_message_function_(interpreter->real_interpreter, function, status);
+		}
 	}
 } /* redirect_interpreter_output */
 
@@ -1320,13 +1382,17 @@ DESCRIPTION :
 Dynamic loader wrapper
 ==============================================================================*/
 {
-	if (interpreter->use_dynamic_interpreter)
+	if (interpreter)
 	{
-		(interpreter->redirect_interpreter_output_handle)(interpreter->real_interpreter, status);
-	}
-	else
-	{
-		__redirect_interpreter_output_(interpreter->real_interpreter, status);
+	printf("0000000000000000000000000000\n");
+		if (interpreter->use_dynamic_interpreter)
+		{
+			(interpreter->redirect_interpreter_output_handle)(interpreter->real_interpreter, status);
+		}
+		else
+		{
+			__redirect_interpreter_output_(interpreter->real_interpreter, status);
+		}
 	}
 } /* redirect_interpreter_output */
 
@@ -1339,14 +1405,17 @@ DESCRIPTION :
 Dynamic loader wrapper
 ==============================================================================*/
 {
-	if (interpreter->use_dynamic_interpreter)
+	if (interpreter)
 	{
-		(interpreter->interpreter_evaluate_integer_handle)(interpreter->real_interpreter, expression, result,
-			status);
-	}
-	else
-	{
-		__interpreter_evaluate_integer_(interpreter->real_interpreter, expression, result, status);
+		if (interpreter->use_dynamic_interpreter)
+		{
+			(interpreter->interpreter_evaluate_integer_handle)(interpreter->real_interpreter, expression, result,
+				status);
+		}
+		else
+		{
+			__interpreter_evaluate_integer_(interpreter->real_interpreter, expression, result, status);
+		}
 	}
 } /* interpreter_evaluate_integer */
 
@@ -1359,14 +1428,17 @@ DESCRIPTION :
 Dynamic loader wrapper
 ==============================================================================*/
 {
-	if (interpreter->use_dynamic_interpreter)
+	if (interpreter)
 	{
-		(interpreter->interpreter_set_integer_handle)(interpreter->real_interpreter, variable_name, value,
-			status);
-	}
-	else
-	{
-		__interpreter_set_integer_(interpreter->real_interpreter, variable_name, value, status);
+		if (interpreter->use_dynamic_interpreter)
+		{
+			(interpreter->interpreter_set_integer_handle)(interpreter->real_interpreter, variable_name, value,
+				status);
+		}
+		else
+		{
+			__interpreter_set_integer_(interpreter->real_interpreter, variable_name, value, status);
+		}
 	}
 } /* interpreter_set_integer */
 
@@ -1379,14 +1451,17 @@ DESCRIPTION :
 Dynamic loader wrapper
 ==============================================================================*/
 {
-	if (interpreter->use_dynamic_interpreter)
+	if (interpreter)
 	{
-		(interpreter->interpreter_evaluate_double_handle)(interpreter->real_interpreter, expression, result,
-			status);
-	}
-	else
-	{
-		__interpreter_evaluate_double_(interpreter->real_interpreter, expression, result, status);
+		if (interpreter->use_dynamic_interpreter)
+		{
+			(interpreter->interpreter_evaluate_double_handle)(interpreter->real_interpreter, expression, result,
+				status);
+		}
+		else
+		{
+			__interpreter_evaluate_double_(interpreter->real_interpreter, expression, result, status);
+		}
 	}
 } /* interpreter_evaluate_double */
 
@@ -1399,14 +1474,17 @@ DESCRIPTION :
 Dynamic loader wrapper
 ==============================================================================*/
 {
-	if (interpreter->use_dynamic_interpreter)
+	if (interpreter)
 	{
-		(interpreter->interpreter_set_double_handle)(interpreter->real_interpreter,
-			variable_name, value, status);
-	}
-	else
-	{
-		__interpreter_set_double_(interpreter->real_interpreter, variable_name, value, status);
+		if (interpreter->use_dynamic_interpreter)
+		{
+			(interpreter->interpreter_set_double_handle)(interpreter->real_interpreter,
+				variable_name, value, status);
+		}
+		else
+		{
+			__interpreter_set_double_(interpreter->real_interpreter, variable_name, value, status);
+		}
 	}
 } /* interpreter_set_double */
 
@@ -1419,15 +1497,18 @@ DESCRIPTION :
 Dynamic loader wrapper
 ==============================================================================*/
 {
-	if (interpreter->use_dynamic_interpreter)
+	if (interpreter)
 	{
-		(interpreter->interpreter_evaluate_string_handle)(
-			interpreter->real_interpreter, expression, result, status);
-	}
-	else
-	{
-		__interpreter_evaluate_string_(interpreter->real_interpreter, expression,
-			result, status);
+		if (interpreter->use_dynamic_interpreter)
+		{
+			(interpreter->interpreter_evaluate_string_handle)(
+				interpreter->real_interpreter, expression, result, status);
+		}
+		else
+		{
+			__interpreter_evaluate_string_(interpreter->real_interpreter, expression,
+				result, status);
+		}
 	}
 } /* interpreter_evaluate_string */
 
@@ -1439,14 +1520,17 @@ DESCRIPTION :
 Dynamic loader wrapper
 ==============================================================================*/
 {
-	if (interpreter->use_dynamic_interpreter)
+	if (interpreter)
 	{
-		(interpreter->interpreter_destroy_string_handle)(
-			interpreter->real_interpreter, string);
-	}
-	else
-	{
-		__interpreter_destroy_string_(interpreter->real_interpreter, string);
+		if (interpreter->use_dynamic_interpreter)
+		{
+			(interpreter->interpreter_destroy_string_handle)(
+				interpreter->real_interpreter, string);
+		}
+		else
+		{
+			__interpreter_destroy_string_(interpreter->real_interpreter, string);
+		}
 	}
 } /* interpreter_destroy_string */
 
@@ -1459,15 +1543,18 @@ DESCRIPTION :
 Dynamic loader wrapper
 ==============================================================================*/
 {
-	if (interpreter->use_dynamic_interpreter)
+	if (interpreter)
 	{
-		(interpreter->interpreter_set_string_handle)(interpreter->real_interpreter,
-			variable_name, value, status);
-	}
-	else
-	{
-		__interpreter_set_string_(interpreter->real_interpreter, variable_name,
-			value, status);
+		if (interpreter->use_dynamic_interpreter)
+		{
+			(interpreter->interpreter_set_string_handle)(interpreter->real_interpreter,
+				variable_name, value, status);
+		}
+		else
+		{
+			__interpreter_set_string_(interpreter->real_interpreter, variable_name,
+				value, status);
+		}
 	}
 } /* interpreter_set_string */
 
@@ -1480,15 +1567,18 @@ DESCRIPTION :
 Dynamic loader wrapper
 ==============================================================================*/
 {
-	if (interpreter->use_dynamic_interpreter)
+	if (interpreter)
 	{
-		(interpreter->interpreter_set_pointer_handle)(interpreter->real_interpreter,
-			variable_name, class_name, value, status);
-	}
-	else
-	{
-		__interpreter_set_pointer_(interpreter->real_interpreter, variable_name,
-			class_name, value, status);
+		if (interpreter->use_dynamic_interpreter)
+		{
+			(interpreter->interpreter_set_pointer_handle)(interpreter->real_interpreter,
+				variable_name, class_name, value, status);
+		}
+		else
+		{
+			__interpreter_set_pointer_(interpreter->real_interpreter, variable_name,
+				class_name, value, status);
+		}
 	}
 } /* interpreter_set_pointer */
 

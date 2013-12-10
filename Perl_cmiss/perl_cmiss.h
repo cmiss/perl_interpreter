@@ -1,1 +1,1 @@
-int cmiss(char *);
+//int cmiss(char *);
