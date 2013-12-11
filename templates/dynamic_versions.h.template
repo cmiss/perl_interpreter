@@ -1,9 +1,7 @@
 
-static char libperl_interpreter@PERL_API_STRING_STANDARD_CHARACTERS@[] =
-#include "@PERLINTERPRETER_SHARED_LIB_HEADER@"
-;
+@STATIC_CHAR_LIBPERL_INTERPRETERS@
 
 static struct Interpreter_library_strings interpreter_strings[] = {
-	{"@PERL_API_STRING@", libperl_interpreter@PERL_API_STRING_STANDARD_CHARACTERS@ },
+@PERL_INTERPRETER_LIBRARY_STRINGS@
 };
 
