@@ -184,6 +184,7 @@ SET( SHARED_PERLINTERPRETER_LIBRARY_TARGETS )
 SET( INDEX 1 )
 FOREACH( perl_interpreter_perl ${PERL_INTERPRETER_PERLS})
 	SET( cur_perl_exe_name PERL_EXECUTABLE_${INDEX} )
+UNSET( ${cur_perl_exe_name} CACHE )
 	FIND_PROGRAM( ${cur_perl_exe_name}
 		NAMES perl
 		PATHS ${perl_interpreter_perl}/bin
@@ -200,6 +201,9 @@ FOREACH( perl_interpreter_perl ${PERL_INTERPRETER_PERLS})
 	# Sets PERL_INCLUDE_DIRS, PERL_LINK_LIBRARIES and PERL_COMPILER_FLAGS
 	SEPARATE_PERL_C_FLAGS( ${PERL_C_FLAGS} )
 
+FIND_PERL_LIBRARY( ${cur_perl_exe} TRUE )
+SET( PERL_LIBRARIES ${PERL_LIBRARY} )
+message(STATUS "====${PERL_LIBRARIES}===")
 	# Set the perl API string with valid characters for use in c functions
 	STRING( REGEX REPLACE "(\\.|-)" "_" PERL_API_STRING_STANDARD_CHARACTERS ${PERL_API_STRING} )
 	SET( PERL_VERSION_ARCHNAME_DEFINE PERL_VERSION_ARCHNAME=\"${PERL_API_STRING}\" )
@@ -228,7 +232,7 @@ FOREACH( perl_interpreter_perl ${PERL_INTERPRETER_PERLS})
 		COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PROJECT_SOURCE_DIR}/Perl_cmiss/perl_cmiss.h ${PROJECT_BINARY_DIR}/Perl_cmiss/perl_cmiss.h
 		COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PROJECT_SOURCE_DIR}/Perl_cmiss/Perl_cmiss.pm ${PROJECT_BINARY_DIR}/Perl_cmiss/Perl_cmiss.pm
 		COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PROJECT_SOURCE_DIR}/Perl_cmiss/Perl_cmiss.xs ${PROJECT_BINARY_DIR}/Perl_cmiss/Perl_cmiss.xs
-		COMMAND ${CMAKE_COMMAND} -E chdir ${PROJECT_BINARY_DIR}/Perl_cmiss ${PERL_EXECUTABLE} Makefile.PL ${CMISS_PERL_CALLBACK} ${CMISS_PERL_WORKING_DIRECTORY} ${CMAKE_BUILD_TYPE}
+		COMMAND ${CMAKE_COMMAND} -E chdir ${PROJECT_BINARY_DIR}/Perl_cmiss ${cur_perl_exe} Makefile.PL ${CMISS_PERL_CALLBACK} ${CMISS_PERL_WORKING_DIRECTORY} ${CMAKE_BUILD_TYPE}
 		COMMENT "Running PERL_CMISS_MAKEFILE CMISS_PERL_CALLBACK=${CMISS_PERL_CALLBACK} WORKING_DIR=${CMISS_PERL_WORKING_DIRECTORY} ${CMAKE_BUILD_TYPE}" )
 	ADD_CUSTOM_TARGET( MAKE_PERL_CMISS_${INDEX}
 		COMMAND ${MAKE_PROGRAM} static
@@ -272,7 +276,7 @@ FOREACH( perl_interpreter_perl ${PERL_INTERPRETER_PERLS})
 		# Execute the pm2pmh command, is ">" redirection portable?
 		# no probably not, going for modifying pm2pmh perl script
 		ADD_CUSTOM_COMMAND( OUTPUT ${PMH_FILE}
-			COMMAND ${PERL_EXECUTABLE} bin2hex.pl ${PM_FILE_ABSPATH} ${PMH_FILE}
+			COMMAND ${cur_perl_exe} bin2hex.pl ${PM_FILE_ABSPATH} ${PMH_FILE}
 			WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/utilities )
 
 		# Trying various ways to make CMake run this custom command before
