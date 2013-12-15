@@ -367,15 +367,15 @@ just EXIT_FAILURE if the perlinterpreter can't be run.
 			exit(EXIT_FAILURE);
 		}
 
+	argc = 0;
+	while( argv[argc] != NULL )
+		argc++;
+
 	my_perl = (perl_alloc)();
 	if( !my_perl )
 		exit(EXIT_FAILURE);
 
 	(perl_construct)( my_perl );
-
-	argc = 0;
-	while( argv[argc] != NULL )
-		argc++;
 
 	exitstatus =
 		(perl_parse)( my_perl, (XSINIT_t)NULL, argc, argv, (char **)NULL);
@@ -387,7 +387,6 @@ just EXIT_FAILURE if the perlinterpreter can't be run.
 	(perl_free)( my_perl );
 
 	exit(exitstatus);
-	/* 	return(exitstatus); */
 }
 
 #if defined (WIN32)
@@ -895,7 +894,7 @@ the function pointers and then calls create_interpreter_ for that instance.
 				"$Config{api_versionstring}||$Config{apiversion}||$],"
 				"grep {$Config{\"use$_\"}}"
 				"qw(threads multiplicity 64bitall longdouble perlio) ),"
-				"\"\\0$Config{installarchlib}\\0\","
+				"\"\\0$Config{archlib}\\0\","
 				"$Config{useshrplib} eq 'true' && $Config{libperl},"
 				"\"\\0\"";
 #else
@@ -1063,7 +1062,7 @@ the function pointers and then calls create_interpreter_ for that instance.
 					Perhaps a CMISS_LIBPERL environment variable should be checked
 					before CMISS_PERL?
 				*/
-
+char perl_executable[] = "perl";
 				char *perl_argv[5];
 				const size_t libperl_result_buffer_size = 500;
 				char *libperl_result_buffer = (char *)malloc(libperl_result_buffer_size*sizeof(char));//[libperl_result_buffer_size];
@@ -1071,15 +1070,14 @@ the function pointers and then calls create_interpreter_ for that instance.
 				perl_argv[0] = perl_libperl;
 				perl_argv[1] = "-MConfig";
 				perl_argv[2] = "-e";
-				perl_argv[3] = "print "
 #ifdef CHECK_API_ONLY
-					"join( '-',"
+				perl_argv[3] = "print join( '-',"
 					"$Config{api_versionstring}||$Config{apiversion}||$],"
 					"grep {$Config{\"use$_\"}}"
 					"qw(threads multiplicity 64bitall longdouble perlio) ),"
 					"\"\\0\""
 #else /* ! CHECK_API */
-				"\"$Config{installarchlib}\\0\""
+				perl_argv[3] = "'print $Config{archlib}'"
 #endif
 					;
 				perl_argv[4] = (char *)NULL;
@@ -1201,7 +1199,6 @@ the function pointers and then calls create_interpreter_ for that instance.
 				free(full_libperl_name);
 			}
 		}
-
 		if (!return_code)
 		{
 			/* ??? This message may only be necessary if perl_api_string and
