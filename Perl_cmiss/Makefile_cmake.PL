@@ -82,22 +82,18 @@ if( $osname eq 'darwin' ){
 	#print "config darwin c_flags ----- $c_flags\n";
 }
 
-if( "$ARGV[2]" eq "Debug" ) {
-#	$name = $name . "d";
-}
-
 WriteMakefile(
-    'NAME'	=> $name,
-    # ??? Shouldn't this be "$source_dir/../source/$name.pm" or should that be moved here.
-    'VERSION_FROM' => "$source_dir/$name.pm", # finds $VERSION
+	'NAME'	=> $name,
+	# ??? Shouldn't this be "$source_dir/../source/$name.pm" or should that be moved here.
+	'VERSION_FROM' => "$source_dir/$name.pm", # finds $VERSION
 #    'EXTRALIBS' => '',# to prevent undefined warnings in Makefile
-    'MYEXTLIB'  => '',# to prevent undefined warnings in Makefile
-    'INC'	=> "-I$source_dir",     # e.g., '-I/usr/include/other'
-    'DEFINE'	=> $define_list,
-    'LINKTYPE'  => 'static',
+	'MYEXTLIB'  => '',# to prevent undefined warnings in Makefile
+	'INC'	=> "-I$source_dir",     # e.g., '-I/usr/include/other'
+	'DEFINE'	=> $define_list,
+	'LINKTYPE'  => 'static',
 	'CCFLAGS' => $c_flags,
 	'OPTIMIZE' => $c_flags_opt,
-    'INST_ARCHLIB' => '.'
+	'INST_ARCHLIB' => '.'
 );
 
 print "$0: Leaving directory `$working_dir'\n";
