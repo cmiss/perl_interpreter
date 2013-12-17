@@ -1077,7 +1077,7 @@ char perl_executable[] = "perl";
 					"qw(threads multiplicity 64bitall longdouble perlio) ),"
 					"\"\\0\""
 #else /* ! CHECK_API */
-				perl_argv[3] = "'print $Config{archlib}'"
+				perl_argv[3] = "print \"$Config{archlib}\\0\""
 #endif
 					;
 				perl_argv[4] = (char *)NULL;
