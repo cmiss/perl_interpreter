@@ -41,10 +41,6 @@ int main(int argc, char **argv)
 	data[0] = '\0';data[1] = '\0';data[2] = '\0';
 	for (i = 0; i < binsize; i++)
 	{
-		//if ((i + 1) % 4000 == 0)
-		//{
-		//	fprintf(fid64, "\"\n\"");
-		//}
 		data[byte_count] = inbuffer[i];
 		byte_count++;
 		if (byte_count == 3)

@@ -61,9 +61,9 @@ Provides an interface between cmiss and a Perl interpreter.
 #ifndef WIN32
 #	include <unistd.h>
 #else
-#	define close _close
-#	define dup2 _dup2
-#	define read _read
+//#	define close _close
+//#	define dup2 _dup2
+//#	define read _read
 #endif
 #include <string.h>
 #include <fcntl.h>
