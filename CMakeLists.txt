@@ -193,6 +193,7 @@ SET( SHARED_PERLINTERPRETER_LIBRARY_TARGETS )
 SET( INDEX 1 )
 FOREACH( perl_interpreter_perl ${PERL_INTERPRETER_PERLS})
 	SET( cur_perl_exe_name PERL_EXECUTABLE_${INDEX} )
+	# Reset the search for this perl
 	UNSET( ${cur_perl_exe_name} CACHE )
 	FIND_PROGRAM( ${cur_perl_exe_name}
 		NAMES perl
@@ -328,6 +329,10 @@ ENDFOREACH()
 
 # Set the library type suffix for this build, maybe this should be static?
 SET( LIBRARY_TYPE_SUFFIX "-dynamic" )
+
+# Set the generated path and create the directory if it doesn't currenly exist.
+SET( GENERATED_FILES_DIR ${PROJECT_BINARY_DIR}/generated/${BIN_ARCH_DIR}/${PERL_API_STRING}${DEBUG_TARGET_SUFFIX}${LIBRARY_TYPE_SUFFIX} )
+FILE( MAKE_DIRECTORY "${GENERATED_FILES_DIR}" )
 
 # Perl no longer comes with a static library
 SET( NO_STATIC_FALLBACK TRUE )
