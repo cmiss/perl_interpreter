@@ -178,14 +178,14 @@ ENDIF()
 SET( BIN2BASE64H_EXECUTABLE_NAME bin2base64str )
 SET( CMAKE_OSX_ARCHITECTURES x86_64 )
 ADD_EXECUTABLE( ${BIN2BASE64H_EXECUTABLE_NAME} utilities/bin2base64str.c source/base64.c )
-SET_TARGET_PROPERTIES( ${BIN2BASE64H_EXECUTABLE_NAME} PROPERTIES 
+SET_TARGET_PROPERTIES( ${BIN2BASE64H_EXECUTABLE_NAME} PROPERTIES
 	INCLUDE_DIRECTORIES ${PROJECT_SOURCE_DIR}/source )
 SET( CMAKE_OSX_ARCHITECTURES i386 )
 
 GET_FILENAME_COMPONENT( PERL_EXECUTABLE_PATH ${PERL_EXECUTABLE} PATH )
 LIST( APPEND PERL_INTERPRETER_PERLS ${PERL_EXECUTABLE_PATH} )
 
-SET( USE_DYNAMIC_LOADER TRUE )
+SET( USE_DYNAMIC_LOADER FALSE )
 SET( SHARED_OBJECT TRUE ) # May not be a good idea for Windows
 SET( LIBRARY_TYPE_SUFFIX "-shared" )
 
@@ -203,7 +203,7 @@ FOREACH( perl_interpreter_perl ${PERL_INTERPRETER_PERLS})
 	SET( cur_perl_exe ${${cur_perl_exe_name}} )
 
 	# Get the perl strings for the current perl
-	DEFINE_PERL_ARCHLIB_DIR(  ${cur_perl_exe} )
+	DEFINE_PERL_ARCHLIB_DIR( ${cur_perl_exe} )
 	DEFINE_PERL_API_STRING( ${cur_perl_exe} )
 	DEFINE_PERL_C_FLAGS( ${cur_perl_exe} )
 	# Separate perl c flags into include directories, link
@@ -220,13 +220,8 @@ FOREACH( perl_interpreter_perl ${PERL_INTERPRETER_PERLS})
 	SET( CMISS_PERL_CALLBACK cmiss_perl_callback_${PERL_API_STRING_STANDARD_CHARACTERS} )
 	SET( CMISS_PERL_WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/Perl_cmiss/generated_cmake/${BIN_ARCH_DIR}/${PERL_API_STRING} )
 	# Set the Perl_cmiss library /*install*/ location on a build type basis
-	IF( "${CMAKE_BUILD_TYPE}" STREQUAL "Debug" )
-		SET( PERL_CMISS_LIB
-			${CMISS_PERL_WORKING_DIRECTORY}/auto/Perl_cmiss/Perl_cmiss${CMAKE_STATIC_LIBRARY_SUFFIX} )
-	ELSE( "${CMAKE_BUILD_TYPE}" STREQUAL "Debug" )
-		SET( PERL_CMISS_LIB
-			${CMISS_PERL_WORKING_DIRECTORY}/auto/Perl_cmiss/Perl_cmiss${CMAKE_STATIC_LIBRARY_SUFFIX} )
-	ENDIF( "${CMAKE_BUILD_TYPE}" STREQUAL "Debug" )
+	SET( PERL_CMISS_LIB
+		${CMISS_PERL_WORKING_DIRECTORY}/auto/Perl_cmiss/Perl_cmiss${CMAKE_STATIC_LIBRARY_SUFFIX} )
 
 	# this version of the perl cmiss library won't need to be installed to be used as it is
 	# already included in the shared object perl interpreter!
@@ -248,14 +243,18 @@ FOREACH( perl_interpreter_perl ${PERL_INTERPRETER_PERLS})
 	FILE( MAKE_DIRECTORY "${GENERATED_FILES_DIR}" )
 
 	IF( USE_DYNAMIC_LOADER )
-		SET( DYNAMIC_LOADER_DEFINE INCLUDE_DYNALOADERPMH USE_DYNAMIC_LOADER)
+		SET( DYNAMIC_LOADER_DEFINE USE_DYNAMIC_LOADER)
+	ELSE()
+		SET( DYNAMIC_LOADER_DEFINE INCLUDE_DYNALOADERPMH )
 	ENDIF()
 
 	IF( SHARED_OBJECT )
 		SET( SHARED_OBJECT_DEFINE SHARED_OBJECT )
+	ELSE()
+		SET( SHARED_OBJECT_DEFINE )
 	ENDIF()
 
-	SET( LIBRARY_DEFINITIONS ${PERL_VERSION_ARCHNAME_DEFINE} ABI_ENV=\"64\"
+	SET( LIBRARY_DEFINITIONS ${PERL_VERSION_ARCHNAME_DEFINE} ABI_ENV=\"64\" ${DYNAMIC_LOADER_DEFINE}
 		bool=char ${SHARED_OBJECT_DEFINE} HAS_BOOL CMISS_PERL_CALLBACK=${CMISS_PERL_CALLBACK} )
 
 	# These are the files we want to convert to header? files
@@ -295,10 +294,13 @@ FOREACH( perl_interpreter_perl ${PERL_INTERPRETER_PERLS})
 
 	ADD_DEPENDENCIES( ${LIBRARY_NAME} MAKE_PERL_CMISS_${INDEX} )
 
-	TARGET_LINK_LIBRARIES( ${LIBRARY_NAME} ${PERL_LIBRARIES} ${PERL_CMISS_LIB} ${OS_SPECIFIC_LIBRARIES} )
+	TARGET_LINK_LIBRARIES( ${LIBRARY_NAME} ${PERL_LIBRARIES} ${OS_SPECIFIC_LIBRARIES} ${PERL_CMISS_LIB} )
 
 	SET( LIBRARY_OUTPUT_LOCATION ${CMAKE_BINARY_DIR}/lib/${BIN_ARCH_DIR}/${PERL_API_STRING}${DEBUG_TARGET_SUFFIX}${LIBRARY_TYPE_SUFFIX} )
-	SET_TARGET_PROPERTIES( ${LIBRARY_NAME} PROPERTIES 
+	# We don't want any rpath information stored in the dynamic perl libraries
+	# as they do not get recreated where they were built so we set SKIP_BUILD_RPATH TRUE.
+	SET_TARGET_PROPERTIES( ${LIBRARY_NAME} PROPERTIES
+		SKIP_BUILD_RPATH TRUE
 		LIBRARY_OUTPUT_DIRECTORY ${LIBRARY_OUTPUT_LOCATION}
 		RUNTIME_OUTPUT_DIRECTORY ${LIBRARY_OUTPUT_LOCATION}
 		INCLUDE_DIRECTORIES "${PERL_INCLUDE_DIRS};${PROJECT_SOURCE_DIR}/source;${GENERATED_FILES_DIR}"
@@ -327,112 +329,149 @@ FOREACH( perl_interpreter_perl ${PERL_INTERPRETER_PERLS})
 ENDFOREACH()
 # end loop here  ==========================
 
-# Set the library type suffix for this build, maybe this should be static?
-SET( LIBRARY_TYPE_SUFFIX "-dynamic" )
+## Start building a static perl interpreter backup
+IF( STATIC_PERL_INTERPRETER_PERL )
+	SET( NO_STATIC_FALLBACK FALSE )
+	SET( BACKUP_PERL_INTERPRETER_SRCS source/perl_interpreter.c )
+	SET( USE_DYNAMIC_LOADER TRUE )
+	SET( SHARED_OBJECT FALSE )
+	SET( LIBRARY_TYPE_SUFFIX "-static" )
 
-# Set the generated path and create the directory if it doesn't currenly exist.
-SET( GENERATED_FILES_DIR ${PROJECT_BINARY_DIR}/generated/${BIN_ARCH_DIR}/${PERL_API_STRING}${DEBUG_TARGET_SUFFIX}${LIBRARY_TYPE_SUFFIX} )
-FILE( MAKE_DIRECTORY "${GENERATED_FILES_DIR}" )
+	SET( cur_perl_exe_name PERL_EXECUTABLE_STATIC )
+	UNSET( ${cur_perl_exe_name} CACHE )
+	FIND_PROGRAM( ${cur_perl_exe_name}
+		NAMES perl
+		PATHS ${STATIC_PERL_INTERPRETER_PERL}/bin
+		${STATIC_PERL_INTERPRETER_PERL}
+		NO_DEFAULT_PATH)
+	SET( cur_perl_exe ${${cur_perl_exe_name}} )
 
-# Perl no longer comes with a static library
-SET( NO_STATIC_FALLBACK TRUE )
+	# Get the perl strings for the current perl
+	DEFINE_PERL_ARCHLIB_DIR( ${cur_perl_exe} )
+	DEFINE_PERL_API_STRING( ${cur_perl_exe} )
+	DEFINE_PERL_C_FLAGS( ${cur_perl_exe} )
+	# Separate perl c flags into include directories, link
+	# libraries and compiler flags.
+	# Sets PERL_INCLUDE_DIRS, PERL_LINK_LIBRARIES and PERL_COMPILER_FLAGS
+	SEPARATE_PERL_C_FLAGS( ${PERL_C_FLAGS} ${cur_perl_exe} )
+
+	FIND_PERL_LIBRARY( ${cur_perl_exe} TRUE )
+	SET( STATIC_PERL_LIBRARIES ${PERL_LIBRARY} )
+	# Extract this information from PERL_LINK_LIBRARIES
+	SET( STATIC_PERL_DEPENDENT_LIBRARIES crypt )
+
+	SET( PERL_VERSION_ARCHNAME_DEFINE PERL_VERSION_ARCHNAME=\"${PERL_API_STRING}\" )
+	SET( CMISS_PERL_WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/Perl_cmiss/generated_cmake/${BIN_ARCH_DIR}/${PERL_API_STRING}-static )
+	SET( CMISS_PERL_CALLBACK cmiss_perl_callback_static ) # SET( CMISS_PERL_CALLBACK_SUFFIX static )
+	SET( PERL_CMISS_LIB
+		${CMISS_PERL_WORKING_DIRECTORY}/auto/Perl_cmiss/Perl_cmiss${CMAKE_STATIC_LIBRARY_SUFFIX} ) #${CMAKE_INSTALL_PREFIX}/lib/${PERL_API_STRING}/Perl_cmiss${CMAKE_STATIC_LIBRARY_SUFFIX} )
+	IF( "${CMAKE_BUILD_TYPE}" STREQUAL "Debug" )
+		SET( PERL_CMISS_LIB_INSTALL
+			${CMAKE_INSTALL_PREFIX}/lib/${PERL_API_STRING}/${CMAKE_STATIC_LIBRARY_PREFIX}Perl_cmiss${CMAKE_DEBUG_POSTFIX}${CMAKE_STATIC_LIBRARY_SUFFIX} )
+	ELSE( "${CMAKE_BUILD_TYPE}" STREQUAL "Debug" )
+		SET( PERL_CMISS_LIB_INSTALL
+			${CMAKE_INSTALL_PREFIX}/lib/${PERL_API_STRING}/${CMAKE_STATIC_LIBRARY_PREFIX}Perl_cmiss${CMAKE_STATIC_LIBRARY_SUFFIX} )
+	ENDIF( "${CMAKE_BUILD_TYPE}" STREQUAL "Debug" )
+
+	# We need to install the static library that we create here so that we can link to it later.
+	# This is important because we cannot move the Perl_cmiss library once we have linked the static
+	# perl interpreter library to it.
+	CONFIGURE_FILE( InstallPerlCmissLib.in.cmake InstallPerlCmissLib.cmake )
+
+	SET( PERL_CMISS_TARGET MAKE_PERL_CMISS_STATIC )
+	# This version of the perl cmiss library will need to be installed as it is
+	# required by the static library we are about to create.
+	# Can't use symlinks on Windows so using the copy version for windows and linux alike
+	ADD_CUSTOM_TARGET( PERL_CMISS_MAKEFILE_STATIC
+		COMMAND ${CMAKE_COMMAND} -E make_directory Perl_cmiss
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PROJECT_SOURCE_DIR}/Perl_cmiss/Makefile_cmake.PL ${PROJECT_BINARY_DIR}/Perl_cmiss/Makefile.PL
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PROJECT_SOURCE_DIR}/Perl_cmiss/perl_cmiss.h ${PROJECT_BINARY_DIR}/Perl_cmiss/perl_cmiss.h
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PROJECT_SOURCE_DIR}/Perl_cmiss/Perl_cmiss.pm ${PROJECT_BINARY_DIR}/Perl_cmiss/Perl_cmiss.pm
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PROJECT_SOURCE_DIR}/Perl_cmiss/Perl_cmiss.xs ${PROJECT_BINARY_DIR}/Perl_cmiss/Perl_cmiss.xs
+		COMMAND ${CMAKE_COMMAND} -E chdir ${PROJECT_BINARY_DIR}/Perl_cmiss ${cur_perl_exe} Makefile.PL ${CMISS_PERL_CALLBACK} ${CMISS_PERL_WORKING_DIRECTORY} ${CMAKE_BUILD_TYPE}
+		COMMENT "Running PERL_CMISS_MAKEFILE CMISS_PERL_CALLBACK=${CMISS_PERL_CALLBACK} WORKING_DIR=${CMISS_PERL_WORKING_DIRECTORY} ${CMAKE_BUILD_TYPE}" )
+	ADD_CUSTOM_TARGET( ${PERL_CMISS_TARGET}
+		COMMAND ${MAKE_PROGRAM} static
+		COMMAND ${CMAKE_COMMAND} -P ${PROJECT_BINARY_DIR}/InstallPerlCmissLib.cmake
+		WORKING_DIRECTORY ${CMISS_PERL_WORKING_DIRECTORY}
+		COMMENT "Making ${PERL_API_STRING}${LIBRARY_TYPE_SUFFIX}" )
+	ADD_DEPENDENCIES( ${PERL_CMISS_TARGET} PERL_CMISS_MAKEFILE_STATIC )
+
+	SET( GENERATED_FILES_DIR ${PROJECT_BINARY_DIR}/generated/${BIN_ARCH_DIR}/${PERL_API_STRING}${DEBUG_TARGET_SUFFIX}${LIBRARY_TYPE_SUFFIX} )
+	FILE( MAKE_DIRECTORY "${GENERATED_FILES_DIR}" )
+
+	IF( USE_DYNAMIC_LOADER )
+		SET( DYNAMIC_LOADER_DEFINE USE_DYNAMIC_LOADER) #  INCLUDE_DYNALOADERPMH
+	ELSE()
+		SET( DYNAMIC_LOADER_DEFINE )
+	ENDIF()
+
+	IF( SHARED_OBJECT )
+		SET( SHARED_OBJECT_DEFINE SHARED_OBJECT )
+	ELSE()
+		SET( SHARED_OBJECT_DEFINE )
+	ENDIF()
+
+	SET( LIBRARY_DEFINITIONS ${PERL_VERSION_ARCHNAME_DEFINE} ABI_ENV=\"64\" ${DYNAMIC_LOADER_DEFINE}
+		bool=char ${SHARED_OBJECT_DEFINE} HAS_BOOL CMISS_PERL_CALLBACK=${CMISS_PERL_CALLBACK} )
+
+	# These are the files we want to convert to header? files
+	SET( PMH_FILES )
+	SET( PM_FILES strict.pm Balanced.pm Perl_cmiss.pm ) # DynaLoader.pm
+	FOREACH( PM_FILE ${PM_FILES} )
+		# This is where we want the converted files to go
+		SET( PMH_FILE ${GENERATED_FILES_DIR}/${PM_FILE}h )
+		# This is the location of the files to be converted
+		SET( PM_FILE_ABSPATH ${PROJECT_SOURCE_DIR}/source/${PM_FILE} )
+		# DynaLoader.pm comes from somewhere in the system
+		IF( ${PM_FILE} MATCHES "DynaLoader.pm" )
+			SET( PM_FILE_ABSPATH ${PERL_ARCHLIB_DIR}/DynaLoader.pm )
+		ENDIF() # ${PM_FILE} MATCHES "DynaLoader.pm"
+
+		# Execute the pm2pmh command, is ">" redirection portable?
+		# no probably not, going for modifying pm2pmh perl script
+		ADD_CUSTOM_COMMAND( OUTPUT ${PMH_FILE}
+			COMMAND ${cur_perl_exe} bin2hex.pl ${PM_FILE_ABSPATH} ${PMH_FILE}
+			WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/utilities )
+
+		# Trying various ways to make CMake run this custom command before
+		# compiling the source code.  Setting the generated header files directly
+		# into the library compilation works, but is it the best way? Yes it is actually.
+		SET_SOURCE_FILES_PROPERTIES( ${PMH_FILE} PROPERTIES HEADER_FILE_ONLY TRUE
+			GENERATED TRUE )
+		SET( PMH_FILES ${PMH_FILES} ${PMH_FILE} )
+	ENDFOREACH( PM_FILE $PM_FILES )
+
+	IF( ${CMAKE_SYSTEM_NAME} STREQUAL "Linux" AND ${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64" )
+		SET_SOURCE_FILES_PROPERTIES( ${SOURCES}
+			PROPERTIES COMPILE_FLAGS "-fPIC" )
+	ENDIF( ${CMAKE_SYSTEM_NAME} STREQUAL "Linux" AND ${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64" )
+ENDIF()
+
 CONFIGURE_FILE( "${PROJECT_SOURCE_DIR}/templates/static_version.h.template"
 	"${GENERATED_FILES_DIR}/static_version.h" )
 CONFIGURE_FILE( "${PROJECT_SOURCE_DIR}/templates/dynamic_versions.h.template"
 	"${GENERATED_FILES_DIR}/dynamic_versions.h" )
 
-
-SET( CMISS_PERL_CALLBACK cmiss_perl_callback_${PERL_API_STRING_STANDARD_CHARACTERS} )
-SET( CMISS_PERL_WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/Perl_cmiss/generated_cmake/${BIN_ARCH_DIR}/${PERL_API_STRING}-system )
-# Set the Perl_cmiss library /*install*/ location on a build type basis
-IF( "${CMAKE_BUILD_TYPE}" STREQUAL "Debug" )
-	SET( PERL_CMISS_LIB
-		${CMAKE_INSTALL_PREFIX}/lib/${PERL_API_STRING}/${CMAKE_STATIC_LIBRARY_PREFIX}Perl_cmiss${CMAKE_STATIC_LIBRARY_SUFFIX} )
-#		${CMAKE_INSTALL_PREFIX}/lib/${PERL_API_STRING}/${CMAKE_STATIC_LIBRARY_PREFIX}Perl_cmiss${CMAKE_DEBUG_POSTFIX}${CMAKE_STATIC_LIBRARY_SUFFIX} )
-ELSE( "${CMAKE_BUILD_TYPE}" STREQUAL "Debug" )
-	SET( PERL_CMISS_LIB
-		${CMAKE_INSTALL_PREFIX}/lib/${PERL_API_STRING}/${CMAKE_STATIC_LIBRARY_PREFIX}Perl_cmiss${CMAKE_STATIC_LIBRARY_SUFFIX} )
-ENDIF( "${CMAKE_BUILD_TYPE}" STREQUAL "Debug" )
-
-# We need to install the static library that we create here so that we can link to it later.
-# This is important because we cannot move the Perl_cmiss library once we have linked the static
-# perl interpreter library to it.
-CONFIGURE_FILE( InstallPerlCmissLib.in.cmake InstallPerlCmissLib.cmake )
-# using the copy version for windows and linux alike
-ADD_CUSTOM_TARGET( PERL_CMISS_MAKEFILE_SYSTEM
-	COMMAND ${CMAKE_COMMAND} -E make_directory Perl_cmiss
-	COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PROJECT_SOURCE_DIR}/Perl_cmiss/Makefile_cmake.PL ${PROJECT_BINARY_DIR}/Perl_cmiss/Makefile.PL
-	COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PROJECT_SOURCE_DIR}/Perl_cmiss/perl_cmiss.h ${PROJECT_BINARY_DIR}/Perl_cmiss/perl_cmiss.h
-	COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PROJECT_SOURCE_DIR}/Perl_cmiss/Perl_cmiss.pm ${PROJECT_BINARY_DIR}/Perl_cmiss/Perl_cmiss.pm
-	COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PROJECT_SOURCE_DIR}/Perl_cmiss/Perl_cmiss.xs ${PROJECT_BINARY_DIR}/Perl_cmiss/Perl_cmiss.xs
-	COMMAND ${CMAKE_COMMAND} -E chdir ${PROJECT_BINARY_DIR}/Perl_cmiss ${PERL_EXECUTABLE} Makefile.PL ${CMISS_PERL_CALLBACK} ${CMISS_PERL_WORKING_DIRECTORY} ${CMAKE_BUILD_TYPE}
-	COMMENT "Running PERL_CMISS_MAKEFILE CMISS_PERL_CALLBACK=${CMISS_PERL_CALLBACK} WORKING_DIR=${CMISS_PERL_WORKING_DIRECTORY} ${CMAKE_BUILD_TYPE}" )
-ADD_CUSTOM_TARGET( MAKE_PERL_CMISS_SYSTEM
-	COMMAND ${MAKE_PROGRAM} static
-	COMMAND ${CMAKE_COMMAND} -P ${PROJECT_BINARY_DIR}/InstallPerlCmissLib.cmake
-	WORKING_DIRECTORY ${CMISS_PERL_WORKING_DIRECTORY}
-	COMMENT "Making and installing ${PERL_API_STRING}${LIBRARY_TYPE_SUFFIX}" )
-ADD_DEPENDENCIES( MAKE_PERL_CMISS_SYSTEM PERL_CMISS_MAKEFILE_SYSTEM )
-
-# These are the files we want to convert to header? files
-SET( PMH_FILES )
-SET( PM_FILES strict.pm Balanced.pm Perl_cmiss.pm )
-FOREACH( PM_FILE ${PM_FILES} )
-	# This is where we want the converted files to go
-	SET( PMH_FILE ${GENERATED_FILES_DIR}/${PM_FILE}h )
-	# This is the location of the files to be converted
-	SET( PM_FILE_ABSPATH ${PROJECT_SOURCE_DIR}/source/${PM_FILE} )
-	# DynaLoader.pm comes from somewhere in the system
-	IF( ${PM_FILE} MATCHES "DynaLoader.pm" )
-		SET( PM_FILE_ABSPATH ${PERL_ARCHLIB_DIR}/DynaLoader.pm )
-	ENDIF() # ${PM_FILE} MATCHES "DynaLoader.pm"
-
-	# Execute the pm2pmh command, is ">" redirection portable?
-	# no probably not, going for modifying pm2pmh perl script
-	ADD_CUSTOM_COMMAND( OUTPUT ${PMH_FILE}
-		COMMAND ${PERL_EXECUTABLE} bin2hex.pl ${PM_FILE_ABSPATH} ${PMH_FILE}
-		WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/utilities )
-
-	# Trying various ways to make CMake run this custom command before
-	# compiling the source code.  Setting the generated header files directly
-	# into the library compilation works, but is it the best way?
-	SET_SOURCE_FILES_PROPERTIES( ${PMH_FILE} PROPERTIES HEADER_FILE_ONLY TRUE
-		GENERATED TRUE )
-	SET( PMH_FILES ${PMH_FILES} ${PMH_FILE} )
-ENDFOREACH( PM_FILE $PM_FILES )
-
-#INCLUDE_DIRECTORIES( ${GENERATED_FILES_DIR} )
-
 # Set the sources for the static library that contains all the shared object perl interpreters
-SET( SHARED_OBJECT_PERL_INTERPRETER_SRCS
+SET( STATIC_PERL_INTERPRETER_SRCS
+	${BACKUP_PERL_INTERPRETER_SRCS}
 	source/perl_interpreter_dynamic.c
 	source/base64.c )
 
 SET( CMISS_PERL_INTERPRETER cmiss_perl_interpreter )
-ADD_LIBRARY( ${CMISS_PERL_INTERPRETER} STATIC ${SHARED_OBJECT_PERL_INTERPRETER_SRCS}
+ADD_LIBRARY( ${CMISS_PERL_INTERPRETER} STATIC ${STATIC_PERL_INTERPRETER_SRCS}
 	${PMH_FILES} ${PERLINTERPRETER_SHARED_LIB_HEADERS} )
 
-IF( USE_DYNAMIC_LOADER )
-	SET( DYNAMIC_LOADER_DEFINE INCLUDE_DYNALOADERPMH USE_DYNAMIC_LOADER)
-ENDIF()
-
-IF( SHARED_OBJECT )
-	SET( SHARED_OBJECT_DEFINE SHARED_OBJECT )
-ENDIF()
-
-SET( LIBRARY_DEFINITIONS ${PERL_VERSION_ARCHNAME_DEFINE} ABI_ENV=\"64\" ${DYNAMIC_LOADER_DEFINE}
-	bool=char ${SHARED_OBJECT_DEFINE} HAS_BOOL CMISS_PERL_CALLBACK=${CMISS_PERL_CALLBACK} )
-
-SET_TARGET_PROPERTIES( ${CMISS_PERL_INTERPRETER} PROPERTIES INCLUDE_DIRECTORIES "${PERL_INCLUDE_DIRS};${PROJECT_SOURCE_DIR}/source;${GENERATED_FILES_DIR}" ) 
+SET_TARGET_PROPERTIES( ${CMISS_PERL_INTERPRETER} PROPERTIES INCLUDE_DIRECTORIES "${PERL_INCLUDE_DIRS};${PROJECT_SOURCE_DIR}/source;${GENERATED_FILES_DIR}" )
 SET_TARGET_PROPERTIES( ${CMISS_PERL_INTERPRETER} PROPERTIES
 	COMPILE_DEFINITIONS "${LIBRARY_DEFINITIONS}" )
-TARGET_LINK_LIBRARIES( ${CMISS_PERL_INTERPRETER} ${PERL_CMISS_LIB} )
+TARGET_LINK_LIBRARIES( ${CMISS_PERL_INTERPRETER} ${PERL_CMISS_LIB_INSTALL} ${STATIC_PERL_LIBRARIES} ${STATIC_PERL_DEPENDENT_LIBRARIES} )
 
-ADD_DEPENDENCIES( ${CMISS_PERL_INTERPRETER} ${SHARED_PERLINTERPRETER_LIBRARY_TARGETS} MAKE_PERL_CMISS_SYSTEM )
+ADD_DEPENDENCIES( ${CMISS_PERL_INTERPRETER} ${PERL_CMISS_TARGET} ${SHARED_PERLINTERPRETER_LIBRARY_TARGETS} )
 
-SET( LIBRARY_OUTPUT_LOCATION ${CMAKE_BINARY_DIR}/lib/${BIN_ARCH_DIR}/${PERL_API_STRING}${DEBUG_TARGET_SUFFIX}${LIBRARY_TYPE_SUFFIX} )
+SET( LIBRARY_OUTPUT_LOCATION ${CMAKE_BINARY_DIR}/lib/${BIN_ARCH_DIR} )
 SET_TARGET_PROPERTIES( ${CMISS_PERL_INTERPRETER} PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${LIBRARY_OUTPUT_LOCATION} )
-
 
 # Install stuff
 INSTALL( TARGETS ${CMISS_PERL_INTERPRETER} EXPORT ${CMISS_PERL_INTERPRETER}-targets

@@ -123,7 +123,7 @@ name so as to maintain an identical functional interface.
 	void (*redirect_interpreter_output_handle)(struct Interpreter *interpreter, int *status);
 	void (*interpreter_set_display_message_function_handle)
 		(struct Interpreter *interpreter, Interpreter_display_message_function *function, int *status);
-	void (*interpret_command_handle)(struct Interpreter *interpreter, 
+	void (*interpret_command_handle)(struct Interpreter *interpreter,
 		const char *command_string, void *user_data, int *quit,
 		execute_command_function_type execute_command_function, int *status);
 	void (*interpreter_evaluate_integer_handle)(struct Interpreter *interpreter,
@@ -175,7 +175,7 @@ struct Interpreter_library_strings { char *api_string; char *base64_string; };
 		((*interpreter)->display_message_function)(ERROR_MESSAGE,"Unable to find symbol %s", #symbol ); \
 		return_code = 0; \
 	}
-	
+
 #if ! defined (NO_STATIC_FALLBACK)
 void __create_interpreter_(int argc, char **argv, const char *initial_comfile,
 	struct Interpreter **interpreter, int *status);
@@ -202,14 +202,14 @@ void __redirect_interpreter_output_(struct Interpreter *interpreter, int *status
 #endif /* ! defined (NO_STATIC_FALLBACK) */
 
 #if ! defined (NO_STATIC_FALLBACK)
-void __interpreter_set_display_message_function_(struct Interpreter *interpreter, 
+void __interpreter_set_display_message_function_(struct Interpreter *interpreter,
 	Interpreter_display_message_function *function, int *status);
 #else /* ! defined (NO_STATIC_FALLBACK) */
 #define __interpreter_set_display_message_function_(interpreter, function, status)
 #endif /* ! defined (NO_STATIC_FALLBACK) */
 
 #if ! defined (NO_STATIC_FALLBACK)
-void __interpret_command_(struct Interpreter *interpreter, const char *command_string, 
+void __interpret_command_(struct Interpreter *interpreter, const char *command_string,
 	void *user_data, int *quit, execute_command_function_type execute_command_function,
 	int *status);
 #else /* ! defined (NO_STATIC_FALLBACK) */
@@ -246,7 +246,7 @@ void __interpreter_set_double_(struct Interpreter *interpreter, char *variable_n
 #endif /* ! defined (NO_STATIC_FALLBACK) */
 
 #if ! defined (NO_STATIC_FALLBACK)
-void __interpreter_evaluate_string_(struct Interpreter *interpreter, char *expression, 
+void __interpreter_evaluate_string_(struct Interpreter *interpreter, char *expression,
 	char **result, int *status);
 #else /* ! defined (NO_STATIC_FALLBACK) */
 #define __interpreter_evaluate_string_(interpreter, expression, result, status);
@@ -288,7 +288,7 @@ Takes a <command_string>, processes this through the Perl interpreter.
 	}
 } /* interpret_command */
 
-/* int type is for equivalence with execvp */ 
+/* int type is for equivalence with execvp */
 
 static int exec_libperl( const char *libperlname, char *argv[] )
 /*******************************************************************************
@@ -390,7 +390,7 @@ just EXIT_FAILURE if the perlinterpreter can't be run.
 }
 
 #if defined (WIN32)
-//#define BUFSIZE 500 
+//#define BUFSIZE 500
 
 ssize_t createprocess_read_stdout(char *executable, char *argv[], char *buffer, size_t buffer_size)
 {
@@ -400,20 +400,20 @@ ssize_t createprocess_read_stdout(char *executable, char *argv[], char *buffer, 
 	HANDLE g_hChildStd_OUT_Wr = NULL;
 	char *cmdLine;
 	size_t length = 0, index = 0;
-	
+
 	STARTUPINFO si;
 	PROCESS_INFORMATION pi;
 
-	SECURITY_ATTRIBUTES saAttr; 
+	SECURITY_ATTRIBUTES saAttr;
 
-	// Set the bInheritHandle flag so pipe handles are inherited. 
-	saAttr.nLength = sizeof(SECURITY_ATTRIBUTES); 
-	saAttr.bInheritHandle = TRUE; 
-	saAttr.lpSecurityDescriptor = NULL; 
+	// Set the bInheritHandle flag so pipe handles are inherited.
+	saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
+	saAttr.bInheritHandle = TRUE;
+	saAttr.lpSecurityDescriptor = NULL;
 
-// Create a pipe for the child process's STDOUT. 
- 
-	if ( ! CreatePipe(&g_hChildStd_OUT_Rd, &g_hChildStd_OUT_Wr, &saAttr, 0) ) 
+// Create a pipe for the child process's STDOUT.
+
+	if ( ! CreatePipe(&g_hChildStd_OUT_Rd, &g_hChildStd_OUT_Wr, &saAttr, 0) )
 	{
 		printf(TEXT("Error: StdoutRd CreatePipe %d\n"), GetLastError());
 		return -1;
@@ -433,7 +433,7 @@ ssize_t createprocess_read_stdout(char *executable, char *argv[], char *buffer, 
 	si.hStdOutput = g_hChildStd_OUT_Wr;
 	si.dwFlags |= STARTF_USESTDHANDLES;
 	ZeroMemory( &pi, sizeof(pi) );
-	
+
 	while (argv[index])
 	{
 		length += strlen(argv[index]);
@@ -447,7 +447,7 @@ ssize_t createprocess_read_stdout(char *executable, char *argv[], char *buffer, 
 		strcat(cmdLine, " ");
 		index++;
 	}
-	// Start the child process. 
+	// Start the child process.
 	if( !CreateProcess( NULL,   // No module name (use command line)
 		cmdLine,        // Command line
 		NULL,           // Process handle not inheritable
@@ -455,10 +455,10 @@ ssize_t createprocess_read_stdout(char *executable, char *argv[], char *buffer, 
 		TRUE,          // Set handle inheritance to FALSE
 		0,              // No creation flags
 		NULL,           // Use parent's environment block
-		NULL,           // Use parent's starting directory 
+		NULL,           // Use parent's starting directory
 		&si,            // Pointer to STARTUPINFO structure
 		&pi )           // Pointer to PROCESS_INFORMATION structure
-	) 
+	)
 	{
 		free(cmdLine);
 		printf( "CreateProcess failed (%d).\n", GetLastError() );
@@ -467,7 +467,7 @@ ssize_t createprocess_read_stdout(char *executable, char *argv[], char *buffer, 
 	// Wait until child process exits.
 	WaitForSingleObject( pi.hProcess, INFINITE );
 
-	// Close process and thread handles. 
+	// Close process and thread handles.
 	CloseHandle( pi.hProcess );
 	CloseHandle( pi.hThread );
 	free(cmdLine);
@@ -475,14 +475,14 @@ ssize_t createprocess_read_stdout(char *executable, char *argv[], char *buffer, 
 	// Must close this handle before we can successfully return from reading from pipe.
 	CloseHandle(g_hChildStd_OUT_Wr);
 	number_read = 0;
-	for (;;) 
-	{ 
+	for (;;)
+	{
 		bSuccess = ReadFile( g_hChildStd_OUT_Rd, buffer, buffer_size, &cur_number_read, NULL);
 		if (bSuccess)
 		{
 			number_read += cur_number_read;
 		}
-		if( ! bSuccess || cur_number_read == 0 ) break; 
+		if( ! bSuccess || cur_number_read == 0 ) break;
 	}
 	return number_read;
 }
@@ -533,7 +533,7 @@ killed if more than buffer_size bytes are read or it does not respond quickly.
 			int stdin_fd;
 
 			close(stdout_pipe[0]); /* For the parent */
-				
+
 			/* The child shouldn't read anything */
 			/* Is this the best way to redirect stdin to /dev/null? */
 			stdin_fd = open ("/dev/null", O_RDONLY);
@@ -676,7 +676,7 @@ static int glibc_version_greater_than_2_2_4(void)
 LAST MODIFIED : 25 January 2005
 
 DESCRIPTION :
-Need to read the glibc version so that we can determine if we need to 
+Need to read the glibc version so that we can determine if we need to
 swap the endianness of values going into a64l
 ==============================================================================*/
 {
@@ -691,10 +691,10 @@ swap the endianness of values going into a64l
 	{
 #if __GLIBC__ >= 2
 		version_string = (char *)gnu_get_libc_version();
-		if (sscanf(version_string, "%d.%d.%d", &major_version, &minor_version, 
+		if (sscanf(version_string, "%d.%d.%d", &major_version, &minor_version,
 			&minor_sub_version))
 		{
-			
+
 			if ((major_version > 2) ||
 				((major_version == 2) && (minor_version > 2)) ||
 				((major_version == 2) && (minor_version == 2) && (minor_sub_version > 4)))
@@ -726,7 +726,7 @@ int mkstemp(char *template_name)
 	char path_buffer[MAX_PATH];
 	//char tempfilename[MAX_PATH];
 	UINT unique_number;
-	
+
 	path_size = GetTempPath( MAX_PATH, path_buffer);
 	unique_number = GetTempFileName(path_buffer, "pin", 0, template_name);
 	return _open(template_name, _O_RDWR | _O_BINARY);
@@ -747,7 +747,7 @@ remove the temporary file it refers to.
 ==============================================================================*/
 {
 	char *return_string, *binary, data[4];
-	FILE *bin_file;	
+	FILE *bin_file;
 	size_t string_length;
 	size_t char_count = 0, byte_count, i, j;
 #if ! defined (WIN32)
@@ -834,7 +834,7 @@ the function pointers and then calls create_interpreter_ for that instance.
 
 	if (*interpreter = (struct Interpreter *)malloc (sizeof(struct Interpreter)))
 	{
-		
+
 		char *perl_result_buffer = (char *)malloc(perl_result_buffer_size * sizeof(char));//[perl_result_buffer_size];
 
 		(*interpreter)->use_dynamic_interpreter = 0;
@@ -890,7 +890,7 @@ the function pointers and then calls create_interpreter_ for that instance.
 				obj_ext) even though $Config{dlext} = so.
 			*/
 #if ! defined (WIN32)
-			perl_argv[3] = "print join( '-'," 
+			perl_argv[3] = "print join( '-',"
 				"$Config{api_versionstring}||$Config{apiversion}||$],"
 				"grep {$Config{\"use$_\"}}"
 				"qw(threads multiplicity 64bitall longdouble perlio) ),"
@@ -993,7 +993,7 @@ the function pointers and then calls create_interpreter_ for that instance.
 						strncpy(&perl_archlib[8], buf, dist);
 						perl_archlib++;
 					}
-							
+
 				}
 
 				if( perl_api_string )
@@ -1062,7 +1062,7 @@ the function pointers and then calls create_interpreter_ for that instance.
 					Perhaps a CMISS_LIBPERL environment variable should be checked
 					before CMISS_PERL?
 				*/
-char perl_executable[] = "perl";
+				char perl_executable[] = "perl";
 				char *perl_argv[5];
 				const size_t libperl_result_buffer_size = 500;
 				char *libperl_result_buffer = (char *)malloc(libperl_result_buffer_size*sizeof(char));//[libperl_result_buffer_size];
@@ -1145,7 +1145,7 @@ char perl_executable[] = "perl";
 						}
 					}
 				}
-				
+
 				if(libperl_result_buffer)
 				{
 					free(libperl_result_buffer);
@@ -1173,7 +1173,7 @@ char perl_executable[] = "perl";
 						(*interpreter, perl_interpreter_string ) ) )
 				{
 					/* error message already displayed */
-				} 
+				}
 #if ! defined (WIN32)
 				else if( !(interpreter_handle = dlopen(library, RTLD_LAZY)) )
 #else
@@ -1193,7 +1193,7 @@ char perl_executable[] = "perl";
 					return_code = 1;
 				}
 			}
-			
+
 			if(full_libperl_name)
 			{
 				free(full_libperl_name);
@@ -1225,7 +1225,7 @@ char perl_executable[] = "perl";
 				}
 			if (perl_handle)
 			{
-				/* Don't do this as soon as the interpreter_handle fails otherwise this call 
+				/* Don't do this as soon as the interpreter_handle fails otherwise this call
 					overwrites the dlerror message from the interpreter_handle */
 				dlclose(perl_handle);
 			}
@@ -1284,7 +1284,7 @@ char perl_executable[] = "perl";
 			remove(library);
 			free(library);
 		}
-		
+
 		if(perl_result_buffer)
 		{
 			free(perl_result_buffer);
@@ -1329,7 +1329,7 @@ Dynamic loader wrapper
 	}
 } /* destroy_interpreter */
 
-void interpreter_set_display_message_function_(struct Interpreter *interpreter, 
+void interpreter_set_display_message_function_(struct Interpreter *interpreter,
 	Interpreter_display_message_function *function, int *status)
 /*******************************************************************************
 LAST MODIFIED : 25 January 2005
@@ -1383,7 +1383,7 @@ Dynamic loader wrapper
 	}
 } /* redirect_interpreter_output */
 
-void interpreter_evaluate_integer_(struct Interpreter *interpreter, 
+void interpreter_evaluate_integer_(struct Interpreter *interpreter,
 	char *expression, int *result, int *status)
 /*******************************************************************************
 LAST MODIFIED : 25 January 2005
@@ -1406,7 +1406,7 @@ Dynamic loader wrapper
 	}
 } /* interpreter_evaluate_integer */
 
-void interpreter_set_integer_(struct Interpreter *interpreter, 
+void interpreter_set_integer_(struct Interpreter *interpreter,
 	char *variable_name, int *value, int *status)
 /*******************************************************************************
 LAST MODIFIED : 25 January 2005
@@ -1429,7 +1429,7 @@ Dynamic loader wrapper
 	}
 } /* interpreter_set_integer */
 
-void interpreter_evaluate_double_(struct Interpreter *interpreter, 
+void interpreter_evaluate_double_(struct Interpreter *interpreter,
 	char *expression, double *result, int *status)
 /*******************************************************************************
 LAST MODIFIED : 25 January 2005
@@ -1452,7 +1452,7 @@ Dynamic loader wrapper
 	}
 } /* interpreter_evaluate_double */
 
-void interpreter_set_double_(struct Interpreter *interpreter, 
+void interpreter_set_double_(struct Interpreter *interpreter,
 	char *variable_name, double *value, int *status)
 /*******************************************************************************
 LAST MODIFIED : 25 January 2005
@@ -1475,7 +1475,7 @@ Dynamic loader wrapper
 	}
 } /* interpreter_set_double */
 
-void interpreter_evaluate_string_(struct Interpreter *interpreter, 
+void interpreter_evaluate_string_(struct Interpreter *interpreter,
 	char *expression, char **result, int *status)
 /*******************************************************************************
 LAST MODIFIED : 25 January 2005
@@ -1521,7 +1521,7 @@ Dynamic loader wrapper
 	}
 } /* interpreter_destroy_string */
 
-void interpreter_set_string_(struct Interpreter *interpreter, 
+void interpreter_set_string_(struct Interpreter *interpreter,
 	const char *variable_name, const char *value, int *status)
 /*******************************************************************************
 LAST MODIFIED : 25 January 2005
@@ -1545,7 +1545,7 @@ Dynamic loader wrapper
 	}
 } /* interpreter_set_string */
 
-void interpreter_set_pointer_(struct Interpreter *interpreter, 
+void interpreter_set_pointer_(struct Interpreter *interpreter,
 	const char *variable_name, const char *class_name, void *value, int *status)
 /*******************************************************************************
 LAST MODIFIED : 25 January 2005
@@ -1571,8 +1571,8 @@ Dynamic loader wrapper
 
 /*
 	??? Is there a suitable c-file-style?
-	Local Variables: 
+	Local Variables:
 	tab-width: 2
 	c-file-offsets: ((substatement-open . 0))
-	End: 
+	End:
 */

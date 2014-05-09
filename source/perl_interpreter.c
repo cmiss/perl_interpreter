@@ -276,8 +276,8 @@ DESCRIPTION:
 Creates the interpreter for processing commands.
 ==============================================================================*/
 {
-  const char *load_commands[] =
-  {
+	const char *load_commands[] =
+	{
 		"local $SIG{__WARN__} = sub { die $_[0] };\n"
 		"BEGIN {\n"
 #include "strict.pmh"
@@ -333,9 +333,9 @@ Creates the interpreter for processing commands.
 #  endif /* ! defined (USE_DYNAMIC_LOADER) */
 //#endif /* ! defined (WIN32) */
 
-  int i, number_of_load_commands, return_code;
+	int i, number_of_load_commands, return_code;
 	SV *ret;
-  return_code = 1;
+	return_code = 1;
 
 	PERL_SYS_INIT3(&argc, &argv, NULL);
 
@@ -404,6 +404,8 @@ Creates the interpreter for processing commands.
 			}
 		}
 
+		perl_eval_pv("print \"The version of Perl in use by the perl interpreter is: \"", FALSE);
+		perl_eval_pv("print \"$^V\n\"", FALSE);
 		perl_eval_pv(load_commands[0], FALSE);
 		{
 			STRLEN n_a;
@@ -818,7 +820,7 @@ and then executes the returned strings
 		printf("cmiss_perl_callback code: %d (%s)\n", return_code, command_string);
 #endif /* defined (CMISS_DEBUG) */
 		redirect_start(interpreter);
-		/* Put the redirection back on again 
+		/* Put the redirection back on again
 		if (interpreter->perl_interpreter_filehandle_in)
 		{
 			dup2(interpreter->perl_interpreter_filehandle_in, STDOUT_FILENO);
@@ -959,7 +961,7 @@ Takes a <command_string>, processes this through the Perl interpreter.
 				ret = perl_eval_pv(wrapped_command, FALSE);
 
 				redirect_stop(interpreter);
-				
+
 				handle_output(interpreter);
 
 #if defined (BUILD_WITH_CMAKE) && defined (WIN32)
@@ -975,7 +977,7 @@ Takes a <command_string>, processes this through the Perl interpreter.
 					return_code = 0;
 				}
 
-				/* Change STDOUT and STDERR back again 
+				/* Change STDOUT and STDERR back again
 				if (interpreter->keep_stdout)
 				{
 					dup2(interpreter->keep_stdout, STDOUT_FILENO);
@@ -1065,7 +1067,7 @@ as an integer then <status> will be set to zero.
 				sv_result = perl_eval_pv(expression, FALSE);
 
 				redirect_stop(interpreter);
-				/* Change STDOUT and STDERR back again 
+				/* Change STDOUT and STDERR back again
 				if (interpreter->keep_stdout)
 				{
 					dup2(interpreter->keep_stdout, STDOUT_FILENO);

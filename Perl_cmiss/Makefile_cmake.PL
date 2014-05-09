@@ -83,14 +83,14 @@ if( $osname eq 'darwin' ){
 }
 
 WriteMakefile(
-	'NAME'	=> $name,
+	'NAME' => $name,
 	# ??? Shouldn't this be "$source_dir/../source/$name.pm" or should that be moved here.
 	'VERSION_FROM' => "$source_dir/$name.pm", # finds $VERSION
 #    'EXTRALIBS' => '',# to prevent undefined warnings in Makefile
 	'MYEXTLIB'  => '',# to prevent undefined warnings in Makefile
-	'INC'	=> "-I$source_dir",     # e.g., '-I/usr/include/other'
-	'DEFINE'	=> $define_list,
-	'LINKTYPE'  => 'static',
+	'INC' => "-I$source_dir",     # e.g., '-I/usr/include/other'
+	'DEFINE' => $define_list,
+	'LINKTYPE' => 'static',
 	'CCFLAGS' => $c_flags,
 	'OPTIMIZE' => $c_flags_opt,
 	'INST_ARCHLIB' => '.'
