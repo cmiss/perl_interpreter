@@ -329,6 +329,7 @@ FOREACH( perl_interpreter_perl ${PERL_INTERPRETER_PERLS})
 ENDFOREACH()
 # end loop here  ==========================
 
+SET( NO_STATIC_FALLBACK TRUE )
 ## Start building a static perl interpreter backup
 IF( STATIC_PERL_INTERPRETER_PERL )
 	SET( NO_STATIC_FALLBACK FALSE )
