@@ -719,11 +719,11 @@ swap the endianness of values going into a64l
 #endif /* (1234==BYTE_ORDER) */
 #endif /* defined (BYTE_ORDER) */
 
-#if defined (WIN32)
+#if defined (REQUIRE_MKSTEMP_DEFINITION)
 int mkstemp(char *template_name)
 {
 	DWORD path_size;
-	char path_buffer[MAX_PATH];
+	char path_buffer[MAX_PATH+1];
 	//char tempfilename[MAX_PATH];
 	UINT unique_number;
 
@@ -731,6 +731,10 @@ int mkstemp(char *template_name)
 	unique_number = GetTempFileName(path_buffer, "pin", 0, template_name);
 	return _open(template_name, _O_RDWR | _O_BINARY);
 }
+#endif
+
+#if defined (REQUIRE_MKSTEMP_DECLARATION)
+int mkstemp(char *template_name);
 #endif
 
 static char *write_base64_string_to_binary_file(struct Interpreter *interpreter,
@@ -753,7 +757,7 @@ remove the temporary file it refers to.
 #if ! defined (WIN32)
 	char template_name[]="/tmp/perl_interpreterXXXXXX";
 #else
-	char template_name[MAX_PATH];
+	char template_name[MAX_PATH+1];
 #endif
 	int temp_fd;
 
