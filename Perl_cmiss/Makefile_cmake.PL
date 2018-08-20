@@ -74,7 +74,7 @@ if( $osname eq 'MSWin32' ){
 	#print "config win32 c_flags ----- $c_flags\n";
 }
 if( $osname eq 'darwin' ){
-	$c_flags =~ s/-arch x86_64//;
+	#$c_flags =~ s/-arch x86_64//; # No longer only building 32 bit application for MacOS.
 	$c_flags =~ s/-arch ppc//;
 	if( "$ARGV[2]" eq "Debug" ) {
 		$c_flags =~ s/-O3/-g/;
