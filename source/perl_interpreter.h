@@ -218,30 +218,16 @@ sets the class of that variable to be <class_name>.
 To override the cmiss:: package specify the full name in the string.
 ==============================================================================*/
 
-#if ! defined (MESSAGE_H)
-/*
-From message.h:
-===============
-*/
-
-/*
-Global types
-------------
-*/
+#ifndef MESSAGE_TYPE_ENUM
+#define MESSAGE_TYPE_ENUM
 
 enum Message_type
-/*******************************************************************************
-LAST MODIFIED : 31 May 1996
-
-DESCRIPTION :
-The different message types.
-==============================================================================*/
 {
-	ERROR_MESSAGE,
-	INFORMATION_MESSAGE,
-	WARNING_MESSAGE
+        ERROR_MESSAGE = 0,
+        INFORMATION_MESSAGE = 1,
+        WARNING_MESSAGE = 2
 }; /* enum Message_type */
-#endif /* ! defined (MESSAGE_H) */
+#endif /* MESSAGE_TYPE_ENUM */
 
 typedef int (Interpreter_display_message_function)(enum Message_type message_type,
 	const char *format, ... );
