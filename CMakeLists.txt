@@ -33,7 +33,7 @@
  # the provisions above, a recipient may use your version of this file under
  # the terms of any one of the MPL, the GPL or the LGPL.
  #
- # ***** END LICENSE BLOCK ***** */
+ # ***** END LICENSE BLOCK *****
 
 # This perl interpreter build is only designed to work with perl version
 # greater than or equal to 5.10.0
@@ -44,7 +44,7 @@
 # EXTRA_PERLS ==> PERL_INTERPRETER_EXTRA_PERLS
 # STATIC_LIBPERL ==> PERL_INTERPRETER_STATIC_LIBPERL
 
-CMAKE_MINIMUM_REQUIRED( VERSION 2.8.8 )
+CMAKE_MINIMUM_REQUIRED( VERSION 3.10 )
 
 SET( PERL_INTERPRETER_INSTALL_PREFIX "" CACHE PATH "Installation prefix for the perl interpreter." )
 SET( PERL_INTERPRETER_ROOT "" CACHE PATH "Root path for the perl interpreter." )
@@ -111,6 +111,7 @@ message(STATUS "BIN_ARCH_DIR: ${BIN_ARCH_DIR}")
 
 SET( PERL_INTERPRETER_INSTALL_PREFIX_TEMP ${PERL_INTERPRETER_INSTALL_PREFIX} )
 
+option(WITH_DEBUG_OUTPUT "Turn on debug output printing to stdout." OFF)
 OPTION( USE_ARCHITECTURE_DIR "Set true if cross-compiling or colocating libraries from different systems." OFF )
 # Set build type and install location
 IF( USE_ARCHITECTURE_DIR )
@@ -150,8 +151,21 @@ ENDIF( "${CMAKE_BUILD_TYPE}" STREQUAL "Debug" )
 # Set the ABI for the build
 SET( ABI_ENV_DEFINE ABI_ENV=\"${CMAKE_SYSTEM_PROCESSOR}\" )#${CMAKE_SYSTEM_PROCESSOR} )
 
-# Find the system perl 
-FIND_PACKAGE( Perl REQUIRED )
+# Find the system perl
+find_package(Perl REQUIRED)
+if (APPLE)
+  if (PERL_EXECUTABLE STREQUAL "/usr/bin/perl")
+    # This won't do we cannot use the macOS system perl.
+    unset(PERL_EXECUTABLE CACHE)
+    # Let's try and find a perlbrew perl.
+    file(GLOB children LIST_DIRECTORIES TRUE $ENV{HOME}/perl*/perlbrew/perls/*)
+    list(GET children 0 first_perl_directory)
+    set(CMAKE_PREFIX_PATH ${first_perl_directory})
+    find_package(Perl REQUIRED)
+    unset(CMAKE_PREFIX_PATH)
+  endif()
+endif()
+
 #FIND_PACKAGE( PerlLibs REQUIRED )
 
 # Find the perls listed under PERL_INTERPRETER_EXTRA_PERLS
@@ -175,7 +189,7 @@ ADD_DEFINITIONS( -DBUILD_WITH_CMAKE )
 IF( WIN32 )
 	ADD_DEFINITIONS( -D_CRT_SECURE_NO_WARNINGS )
 ENDIF()
-IF( "${CMAKE_BUILD_TYPE}" STREQUAL "Debug" )
+if(WITH_DEBUG_OUTPUT)
 	ADD_DEFINITIONS( -DCMISS_DEBUG )
 ENDIF()
 
@@ -231,7 +245,7 @@ FOREACH( dynamic_perl ${DYNAMIC_PERLS})
 		ENDIF()
 		FIND_PERL_LIBRARY( ${cur_perl_exe} ${NO_DEFAULT_PATH} )
 		SET( PERL_LIBRARIES ${PERL_LIBRARY} )
-		IF(${CMAKE_SYSTEM_NAME} STREQUAL "Linux" AND (CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX))
+                IF(${CMAKE_SYSTEM_NAME} STREQUAL "Linux" AND (CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX))
 			# We actually don't need the perl libraries in this situation so we won't add them and thus remove
 			# the necessity for rpath information.
 			SET( PERL_LIBRARIES )

@@ -836,7 +836,8 @@ the function pointers and then calls create_interpreter_ for that instance.
 #endif
 	void *interpreter_handle, *perl_handle;
 
-	if (*interpreter = (struct Interpreter *)malloc (sizeof(struct Interpreter)))
+    *interpreter = (struct Interpreter *)malloc (sizeof(struct Interpreter));
+    if (*interpreter != 0)
 	{
 
 		char *perl_result_buffer = (char *)malloc(perl_result_buffer_size * sizeof(char));//[perl_result_buffer_size];

@@ -215,7 +215,8 @@ copied and the NULL termination is added after that length.
 		if (length)
 		{
 			/* Can't use ALLOCATE as this library is used by CM as well */
-			if (copy_of_string = (char *)malloc(length+1))
+            copy_of_string = (char *)malloc(length+1);
+            if (copy_of_string != 0)
 			{
 				strncpy(copy_of_string,source_string,length);
 				copy_of_string[length] = 0;
@@ -228,7 +229,8 @@ copied and the NULL termination is added after that length.
 		}
 		else
 		{
-			if (copy_of_string = (char *)malloc(strlen(source_string)+1))
+            copy_of_string = (char *)malloc(strlen(source_string)+1);
+            if (copy_of_string != 0)
 			{
 				strcpy(copy_of_string,source_string);
 			}
@@ -339,7 +341,8 @@ Creates the interpreter for processing commands.
 
 	PERL_SYS_INIT3(&argc, &argv, NULL);
 
-	if (*interpreter = (struct Interpreter *)malloc(sizeof (struct Interpreter)))
+    *interpreter = (struct Interpreter *)malloc(sizeof (struct Interpreter));
+    if (*interpreter != 0)
 	{
 		PerlInterpreter *my_perl;
 
@@ -445,7 +448,8 @@ Creates the interpreter for processing commands.
 			if (argc > 1)
 			{
 				AV *perl_argv;
-				if (perl_argv = perl_get_av("ARGV", FALSE))
+                perl_argv = perl_get_av("ARGV", FALSE);
+                if (perl_argv != 0)
 				{
 					for (i = 1 ; i < argc ; i++)
 					{
@@ -754,7 +758,8 @@ DESCRIPTION:
 		/* fsync(perl_interpreter_filehandle_out); */
 		while (select(FD_SETSIZE, &readfds, NULL, NULL, &timeout_struct))
 		{
-			if (read_length = read(interpreter->perl_interpreter_filehandle_out, (void *)buffer, sizeof(buffer) - 1))
+            read_length = read(interpreter->perl_interpreter_filehandle_out, (void *)buffer, sizeof(buffer) - 1);
+            if (read_length != 0)
 			{
 				buffer[read_length] = 0;
 				(interpreter->display_message_function)(INFORMATION_MESSAGE,
@@ -877,27 +882,30 @@ Takes a <command_string>, processes this through the Perl interpreter.
 			{
 				/* Count how many things we are going to escape */
 				quote_pointer = command_string;
-				while (quote_pointer = strchr (quote_pointer, '\\'))
+                quote_pointer = strchr (quote_pointer, '\\');
+                while (quote_pointer != 0)
 				{
 					quote_pointer++;
 					escape_symbols++;
+                    quote_pointer = strchr (quote_pointer, '\\');
 				}
 				quote_pointer = command_string;
-				while (quote_pointer = strchr (quote_pointer, '\''))
+                quote_pointer = strchr (quote_pointer, '\'');
+                while (quote_pointer != 0)
 				{
 					quote_pointer++;
 					escape_symbols++;
+                    quote_pointer = strchr (quote_pointer, '\'');
 				}
 			}
-
-			if (wrapped_command = (char *)malloc(strlen(command_string) +
-				escape_symbols + 100))
+            wrapped_command = (char *)malloc(strlen(command_string) + escape_symbols + 100);
+            if (wrapped_command != 0)
 			{
 				/* Escape any 's in the string */
 				if (escape_symbols)
 				{
-					if (escaped_command = (char *)malloc(strlen(command_string) +
-						escape_symbols + 10))
+                    escaped_command = (char *)malloc(strlen(command_string) + escape_symbols + 10);
+                    if (escaped_command != 0)
 					{
 						slash_pointer = strchr (command_string, '\\');
 						new_pointer = escaped_command;
@@ -952,7 +960,7 @@ Takes a <command_string>, processes this through the Perl interpreter.
 
 				/*if (interpreter->perl_interpreter_filehandle_in)
 				{
-					/* Redirect STDOUT and STDERR /
+                    // Redirect STDOUT and STDERR /
 					dup2(interpreter->perl_interpreter_filehandle_in, STDOUT_FILENO);
 					dup2(interpreter->perl_interpreter_filehandle_in, STDERR_FILENO);
 				}*/
@@ -1391,8 +1399,8 @@ as an string then <status> will be set to zero and <*result> will be NULL.
 					if (SvPOK(sv_result))
 					{
 							internal_string = SvPV(sv_result, string_length);
-							if (*result = interpreter_duplicate_string(interpreter,
-								internal_string, string_length))
+                            *result = interpreter_duplicate_string(interpreter, internal_string, string_length);
+                            if (*result == 0)
 							{
 								return_code = 1;
 							}
