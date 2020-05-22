@@ -223,9 +223,9 @@ To override the cmiss:: package specify the full name in the string.
 
 enum Message_type
 {
-        ERROR_MESSAGE = 0,
-        INFORMATION_MESSAGE = 1,
-        WARNING_MESSAGE = 2
+    ERROR_MESSAGE = 0,
+    WARNING_MESSAGE = 1,
+    INFORMATION_MESSAGE = 2
 }; /* enum Message_type */
 #endif /* MESSAGE_TYPE_ENUM */
 

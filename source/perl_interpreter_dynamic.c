@@ -322,7 +322,7 @@ just EXIT_FAILURE if the perlinterpreter can't be run.
 	dlerror(); /* Clear any existing error */
 	if( !( libperl = dlopen( libperlname, RTLD_LAZY ) ) )
 	{
-		interpreter_display_message(ERROR_MESSAGE, "%s\n", dlerror() );
+        interpreter_display_message(ERROR_MESSAGE, "dlopen error: %s\n", dlerror() );
 		exit(EXIT_FAILURE);
 	}
 #else
@@ -868,7 +868,7 @@ the function pointers and then calls create_interpreter_ for that instance.
 				}
 			}
 
-			perl_argv[0] = perl_executable;
+            perl_argv[0] = perl_executable;
 			perl_argv[1] = "-MConfig";
 			perl_argv[2] = "-e";
 			/*
@@ -920,7 +920,6 @@ the function pointers and then calls create_interpreter_ for that instance.
 				fork_read_stdout( execvp, perl_executable, perl_argv,
 					perl_result_buffer, perl_result_buffer_size );
 #endif
-
 			/* Error already reported with number_read < 0 */
 			if( number_read == 0 )
 			{
@@ -978,8 +977,10 @@ the function pointers and then calls create_interpreter_ for that instance.
 					}
 					else if( perl_libperl[0] == 0 )
 					{
-#if ! defined (WIN32)
-						perl_libperl = "libperl.so";
+#if defined (__APPLE__)
+                        perl_libperl = "libperl.dylib";
+#elif defined (__linux__)
+                        perl_libperl = "libperl.so";
 #else
 						perl_libperl = "perl.dll";
 #endif
@@ -1004,7 +1005,6 @@ the function pointers and then calls create_interpreter_ for that instance.
 				if( perl_api_string )
 				{
 					int i;
-
 					for (i = 0 ; i < number_of_perl_interpreters ; i++)
 					{
 						if (0 == strcmp(perl_api_string, interpreter_strings[i].api_string))
@@ -1066,13 +1066,17 @@ the function pointers and then calls create_interpreter_ for that instance.
 
 					Perhaps a CMISS_LIBPERL environment variable should be checked
 					before CMISS_PERL?
+
+                    Perl doesn't always ship with a dynamic perl anymore so may have to use
+                    a stored one if this fails.
+
 				*/
 				char perl_executable[] = "perl";
 				char *perl_argv[5];
 				const size_t libperl_result_buffer_size = 500;
 				char *libperl_result_buffer = (char *)malloc(libperl_result_buffer_size*sizeof(char));//[libperl_result_buffer_size];
 
-				perl_argv[0] = perl_libperl;
+                perl_argv[0] = perl_libperl;
 				perl_argv[1] = "-MConfig";
 				perl_argv[2] = "-e";
 #ifdef CHECK_API_ONLY
@@ -1082,7 +1086,7 @@ the function pointers and then calls create_interpreter_ for that instance.
 					"qw(threads multiplicity 64bitall longdouble perlio) ),"
 					"\"\\0\""
 #else /* ! CHECK_API */
-				perl_argv[3] = "print \"$Config{archlib}\\0\""
+                perl_argv[3] = "'print $Config{archlib}'"
 #endif
 					;
 				perl_argv[4] = (char *)NULL;
@@ -1094,76 +1098,76 @@ the function pointers and then calls create_interpreter_ for that instance.
 					fork_read_stdout( exec_libperl, perl_libperl, perl_argv,
 						libperl_result_buffer, libperl_result_buffer_size );
 #endif
-
 				/* Error already reported with number_read < 0 */
-				if( number_read == 0 )
-				{
-					((*interpreter)->display_message_function)
-						(ERROR_MESSAGE,
-						 "No API information received from \"%s\"",
-						 perl_libperl);
-				}
-				else if( number_read > 0 )
-				{
-					{
-						size_t i = 0;
+               if( number_read == 0 )
+               {
+                       ((*interpreter)->display_message_function)
+                               (ERROR_MESSAGE,
+                                "No API information received from \"%s\"",
+                                perl_libperl);
+               }
+               else if( number_read > 0 )
+               {
+                       {
+                               size_t i = 0;
 
-						while( i < libperl_result_buffer_size && libperl_result_buffer[i] )
-						{
-							i++;
-						}
-						if( i >= libperl_result_buffer_size )
-						{
-							((*interpreter)->display_message_function)
-								(ERROR_MESSAGE,
-								 "Unexpected result for API information from \"%s\"",
-								 perl_libperl);
-						}
+                               while( i < libperl_result_buffer_size && libperl_result_buffer[i] )
+                               {
+                                       i++;
+                               }
+                               if( i >= libperl_result_buffer_size )
+                               {
+                                       ((*interpreter)->display_message_function)
+                                               (ERROR_MESSAGE,
+                                                "Unexpected result for API information from \"%s\"",
+                                                perl_libperl);
+                               }
 #ifdef CHECK_API_ONLY
-						/*
-							If the api of the libperl is the same as the selected perl
-							executable, then it is probably better to use this libperl than
-							any builtin libperl, but @INC needs to be set to use the
-							modules from the selected perl if they are in a different
-							location to those of the libperl.
-						*/
-						else if( 0 == strcmp( libperl_result_buffer, perl_api_string ) )
+                               /*
+                                       If the api of the libperl is the same as the selected perl
+                                       executable, then it is probably better to use this libperl than
+                                       any builtin libperl, but @INC needs to be set to use the
+                                       modules from the selected perl if they are in a different
+                                       location to those of the libperl.
+                               */
+                               else if( 0 == strcmp( libperl_result_buffer, perl_api_string ) )
 #else /* ! CHECK_API_ONLY */
-						/*
-							This essentially checks that the libperl is using modules from
-							the same place as the perl executable (which probably means
-							they are the same version built with the same options).
-						*/
-						else if( 0 == strcmp( libperl_result_buffer, perl_archlib ) )
+                               /*
+                                       This essentially checks that the libperl is using modules from
+                                       the same place as the perl executable (which probably means
+                                       they are the same version built with the same options).
+                               */
+                               else if( 0 == strcmp( libperl_result_buffer, perl_archlib ) )
 #endif
-						{
-							/* libperl matches perl */
-							libperl_name = perl_libperl;
-						}
-						else
-						{
-							((*interpreter)->display_message_function)
-								(ERROR_MESSAGE,
-								 "\"%s\" does not match your perl \"%s\".",
-								 perl_libperl, perl_executable);
+                               {
+                                       /* libperl matches perl */
+                                       libperl_name = perl_libperl;
+                               }
+                               else
+                               {
+                                       ((*interpreter)->display_message_function)
+                                               (ERROR_MESSAGE,
+                                                "\"%s\" does not match your perl \"%s\".",
+                                                perl_libperl, perl_executable);
 
-						}
-					}
-				}
+                               }
+                       }
+               }
 
-				if(libperl_result_buffer)
-				{
-					free(libperl_result_buffer);
-				}
+               if(libperl_result_buffer)
+               {
+                       free(libperl_result_buffer);
+               }
 			}
 
-			if( libperl_name )
+            if( libperl_name )
 			{
 #if ! defined (WIN32)
-				if( !( perl_handle = dlopen( libperl_name, RTLD_LAZY | RTLD_GLOBAL ) ) )
+                perl_handle = dlopen( libperl_name, RTLD_LAZY | RTLD_GLOBAL );
 #else
-				if( !( perl_handle = LoadLibrary( libperl_name ) ) )
+                perl_handle = LoadLibrary( libperl_name );
 #endif
+                if( !perl_handle )
 				{
 #if ! defined (WIN32)
 					((*interpreter)->display_message_function)
@@ -1204,36 +1208,44 @@ the function pointers and then calls create_interpreter_ for that instance.
 				free(full_libperl_name);
 			}
 		}
-		if (!return_code)
+        if (!return_code)
 		{
-			/* ??? This message may only be necessary if perl_api_string and
-				 !perl_interpreter_string. */
-			((*interpreter)->display_message_function)(ERROR_MESSAGE,
-				"Unable to open a dynamic perl_interpreter to match your perl \"%s\".",
-				perl_executable);
-			if ( perl_api_string && !perl_interpreter_string )
-				{
-					int i;
+            if (number_of_perl_interpreters == 0)
+            {
+                ((*interpreter)->display_message_function)(ERROR_MESSAGE,
+                    "No dynamic perl interpreters available.");
+            }
+            else
+            {
+                /* ??? This message may only be necessary if perl_api_string and
+                     !perl_interpreter_string. */
+                ((*interpreter)->display_message_function)(ERROR_MESSAGE,
+                    "Unable to open a dynamic perl interpreter to match your perl \"%s\".",
+                    perl_executable);
+                if ( perl_api_string && !perl_interpreter_string )
+                    {
+                        int i;
 
-					/* We didn't get a match so lets list all the versions strings */
-					((*interpreter)->display_message_function)(ERROR_MESSAGE,
-						"Your perl reported API version and options \"%s\".",
-						perl_api_string);
-					((*interpreter)->display_message_function)(ERROR_MESSAGE,
-						"The APIs supported by this executable are:");
-					for (i = 0 ; i < number_of_perl_interpreters ; i++)
-					{
-						((*interpreter)->display_message_function)(ERROR_MESSAGE,
-							"                         %s",
-							interpreter_strings[i].api_string);
-					}
-				}
-			if (perl_handle)
-			{
-				/* Don't do this as soon as the interpreter_handle fails otherwise this call
-					overwrites the dlerror message from the interpreter_handle */
-				dlclose(perl_handle);
-			}
+                        /* We didn't get a match so lets list all the versions strings */
+                        ((*interpreter)->display_message_function)(ERROR_MESSAGE,
+                            "Your perl reported API version and options \"%s\".",
+                            perl_api_string);
+                        ((*interpreter)->display_message_function)(ERROR_MESSAGE,
+                            "The APIs supported by this executable are:");
+                        for (i = 0 ; i < number_of_perl_interpreters ; i++)
+                        {
+                            ((*interpreter)->display_message_function)(ERROR_MESSAGE,
+                                "                         %s",
+                                interpreter_strings[i].api_string);
+                        }
+                    }
+                if (perl_handle)
+                {
+                    /* Don't do this as soon as the interpreter_handle fails otherwise this call
+                        overwrites the dlerror message from the interpreter_handle */
+                    dlclose(perl_handle);
+                }
+            }
 		}
 
 		if (return_code)
