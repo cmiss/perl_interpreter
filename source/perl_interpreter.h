@@ -220,14 +220,13 @@ To override the cmiss:: package specify the full name in the string.
 
 #ifndef MESSAGE_TYPE_ENUM
 #define MESSAGE_TYPE_ENUM
-
 enum Message_type
 {
     ERROR_MESSAGE = 0,
     WARNING_MESSAGE = 1,
     INFORMATION_MESSAGE = 2
 }; /* enum Message_type */
-#endif /* MESSAGE_TYPE_ENUM */
+#endif
 
 typedef int (Interpreter_display_message_function)(enum Message_type message_type,
 	const char *format, ... );

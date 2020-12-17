@@ -223,7 +223,7 @@ copied and the NULL termination is added after that length.
 			}
 			else
 			{
-				(interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_duplicate_string.  "
+                (interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_duplicate_string.  "
 					"Not enough memory");
 			}
 		}
@@ -236,14 +236,14 @@ copied and the NULL termination is added after that length.
 			}
 			else
 			{
-				(interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_duplicate_string.  "
+                (interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_duplicate_string.  "
 					"Not enough memory");
 			}
 		}
 	}
 	else
 	{
-		(interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_duplicate_string.  "
+        (interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_duplicate_string.  "
 			"Invalid argument(s)");
 		copy_of_string=(char *)NULL;
 	}
@@ -265,7 +265,7 @@ Frees the memory associated with a string allocated by the interpreter.
 	}
 	else
 	{
-		(interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_duplicate_string.  Invalid argument(s)");
+        (interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_duplicate_string.  Invalid argument(s)");
 	}
 } /* interpreter_duplicate_string */
 
@@ -458,7 +458,7 @@ Creates the interpreter for processing commands.
 				}
 				else
 				{
-						((*interpreter)->display_message_function)(ERROR_MESSAGE,"initialise_interpreter.  "
+                        ((*interpreter)->display_message_function)(ERROR_MESSAGE,"initialise_interpreter.  "
 							"Unable to get ARGV\n") ;
 				}
 			}
@@ -475,7 +475,7 @@ Creates the interpreter for processing commands.
 #endif
 				if (SvTRUE(errsv))
 				{
-						((*interpreter)->display_message_function)(ERROR_MESSAGE,"initialise_interpreter.  "
+                        ((*interpreter)->display_message_function)(ERROR_MESSAGE,"initialise_interpreter.  "
 							"Uh oh - %s\n", SvPV(errsv, n_a)) ;
 						/* !!! What does this pop? */
 						ret = POPs ;
@@ -500,7 +500,7 @@ Creates the interpreter for processing commands.
 						if (SvTRUE(ERRSV))
 							{
 								((*interpreter)->display_message_function)
-									( ERROR_MESSAGE,"initialise_interpreter.  "
+                                    ( ERROR_MESSAGE,"initialise_interpreter.  "
 										"Failed to load DynaLoader: %s\n", SvPV( ERRSV, n_a ) ) ;
 							}
 						else
@@ -693,7 +693,7 @@ routine can write this to the command window.
 	}
 	else
 	{
-		(interpreter->display_message_function)(ERROR_MESSAGE,"redirect_interpreter_output.  "
+        (interpreter->display_message_function)(ERROR_MESSAGE,"redirect_interpreter_output.  "
 			"Unable to create pipes") ;
 		return_code = 0;
 	}
@@ -712,7 +712,7 @@ routine can write this to the command window.
 	}
 	else
 	{
-		(interpreter->display_message_function)(ERROR_MESSAGE,"redirect_interpreter_output.  "
+        (interpreter->display_message_function)(ERROR_MESSAGE,"redirect_interpreter_output.  "
 			"Unable to create pipes") ;
 		return_code = 0;
 	}
@@ -762,7 +762,7 @@ DESCRIPTION:
             if (read_length != 0)
 			{
 				buffer[read_length] = 0;
-				(interpreter->display_message_function)(INFORMATION_MESSAGE,
+                (interpreter->display_message_function)(INFORMATION_MESSAGE,
 					"%s", buffer) ;
 			}
 		}
@@ -771,7 +771,7 @@ DESCRIPTION:
 		if (read_length)
 		{
 			buffer[read_length] = 0;
-			(interpreter->display_message_function)(INFORMATION_MESSAGE,
+            (interpreter->display_message_function)(INFORMATION_MESSAGE,
 				"%s", buffer) ;
 		}
 #endif /* ! defined (WIN32) */
@@ -834,7 +834,7 @@ and then executes the returned strings
 	}
 	else
 	{
-		(interpreter->display_message_function)(ERROR_MESSAGE,"cmiss_perl_callback.  "
+        (interpreter->display_message_function)(ERROR_MESSAGE,"cmiss_perl_callback.  "
 			"Missing command_data");
 		return_code=0;
 	}
@@ -944,7 +944,7 @@ Takes a <command_string>, processes this through the Perl interpreter.
 					}
 					else
 					{
-						(interpreter->display_message_function)(ERROR_MESSAGE,"cmiss_perl_execute_command.  "
+                        (interpreter->display_message_function)(ERROR_MESSAGE,"cmiss_perl_execute_command.  "
 							"Unable to allocate escaped_string");
 						return_code=0;
 					}
@@ -979,7 +979,7 @@ Takes a <command_string>, processes this through the Perl interpreter.
 #endif
 				if (SvTRUE(errsv))
 				{
-					(interpreter->display_message_function)(ERROR_MESSAGE,
+                    (interpreter->display_message_function)(ERROR_MESSAGE,
 						"%s", SvPV(errsv, n_a));
 					ret = POPs;
 					return_code = 0;
@@ -1001,7 +1001,7 @@ Takes a <command_string>, processes this through the Perl interpreter.
 					partially complete command before it is useful
 					if (!SvTRUE(cvrv))
 					{
-					(interpreter->display_message_function)(ERROR_MESSAGE,
+                    (interpreter->display_message_function)(ERROR_MESSAGE,
 					"Unable to compile command: %s\n", wrapped_command) ;
 					POPs ;
 					}*/
@@ -1010,14 +1010,14 @@ Takes a <command_string>, processes this through the Perl interpreter.
 			}
 			else
 			{
-				(interpreter->display_message_function)(ERROR_MESSAGE,"interpret_command.  "
+                (interpreter->display_message_function)(ERROR_MESSAGE,"interpret_command.  "
 						"Unable to allocate wrapped_string");
 				return_code=0;
 			}
 		}
 		else
 		{
-				(interpreter->display_message_function)(ERROR_MESSAGE,"interpret_command.  "
+                (interpreter->display_message_function)(ERROR_MESSAGE,"interpret_command.  "
 					"Missing command_data");
 				return_code=0;
 		}
@@ -1028,7 +1028,7 @@ Takes a <command_string>, processes this through the Perl interpreter.
 	}
 	else
 	{
-		(interpreter->display_message_function)(ERROR_MESSAGE,"interpret_command.  "
+        (interpreter->display_message_function)(ERROR_MESSAGE,"interpret_command.  "
 				"Missing interpreter");
 		return_code=0;
 	}
@@ -1094,7 +1094,7 @@ as an integer then <status> will be set to zero.
 #endif
 				if (SvTRUE(errsv))
 				{
-					(interpreter->display_message_function)(ERROR_MESSAGE,
+                    (interpreter->display_message_function)(ERROR_MESSAGE,
 							"%s", SvPV(errsv, n_a));
 					ret = POPs;
 					return_code = 0;
@@ -1108,7 +1108,7 @@ as an integer then <status> will be set to zero.
 					}
 					else
 					{
-							(interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_evaluate_integer.  "
+                            (interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_evaluate_integer.  "
 								"String \"%s\" does not evaluate to an integer.", expression);
 							return_code = 0;
 					}
@@ -1116,7 +1116,7 @@ as an integer then <status> will be set to zero.
 		}
 		else
 		{
-				(interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_evaluate_integer.  "
+                (interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_evaluate_integer.  "
 					"Invalid arguments.") ;
 				return_code = 0;
 		}
@@ -1126,7 +1126,7 @@ as an integer then <status> will be set to zero.
 	}
 	else
 	{
-		(interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_evaluate_integer.  "
+        (interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_evaluate_integer.  "
 				"Missing interpreter");
 		return_code=0;
 	}
@@ -1163,7 +1163,7 @@ To override the cmiss:: package specify the full name in the string.
 		}
 		else
 		{
-				(interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_set_integer.  "
+                (interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_set_integer.  "
 					"Invalid arguments.") ;
 				return_code = 0;
 		}
@@ -1173,7 +1173,7 @@ To override the cmiss:: package specify the full name in the string.
 	}
 	else
 	{
-		(interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_set_integer.  "
+        (interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_set_integer.  "
 				"Missing interpreter");
 		return_code=0;
 	}
@@ -1239,7 +1239,7 @@ as an double then <status> will be set to zero.
 #endif
 				if (SvTRUE(errsv))
 				{
-					(interpreter->display_message_function)(ERROR_MESSAGE,
+                    (interpreter->display_message_function)(ERROR_MESSAGE,
 							"%s", SvPV(errsv, n_a));
 					ret = POPs;
 					return_code = 0;
@@ -1253,7 +1253,7 @@ as an double then <status> will be set to zero.
 					}
 					else
 					{
-							(interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_evaluate_double.  "
+                            (interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_evaluate_double.  "
 								"String \"%s\" does not evaluate to a double.", expression);
 							return_code = 0;
 					}
@@ -1261,7 +1261,7 @@ as an double then <status> will be set to zero.
 		}
 		else
 		{
-				(interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_evaluate_double.  "
+                (interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_evaluate_double.  "
 					"Invalid arguments.") ;
 				return_code = 0;
 		}
@@ -1271,7 +1271,7 @@ as an double then <status> will be set to zero.
 	}
 	else
 	{
-		(interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_evaluate_double.  "
+        (interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_evaluate_double.  "
 				"Missing interpreter");
 		return_code=0;
 	}
@@ -1308,7 +1308,7 @@ To override the cmiss:: package specify the full name in the string.
 		}
 		else
 		{
-				(interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_set_double.  "
+                (interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_set_double.  "
 					"Invalid arguments.") ;
 				return_code = 0;
 		}
@@ -1318,7 +1318,7 @@ To override the cmiss:: package specify the full name in the string.
 	}
 	else
 	{
-		(interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_set_double.  "
+        (interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_set_double.  "
 				"Missing interpreter");
 		return_code=0;
 	}
@@ -1389,7 +1389,7 @@ as an string then <status> will be set to zero and <*result> will be NULL.
 #endif
 				if (SvTRUE(errsv))
 				{
-					(interpreter->display_message_function)(ERROR_MESSAGE,
+                    (interpreter->display_message_function)(ERROR_MESSAGE,
 							"%s", SvPV(errsv, n_a));
 					ret = POPs;
 					return_code = 0;
@@ -1411,7 +1411,7 @@ as an string then <status> will be set to zero and <*result> will be NULL.
 					}
 					else
 					{
-							(interpreter->display_message_function)(ERROR_MESSAGE,
+                            (interpreter->display_message_function)(ERROR_MESSAGE,
 								"interpreter_evaluate_string.  "
 								"String \"%s\" does not evaluate to a string.",
 								expression);
@@ -1421,7 +1421,7 @@ as an string then <status> will be set to zero and <*result> will be NULL.
 		}
 		else
 		{
-				(interpreter->display_message_function)(ERROR_MESSAGE,
+                (interpreter->display_message_function)(ERROR_MESSAGE,
 					"interpreter_evaluate_string.  Invalid arguments.") ;
 				return_code = 0;
 		}
@@ -1431,7 +1431,7 @@ as an string then <status> will be set to zero and <*result> will be NULL.
 	}
 	else
 	{
-		(interpreter->display_message_function)(ERROR_MESSAGE,
+        (interpreter->display_message_function)(ERROR_MESSAGE,
 				"interpreter_evaluate_string.  Missing interpreter");
 		return_code=0;
 	}
@@ -1468,7 +1468,7 @@ To override the cmiss:: package specify the full name in the string.
 		}
 		else
 		{
-				(interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_set_string.  "
+                (interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_set_string.  "
 					"Invalid arguments.") ;
 				return_code = 0;
 		}
@@ -1478,7 +1478,7 @@ To override the cmiss:: package specify the full name in the string.
 	}
 	else
 	{
-		(interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_set_string.  Missing interpreter");
+        (interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_set_string.  Missing interpreter");
 		return_code=0;
 	}
 
@@ -1515,7 +1515,7 @@ To override the cmiss:: package specify the full name in the string.
 		}
 		else
 		{
-				(interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_set_string.  "
+                (interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_set_string.  "
 					"Invalid arguments.") ;
 				return_code = 0;
 		}
@@ -1525,7 +1525,7 @@ To override the cmiss:: package specify the full name in the string.
 	}
 	else
 	{
-		(interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_set_string.  Missing interpreter");
+        (interpreter->display_message_function)(ERROR_MESSAGE,"interpreter_set_string.  Missing interpreter");
 		return_code=0;
 	}
 

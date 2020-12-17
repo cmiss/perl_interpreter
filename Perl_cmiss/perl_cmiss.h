@@ -1,1 +1,2 @@
-//int cmiss(char *);
+
+int CMISS_PERL_CALLBACK(void *, char *);

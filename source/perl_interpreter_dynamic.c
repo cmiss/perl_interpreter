@@ -172,7 +172,7 @@ struct Interpreter_library_strings { char *api_string; char *base64_string; };
 	if (return_code && (!((*interpreter)->symbol ## handle =	\
 		(void (*)())dlsym(interpreter_handle, #symbol )))) \
 	{ \
-		((*interpreter)->display_message_function)(ERROR_MESSAGE,"Unable to find symbol %s", #symbol ); \
+        ((*interpreter)->display_message_function)(ERROR_MESSAGE,"Unable to find symbol %s", #symbol ); \
 		return_code = 0; \
 	}
 
@@ -329,7 +329,7 @@ just EXIT_FAILURE if the perlinterpreter can't be run.
 	GetLastError(); /* Clear existing error */
 	if( !( libperl = LoadLibrary(libperlname)))
 	{
-		interpreter_display_message(ERROR_MESSAGE, "Error 0x%x\n", GetLastError() );
+        interpreter_display_message(ERROR_MESSAGE, "Error 0x%x\n", GetLastError() );
 		exit(EXIT_FAILURE);
 	}
 #endif
@@ -359,10 +359,10 @@ just EXIT_FAILURE if the perlinterpreter can't be run.
 #if !defined (WIN32)
 			char* error = dlerror();
 			interpreter_display_message
-				( ERROR_MESSAGE, "%s",
+                ( ERROR_MESSAGE, "%s",
 					error ? error : "required libperl function has NULL reference" );
 #else
-			interpreter_display_message(ERROR_MESSAGE, "Error 0x%x\n", GetLastError() );
+            interpreter_display_message(ERROR_MESSAGE, "Error 0x%x\n", GetLastError() );
 #endif
 			exit(EXIT_FAILURE);
 		}
@@ -522,7 +522,7 @@ killed if more than buffer_size bytes are read or it does not respond quickly.
 	if (-1 == pipe(stdout_pipe))
 	{
 		interpreter_display_message
-			( ERROR_MESSAGE, "Unable to create pipe: %s", strerror(errno) );
+            ( ERROR_MESSAGE, "Unable to create pipe: %s", strerror(errno) );
 	}
 	else
 	{
@@ -550,7 +550,7 @@ killed if more than buffer_size bytes are read or it does not respond quickly.
 			/* execvp only returns on error
 				 (because on success the process gets overlayed). */
 			interpreter_display_message
-				( ERROR_MESSAGE, "Failed to exec %s: %s", file, strerror(errno) );
+                ( ERROR_MESSAGE, "Failed to exec %s: %s", file, strerror(errno) );
 			exit(EXIT_FAILURE);
 		}
 
@@ -561,7 +561,7 @@ killed if more than buffer_size bytes are read or it does not respond quickly.
 		if( -1 == process_id )
 		{
 			interpreter_display_message
-				( ERROR_MESSAGE, "Unable to fork process: %s", strerror(errno) );
+                ( ERROR_MESSAGE, "Unable to fork process: %s", strerror(errno) );
 			close( stdout_pipe[0] );
 		}
 		else /* Have child */
@@ -589,12 +589,12 @@ killed if more than buffer_size bytes are read or it does not respond quickly.
 				if( select_code < 0 )
 				{
 					interpreter_display_message
-						( ERROR_MESSAGE, "select failed: %s", strerror(errno) );
+                        ( ERROR_MESSAGE, "select failed: %s", strerror(errno) );
 				}
 				else if( select_code == 0 )
 				{
 					interpreter_display_message
-						( ERROR_MESSAGE, "Timed out waiting for \"%s\"", file );
+                        ( ERROR_MESSAGE, "Timed out waiting for \"%s\"", file );
 				}
 				else
 				{
@@ -639,7 +639,7 @@ killed if more than buffer_size bytes are read or it does not respond quickly.
 				if( WEXITSTATUS(status) != EXIT_SUCCESS )
 				{
 					interpreter_display_message
-						( ERROR_MESSAGE,
+                        ( ERROR_MESSAGE,
 							"\"%s\" failed with status %i", file, WEXITSTATUS(status) );
 					number_read = -1;
 				}
@@ -647,14 +647,14 @@ killed if more than buffer_size bytes are read or it does not respond quickly.
 			else if( WIFSIGNALED(status) )
 			{
 				interpreter_display_message
-					( ERROR_MESSAGE,
+                    ( ERROR_MESSAGE,
 						"\"%s\" received signal %i", file, WTERMSIG(status) );
 				number_read = -1;
 			}
 			else
 			{
 				interpreter_display_message
-					( ERROR_MESSAGE,
+                    ( ERROR_MESSAGE,
 						"Unexpected status %i from \"%s\"", status, file );
 				number_read = -1;
 			}
@@ -770,7 +770,7 @@ remove the temporary file it refers to.
 		{
 			if (string_length % 4 != 0)
 			{
-				(*interpreter->display_message_function)(ERROR_MESSAGE,
+                (*interpreter->display_message_function)(ERROR_MESSAGE,
 					"write_base64_string_to_binary_file.  Unexpected length: %d",
 					string_length);
 				return 0;
@@ -794,14 +794,14 @@ remove the temporary file it refers to.
 		}
 		else
 		{
-			(*interpreter->display_message_function)(ERROR_MESSAGE,
+            (*interpreter->display_message_function)(ERROR_MESSAGE,
 				"write_base64_string_to_binary_file.  Invalid argument(s)");
 			return_string = (char *)NULL;
 		}
 	}
 	else
 	{
-		(*interpreter->display_message_function)(ERROR_MESSAGE,
+        (*interpreter->display_message_function)(ERROR_MESSAGE,
 			"write_base64_string_to_binary_file.  Invalid argument(s)");
 		return_string = (char *)NULL;
 	}
@@ -924,7 +924,7 @@ the function pointers and then calls create_interpreter_ for that instance.
 			if( number_read == 0 )
 			{
 				((*interpreter)->display_message_function)
-					(ERROR_MESSAGE,
+                    (ERROR_MESSAGE,
 					 "No API information received from \"%s\"",
 					 perl_executable);
 			}
@@ -968,7 +968,7 @@ the function pointers and then calls create_interpreter_ for that instance.
 					if( i >= perl_result_buffer_size )
 					{
 						((*interpreter)->display_message_function)
-							(ERROR_MESSAGE,
+                            (ERROR_MESSAGE,
 							 "Unexpected result for API information from \"%s\"",
 							 perl_executable);
 						perl_api_string = (char *)NULL;
@@ -1171,10 +1171,10 @@ the function pointers and then calls create_interpreter_ for that instance.
 				{
 #if ! defined (WIN32)
 					((*interpreter)->display_message_function)
-						( ERROR_MESSAGE, "%s", dlerror() );
+                        ( ERROR_MESSAGE, "%s", dlerror() );
 #else
 					((*interpreter)->display_message_function)
-						( ERROR_MESSAGE, "0x%x", GetLastError() );
+                        ( ERROR_MESSAGE, "0x%x", GetLastError() );
 #endif
 				}
 				else if( !( library =
@@ -1191,10 +1191,10 @@ the function pointers and then calls create_interpreter_ for that instance.
 				{
 #if ! defined (WIN32)
 					((*interpreter)->display_message_function)
-						( ERROR_MESSAGE, "%s", dlerror() );
+                        ( ERROR_MESSAGE, "%s", dlerror() );
 #else
 					((*interpreter)->display_message_function)
-						( ERROR_MESSAGE, "0x%x", GetLastError() );
+                        ( ERROR_MESSAGE, "0x%x", GetLastError() );
 #endif
 				}
 				else
@@ -1281,12 +1281,12 @@ the function pointers and then calls create_interpreter_ for that instance.
 		else
 		{
 #if ! defined (NO_STATIC_FALLBACK)
-			((*interpreter)->display_message_function)(ERROR_MESSAGE, "Falling back to using the internal perl interpreter.");
+            ((*interpreter)->display_message_function)(ERROR_MESSAGE, "Falling back to using the internal perl interpreter.");
 			__create_interpreter_(argc, argv, initial_comfile,
 				&((*interpreter)->real_interpreter), status);
 			return_code = *status;
 #else /* ! defined (NO_STATIC_FALLBACK) */
-			((*interpreter)->display_message_function)(ERROR_MESSAGE,
+            ((*interpreter)->display_message_function)(ERROR_MESSAGE,
 				"No fallback static perl interpreter was included in this executable."
 				"This executable will be unable to operate until your perl version matches one of the dynamically included versions.");
 			return_code = 0;
@@ -1309,7 +1309,7 @@ the function pointers and then calls create_interpreter_ for that instance.
 	}
 	else
 	{
-		((*interpreter)->display_message_function)(ERROR_MESSAGE,
+        ((*interpreter)->display_message_function)(ERROR_MESSAGE,
 			"Unable to allocate memory for internal dynamic perl interpreter structure.");
 		return_code = 0;
 	}

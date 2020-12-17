@@ -109,7 +109,7 @@ ENDIF( WIN32 )
 # Define the system architecture
 STRING( TOLOWER ${CMAKE_SYSTEM_NAME} OPERATING_SYSTEM )
 set(BIN_ARCH_DIR ${CMAKE_SYSTEM_PROCESSOR}-${OPERATING_SYSTEM})
-message(STATUS "BIN_ARCH_DIR: ${BIN_ARCH_DIR}")
+#message(STATUS "BIN_ARCH_DIR: ${BIN_ARCH_DIR}")
 #SET( LIB_ARCH_DIR ${CMAKE_SYSTEM_PROCESSOR}${ABI}-${OPERATING_SYSTEM} )
 
 SET( PERL_INTERPRETER_INSTALL_PREFIX_TEMP ${PERL_INTERPRETER_INSTALL_PREFIX} )
@@ -155,21 +155,30 @@ ENDIF( "${CMAKE_BUILD_TYPE}" STREQUAL "Debug" )
 SET( ABI_ENV_DEFINE ABI_ENV=\"${CMAKE_SYSTEM_PROCESSOR}\" )#${CMAKE_SYSTEM_PROCESSOR} )
 
 # Find the system perl
-unset(PERL_EXECUTABLE CACHE)
+#unset(PERL_EXECUTABLE CACHE)
 find_package(Perl REQUIRED)
 if (APPLE)
-  if (PERL_EXECUTABLE STREQUAL "/usr/bin/perl")
+  if (NOT PERL_EXECUTABLE OR PERL_EXECUTABLE STREQUAL "/usr/bin/perl")
     # This won't do we cannot use the macOS system perl.
     # The macOS system perl does not provide EXETERN.h header file (among others).
+    message(STATUS "Rejecting current perl '${PERL_EXECUTABLE}'.")
     unset(PERL_EXECUTABLE CACHE)
     # Let's try and find a perlbrew perl.
     file(GLOB children LIST_DIRECTORIES TRUE $ENV{HOME}/perl*/perlbrew/perls/*)
-    list(GET children 0 first_perl_directory)
-    set(_CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH})
-    set(CMAKE_PREFIX_PATH ${first_perl_directory})
-    find_package(Perl REQUIRED)
-    set(CMAKE_PREFIX_PATH ${_CMAKE_PREFIX_PATH})
+    if (children)
+      list(GET children 0 first_perl_directory)
+      set(_CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH})
+      set(CMAKE_PREFIX_PATH ${first_perl_directory})
+      find_package(Perl REQUIRED)
+      set(CMAKE_PREFIX_PATH ${_CMAKE_PREFIX_PATH})
+    endif()
     # If that failed start searching for brew installed perl?
+    if (NOT PERL_EXECUTABLE)
+      set(_CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH})
+      set(CMAKE_PREFIX_PATH /usr/local/bin/)
+      find_package(Perl REQUIRED)
+      set(CMAKE_PREFIX_PATH ${_CMAKE_PREFIX_PATH})
+    endif()
   endif()
 endif()
 
